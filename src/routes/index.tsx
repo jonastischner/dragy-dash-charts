@@ -67,6 +67,7 @@ function Index() {
         {tab === "calibration" && <CalibrationTab />}
         {tab === "compare" && <CompareTab />}
         {tab === "backup" && <BackupTab />}
+        {tab === "account" && <AccountTab />}
       </main>
     </div>
   );
