@@ -13,7 +13,7 @@ export const Route = createFileRoute("/")({
       { title: "Dragy Leistungs- & Drehmomentanalyse" },
       { name: "description", content: "Client-seitige Analyse von Dragy-GPS-Rohdaten – Leistungs- und Drehmomentkurven mehrerer Fahrzeuge und Läufe vergleichen." },
       { property: "og:title", content: "Dragy Leistungs- & Drehmomentanalyse" },
-      { property: "og:description", content: "Client-seitige Analyse von Dragy-GPS-Rohdaten – Leistungs- und Drehmomentkurven vergleichen." },
+      { property: "og:description", content: "Client-seitige Analyse von Dragy-GPS-Rohdaten – Leistungs- und Drehmomentkurven mehrerer Fahrzeuge und Läufe vergleichen." },
       { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
     ],
   }),

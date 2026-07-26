@@ -77,14 +77,18 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Lovable App" },
-      { name: "description", content: "Lovable Generated Project" },
+      { title: "Dragy Leistungs- & Drehmomentanalyse" },
+      { name: "description", content: "Client-seitige Analyse von Dragy-GPS-Rohdaten – Leistungs- und Drehmomentkurven mehrerer Fahrzeuge und Läufe vergleichen." },
       { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Lovable App" },
-      { property: "og:description", content: "Lovable Generated Project" },
+      { property: "og:title", content: "Dragy Leistungs- & Drehmomentanalyse" },
+      { property: "og:description", content: "Client-seitige Analyse von Dragy-GPS-Rohdaten – Leistungs- und Drehmomentkurven mehrerer Fahrzeuge und Läufe vergleichen." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:site", content: "@Lovable" },
+      { name: "twitter:title", content: "Dragy Leistungs- & Drehmomentanalyse" },
+      { name: "twitter:description", content: "Client-seitige Analyse von Dragy-GPS-Rohdaten – Leistungs- und Drehmomentkurven mehrerer Fahrzeuge und Läufe vergleichen." },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/d087d959-8c43-49a8-aa84-47758d81f296/id-preview-bf77b3e5--6f7bbdde-47be-45f3-8451-481d43707dcb.lovable.app-1785062748516.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/d087d959-8c43-49a8-aa84-47758d81f296/id-preview-bf77b3e5--6f7bbdde-47be-45f3-8451-481d43707dcb.lovable.app-1785062748516.png" },
     ],
     links: [
       {
