@@ -6,6 +6,7 @@ import { SessionsTab } from "@/components/dragy/SessionsTab";
 import { CalibrationTab } from "@/components/dragy/CalibrationTab";
 import { CompareTab } from "@/components/dragy/CompareTab";
 import { BackupTab } from "@/components/dragy/BackupTab";
+import { AccountTab } from "@/components/dragy/AccountTab";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -20,7 +21,7 @@ export const Route = createFileRoute("/")({
   component: Index,
 });
 
-type Tab = "vehicles" | "import" | "sessions" | "calibration" | "compare" | "backup";
+type Tab = "vehicles" | "import" | "sessions" | "calibration" | "compare" | "backup" | "account";
 const TABS: Array<{ id: Tab; label: string }> = [
   { id: "vehicles", label: "Fahrzeuge" },
   { id: "import", label: "Import" },
@@ -28,6 +29,7 @@ const TABS: Array<{ id: Tab; label: string }> = [
   { id: "calibration", label: "Kalibrierung" },
   { id: "compare", label: "Vergleich" },
   { id: "backup", label: "Backup" },
+  { id: "account", label: "Konto" },
 ];
 
 function Index() {
