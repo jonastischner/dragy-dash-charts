@@ -1,24 +1,71 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useState } from "react";
+import { VehiclesTab } from "@/components/dragy/VehiclesTab";
+import { ImportTab } from "@/components/dragy/ImportTab";
+import { SessionsTab } from "@/components/dragy/SessionsTab";
+import { CalibrationTab } from "@/components/dragy/CalibrationTab";
+import { CompareTab } from "@/components/dragy/CompareTab";
+import { BackupTab } from "@/components/dragy/BackupTab";
 
-// No head() here: the home route inherits title/description/og/twitter from
-// __root.tsx, and ships no og:image so serve-time hosting can inject the
-// project's social preview (explicit og:image or latest screenshot).
 export const Route = createFileRoute("/")({
+  head: () => ({
+    meta: [
+      { title: "Dragy Leistungs- & Drehmomentanalyse" },
+      { name: "description", content: "Client-seitige Analyse von Dragy-GPS-Rohdaten – Leistungs- und Drehmomentkurven mehrerer Fahrzeuge und Läufe vergleichen." },
+      { property: "og:title", content: "Dragy Leistungs- & Drehmomentanalyse" },
+      { property: "og:description", content: "Client-seitige Analyse von Dragy-GPS-Rohdaten – Leistungs- und Drehmomentkurven vergleichen." },
+      { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
+    ],
+  }),
   component: Index,
 });
 
-// IMPORTANT: Replace this placeholder. See ./README.md for routing conventions.
+type Tab = "vehicles" | "import" | "sessions" | "calibration" | "compare" | "backup";
+const TABS: Array<{ id: Tab; label: string }> = [
+  { id: "vehicles", label: "Fahrzeuge" },
+  { id: "import", label: "Import" },
+  { id: "sessions", label: "Sessions" },
+  { id: "calibration", label: "Kalibrierung" },
+  { id: "compare", label: "Vergleich" },
+  { id: "backup", label: "Backup" },
+];
+
 function Index() {
+  const [tab, setTab] = useState<Tab>("vehicles");
+
   return (
     <div
-      className="flex min-h-screen items-center justify-center"
-      style={{ backgroundColor: "#fcfbf8" }}
+      className="min-h-screen text-slate-100"
+      style={{
+        backgroundColor: "#020617",
+        paddingTop: "env(safe-area-inset-top)",
+        paddingBottom: "env(safe-area-inset-bottom)",
+      }}
     >
-      <img
-        data-lovable-blank-page-placeholder="REMOVE_THIS"
-        src="https://cdn.gpteng.co/blank-app-v1.svg"
-        alt="Your app will live here!"
-      />
+      <header className="sticky top-0 z-30 border-b border-slate-800 bg-slate-950/95 backdrop-blur">
+        <div className="mx-auto max-w-2xl px-3 py-2">
+          <h1 className="text-base font-semibold">Dragy Leistungsanalyse</h1>
+          <nav className="mt-2 -mx-1 flex gap-1 overflow-x-auto pb-1">
+            {TABS.map((t) => (
+              <button
+                key={t.id}
+                onClick={() => setTab(t.id)}
+                className={`whitespace-nowrap rounded-md px-3 py-2 text-xs font-medium ${tab === t.id ? "bg-sky-500 text-white" : "bg-slate-800 text-slate-200"}`}
+              >
+                {t.label}
+              </button>
+            ))}
+          </nav>
+        </div>
+      </header>
+      <main className="mx-auto max-w-2xl px-3 py-3">
+        {tab === "vehicles" && <VehiclesTab />}
+        {tab === "import" && <ImportTab />}
+        {tab === "sessions" && <SessionsTab />}
+        {tab === "calibration" && <CalibrationTab />}
+        {tab === "compare" && <CompareTab />}
+        {tab === "backup" && <BackupTab />}
+      </main>
     </div>
   );
 }
