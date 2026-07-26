@@ -12,6 +12,7 @@ export interface Vehicle {
   rpmFactorDefault: number; // rpm per km/h
   rpmMatch: { maxRpm: number; maxKmh: number };
   dragCurve: DragPoint[]; // schleppleistung rpm->ps
+  updatedAt?: number;
 }
 
 export interface Record { t: number; speedKmh: number; heightM: number }
@@ -29,6 +30,7 @@ export interface Session {
   manual: boolean;
   manualRows?: ManualRow[];
   createdAt: number;
+  updatedAt?: number;
 }
 
 export interface Segment {
@@ -41,7 +43,9 @@ export interface Segment {
   color: string;
   visible: boolean;
   calibration?: { crr: number; cdA: number };
+  updatedAt?: number;
 }
+
 
 export interface AppState {
   vehicles: Vehicle[];

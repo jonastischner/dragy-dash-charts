@@ -1,8 +1,11 @@
 import type { Vehicle, Session, Segment } from "./types";
 
 const DB_NAME = "dragy-analyse";
-const DB_VERSION = 1;
-const STORES = ["vehicles", "sessions", "segments", "meta"] as const;
+const DB_VERSION = 2;
+const STORES = ["vehicles", "sessions", "segments", "meta", "tombstones"] as const;
+
+export type TombstoneKind = "vehicle" | "session" | "segment";
+export interface Tombstone { id: string; kind: TombstoneKind; deletedAt: number }
 
 function openDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -47,12 +50,18 @@ export const db = {
   putSegment: (v: Segment) => put("segments", v),
   delSegment: (id: string) => del("segments", id),
   setActive: (id: string | null) => put("meta", { key: "activeVehicleId", value: id }),
+  getMeta: async (key: string) => (await tx<any>("meta", "readonly", (s) => s.get(key)))?.value ?? null,
+  setMeta: (key: string, value: any) => put("meta", { key, value }),
   clearAll: async () => { for (const s of STORES) await clearStore(s); },
   upsertBatch: async (data: { vehicles?: Vehicle[]; sessions?: Session[]; segments?: Segment[] }) => {
     if (data.vehicles) for (const v of data.vehicles) await put("vehicles", v);
     if (data.sessions) for (const v of data.sessions) await put("sessions", v);
     if (data.segments) for (const v of data.segments) await put("segments", v);
   },
+  // Tombstones
+  addTombstone: (t: Tombstone) => put("tombstones", t),
+  allTombstones: () => all<Tombstone>("tombstones"),
+  delTombstone: (id: string) => del("tombstones", id),
 };
 
 export const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
