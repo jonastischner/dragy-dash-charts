@@ -12,6 +12,7 @@ export interface Vehicle {
   rpmFactorDefault: number; // rpm per km/h
   rpmMatch: { maxRpm: number; maxKmh: number };
   dragCurve: DragPoint[]; // schleppleistung rpm->ps
+  updatedAt?: number;
 }
 
 export interface Record { t: number; speedKmh: number; heightM: number }
