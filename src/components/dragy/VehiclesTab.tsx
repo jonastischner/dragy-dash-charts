@@ -22,11 +22,16 @@ export function VehiclesTab() {
             return (
               <li key={v.id} className="rounded-md border border-slate-700 bg-slate-800 p-2">
                 <div className="flex items-center justify-between gap-2">
-                  <div>
-                    <div className="text-sm font-medium text-slate-100">
-                      {v.name} {isActive && <span className="ml-1 rounded bg-sky-600 px-1 text-[10px]">aktiv</span>}
+                  <div className="flex items-center gap-2 min-w-0">
+                    {v.imageDataUrl && (
+                      <img src={v.imageDataUrl} alt={v.name} className="h-12 w-12 flex-none rounded object-cover border border-slate-700" />
+                    )}
+                    <div className="min-w-0">
+                      <div className="text-sm font-medium text-slate-100 truncate">
+                        {v.name} {isActive && <span className="ml-1 rounded bg-sky-600 px-1 text-[10px]">aktiv</span>}
+                      </div>
+                      <div className="text-[11px] text-slate-400">{v.mass} kg · Cd {v.cd} · A {v.area} m² · {sessions} Sessions</div>
                     </div>
-                    <div className="text-[11px] text-slate-400">{v.mass} kg · Cd {v.cd} · A {v.area} m² · {sessions} Sessions</div>
                   </div>
                   <div className="flex gap-1">
                     {!isActive && <Button variant="secondary" onClick={() => setActive(v.id)}>Aktivieren</Button>}
