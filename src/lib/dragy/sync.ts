@@ -31,7 +31,7 @@ export async function pushLocal(kind: Kind, item: Vehicle | Session | Segment) {
   await supabase.from(table).upsert({
     user_id: userId,
     id: item.id,
-    data: item,
+    data: item as any,
     updated_at,
     deleted: false,
   });
