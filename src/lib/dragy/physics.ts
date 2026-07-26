@@ -171,6 +171,9 @@ export function autoDetectCoastdown(session: Session): { startT: number; endT: n
   }
   if (!best) return null;
   return { startT: ts[best.s], endT: ts[best.e] };
+}
+
+
 
 // Auto-detect segments: search backward from target speed to lowest point of the preceding rise.
 export function autoDetectSegments(
