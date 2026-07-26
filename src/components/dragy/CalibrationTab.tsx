@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Section, Field, NumInput, Button, Note, Row } from "./ui";
 import { useAppStore } from "@/lib/dragy/store";
-import { coastdownFit } from "@/lib/dragy/physics";
+import { coastdownFit, autoDetectCoastdown } from "@/lib/dragy/physics";
 import { Chart } from "./Chart";
 import type { Session, Segment } from "@/lib/dragy/types";
 
