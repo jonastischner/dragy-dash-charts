@@ -79,11 +79,43 @@ function VehicleEditor({ vehicle, onSave, onCancel }: { vehicle: Vehicle; onSave
   const addDrag = () => setV({ ...v, dragCurve: [...v.dragCurve, { rpm: 8000, ps: 60 }] });
   const delDrag = (i: number) => setV({ ...v, dragCurve: v.dragCurve.filter((_, k) => k !== i) });
 
+  const onPickImage = async (file: File | null) => {
+    if (!file) return;
+    try {
+      const dataUrl = await downscaleImage(file, 800, 0.82);
+      setV({ ...v, imageDataUrl: dataUrl });
+    } catch (e) {
+      console.warn("[image] konnte nicht geladen werden", e);
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/70 p-2 sm:items-center" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
       <div className="max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-t-xl bg-slate-900 p-3 sm:rounded-xl">
         <h3 className="mb-2 text-base font-semibold text-slate-100">Fahrzeug bearbeiten</h3>
         <Field label="Name"><TextInput value={v.name} onChange={(e) => setV({ ...v, name: e.target.value })} /></Field>
+
+        <div className="mt-2 rounded-md border border-slate-700 p-2">
+          <div className="mb-1 text-xs font-semibold text-slate-200">Fahrzeugbild</div>
+          <div className="flex items-center gap-3">
+            {v.imageDataUrl ? (
+              <img src={v.imageDataUrl} alt={v.name} className="h-20 w-20 flex-none rounded object-cover border border-slate-700" />
+            ) : (
+              <div className="h-20 w-20 flex-none rounded border border-dashed border-slate-600 bg-slate-800 text-center text-[10px] text-slate-500 flex items-center justify-center">kein Bild</div>
+            )}
+            <div className="flex flex-col gap-1">
+              <label className="cursor-pointer rounded-md bg-slate-700 px-3 py-1.5 text-xs text-slate-100 hover:bg-slate-600 w-fit">
+                Bild wählen
+                <input type="file" accept="image/*" className="hidden" onChange={(e) => onPickImage(e.target.files?.[0] ?? null)} />
+              </label>
+              {v.imageDataUrl && (
+                <Button variant="ghost" onClick={() => setV({ ...v, imageDataUrl: undefined })}>Bild entfernen</Button>
+              )}
+              <span className="text-[10px] text-slate-400">Wird auf max. 800 px verkleinert und lokal + in der Cloud gespeichert.</span>
+            </div>
+          </div>
+        </div>
+
         <Row className="mt-2">
           <Field label="Masse (kg, inkl. Fahrer)"><NumInput value={v.mass} onChange={(e) => setV({ ...v, mass: +e.target.value })} /></Field>
           <Field label="Rollwiderstand Crr"><NumInput step="0.001" value={v.crr} onChange={(e) => setV({ ...v, crr: +e.target.value })} /></Field>
