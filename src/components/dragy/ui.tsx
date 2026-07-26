@@ -1,4 +1,4 @@
-import type { ReactNode, InputHTMLAttributes, ButtonHTMLAttributes } from "react";
+import { useState, type ReactNode, type InputHTMLAttributes, type ButtonHTMLAttributes } from "react";
 
 export function Section({ title, children, note }: { title: string; children: ReactNode; note?: string }) {
   return (
