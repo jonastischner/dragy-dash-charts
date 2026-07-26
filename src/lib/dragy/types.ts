@@ -30,6 +30,20 @@ export interface Session {
   manual: boolean;
   manualRows?: ManualRow[];
   createdAt: number;
+  updatedAt?: number;
+}
+
+export interface Segment {
+  id: string;
+  sessionId: string;
+  name: string;
+  startT: number;
+  endT: number;
+  rpmFactor: number;
+  color: string;
+  visible: boolean;
+  calibration?: { crr: number; cdA: number };
+  updatedAt?: number;
 }
 
 export interface Segment {
