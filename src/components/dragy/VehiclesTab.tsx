@@ -3,6 +3,14 @@ import { Section, Field, TextInput, NumInput, Button, Note, Row } from "./ui";
 import { useAppStore, newVehicle } from "@/lib/dragy/store";
 import type { Vehicle, DragPoint } from "@/lib/dragy/types";
 
+function useLockBodyScroll() {
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prev; };
+  }, []);
+}
+
 export function VehiclesTab() {
   const store = useAppStore();
   const { state, saveVehicle, deleteVehicle, setActive } = store;
