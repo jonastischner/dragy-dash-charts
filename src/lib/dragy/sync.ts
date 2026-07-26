@@ -142,7 +142,7 @@ export async function syncAll(): Promise<SyncResult> {
         await supabase.from(table).upsert({
           user_id: userId,
           id: l.id,
-          data: l,
+          data: l as any,
           updated_at: localTs || Date.now(),
           deleted: false,
         });
