@@ -46,17 +46,6 @@ export interface Segment {
   updatedAt?: number;
 }
 
-export interface Segment {
-  id: string;
-  sessionId: string;
-  name: string;
-  startT: number;
-  endT: number;
-  rpmFactor: number;
-  color: string;
-  visible: boolean;
-  calibration?: { crr: number; cdA: number };
-}
 
 export interface AppState {
   vehicles: Vehicle[];
