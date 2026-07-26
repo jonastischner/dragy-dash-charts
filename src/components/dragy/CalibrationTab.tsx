@@ -62,6 +62,14 @@ export function CalibrationTab() {
               <Field label="Ende t (s)"><NumInput step="0.1" value={endT} onChange={(e) => setEndT(Math.min(maxT, +e.target.value))} /></Field>
             </Row>
             <div className="mt-2">
+              <Button variant="secondary" onClick={() => {
+                const d = autoDetectCoastdown(session);
+                if (!d) { alert("Keine geeignete Ausrollphase gefunden."); return; }
+                setStartT(+d.startT.toFixed(2));
+                setEndT(+d.endT.toFixed(2));
+              }}>Auto-Erkennung</Button>
+            </div>
+            <div className="mt-2">
               <Chart series={speedSeries} bands={bands} xLabel="t (s)" yLabel="km/h" xFormat={(v) => v.toFixed(1)} yFormat={(v) => v.toFixed(0)} />
             </div>
 
