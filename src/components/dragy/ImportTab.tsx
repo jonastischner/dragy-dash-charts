@@ -1,0 +1,134 @@
+import { useRef, useState } from "react";
+import { Section, Field, TextInput, NumInput, Button, Note, Row } from "./ui";
+import { useAppStore } from "@/lib/dragy/store";
+import { parseUbx } from "@/lib/dragy/ubx";
+import { uid } from "@/lib/dragy/db";
+import type { Session, ManualRow, Record as R } from "@/lib/dragy/types";
+
+export function ImportTab() {
+  const { state, saveSession } = useAppStore();
+  const activeVehicle = state.vehicles.find((v) => v.id === state.activeVehicleId);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [tempC, setTempC] = useState(20);
+  const [pressureHpa, setPressureHpa] = useState(1013);
+  const [rh, setRh] = useState(50);
+  const [log, setLog] = useState<string[]>([]);
+  const [manualOpen, setManualOpen] = useState(false);
+
+  if (!activeVehicle) return <Section title="Import"><Note>Bitte zuerst ein Fahrzeug anlegen und aktivieren (Reiter Fahrzeuge).</Note></Section>;
+
+  const importFiles = async (files: FileList | null) => {
+    if (!files) return;
+    const msgs: string[] = [];
+    for (const f of Array.from(files)) {
+      try {
+        const buf = await f.arrayBuffer();
+        const records = parseUbx(buf);
+        if (records.length < 3) { msgs.push(`${f.name}: keine gültigen NAV-PVT Datensätze gefunden`); continue; }
+        const s: Session = {
+          id: uid(), vehicleId: activeVehicle.id, name: f.name.replace(/\.(data|ubx)$/i, ""),
+          records, tempC, pressureHpa, rh, manual: false, createdAt: Date.now(),
+        };
+        await saveSession(s);
+        msgs.push(`${f.name}: ${records.length} Punkte importiert (${records[records.length - 1].t.toFixed(1)} s)`);
+      } catch (e: any) {
+        msgs.push(`${f.name}: Fehler – ${e.message ?? e}`);
+      }
+    }
+    setLog(msgs);
+  };
+
+  return (
+    <div>
+      <Section title="Umgebungsdaten (für Luftdichte)">
+        <Row>
+          <Field label="Temperatur (°C)"><NumInput value={tempC} onChange={(e) => setTempC(+e.target.value)} /></Field>
+          <Field label="Luftdruck (hPa)"><NumInput value={pressureHpa} onChange={(e) => setPressureHpa(+e.target.value)} /></Field>
+          <Field label="Rel. Luftfeuchte (%)"><NumInput value={rh} onChange={(e) => setRh(+e.target.value)} /></Field>
+        </Row>
+      </Section>
+
+      <Section title="Dragy-Rohdaten importieren (.data / .ubx)">
+        <p className="text-xs text-slate-300">Aktives Fahrzeug: <b>{activeVehicle.name}</b>. Mehrfachauswahl möglich – eine Datei = eine Session.</p>
+        <input ref={inputRef} type="file" accept=".data,.ubx,application/octet-stream" multiple className="hidden"
+          onChange={(e) => importFiles(e.target.files)} />
+        <div className="mt-2 flex gap-2">
+          <Button onClick={() => inputRef.current?.click()}>Dateien wählen…</Button>
+          <Button variant="secondary" onClick={() => setManualOpen(true)}>Manuell eingeben…</Button>
+        </div>
+        {log.length > 0 && (
+          <ul className="mt-2 space-y-1 text-xs text-slate-300">
+            {log.map((l, i) => <li key={i}>• {l}</li>)}
+          </ul>
+        )}
+      </Section>
+
+      {manualOpen && (
+        <ManualEditor
+          tempC={tempC} pressureHpa={pressureHpa} rh={rh}
+          onCancel={() => setManualOpen(false)}
+          onSave={async (session) => { await saveSession(session); setManualOpen(false); }}
+          vehicleId={activeVehicle.id}
+        />
+      )}
+    </div>
+  );
+}
+
+function defaultRows(): ManualRow[] {
+  const out: ManualRow[] = [];
+  for (let v = 0; v <= 200; v += 10) out.push({ speedKmh: v, t: null });
+  return out;
+}
+
+function ManualEditor({ vehicleId, tempC, pressureHpa, rh, onSave, onCancel }: {
+  vehicleId: string; tempC: number; pressureHpa: number; rh: number;
+  onSave: (s: Session) => void; onCancel: () => void;
+}) {
+  const [name, setName] = useState("Manuelle Session");
+  const [rows, setRows] = useState<ManualRow[]>(defaultRows());
+
+  const update = (i: number, patch: Partial<ManualRow>) => {
+    const arr = rows.slice(); arr[i] = { ...arr[i], ...patch }; setRows(arr);
+  };
+  const addRow = () => setRows([...rows, { speedKmh: 0, t: null }]);
+  const delRow = (i: number) => setRows(rows.filter((_, k) => k !== i));
+
+  const save = () => {
+    const valid = rows.filter((r) => r.t !== null && Number.isFinite(r.t) && r.t >= 0 && Number.isFinite(r.speedKmh))
+      .sort((a, b) => (a.t as number) - (b.t as number));
+    if (valid.length < 3) return alert("Mindestens 3 gültige Zeilen benötigt.");
+    const records: R[] = valid.map((r) => ({ t: r.t as number, speedKmh: r.speedKmh, heightM: 0 }));
+    onSave({
+      id: uid(), vehicleId, name, records, tempC, pressureHpa, rh,
+      manual: true, manualRows: rows, createdAt: Date.now(),
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/70 p-2 sm:items-center" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
+      <div className="max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-t-xl bg-slate-900 p-3 sm:rounded-xl">
+        <h3 className="mb-2 text-base font-semibold text-slate-100">Manuelle Session</h3>
+        <Field label="Name"><TextInput value={name} onChange={(e) => setName(e.target.value)} /></Field>
+        <Note>Bei manuellen Sessions ist die Geschwindigkeits-Glättung deaktiviert (zu wenige Stützpunkte).</Note>
+        <div className="mt-2 grid grid-cols-[1fr_1fr_auto] gap-1 text-[11px] text-slate-400">
+          <div>Geschw. (km/h)</div><div>Zeit (s)</div><div></div>
+        </div>
+        <div className="mt-1 space-y-1">
+          {rows.map((r, i) => (
+            <div key={i} className="grid grid-cols-[1fr_1fr_auto] gap-1">
+              <NumInput value={r.speedKmh} onChange={(e) => update(i, { speedKmh: +e.target.value })} />
+              <NumInput value={r.t ?? ""} onChange={(e) => update(i, { t: e.target.value === "" ? null : +e.target.value })} />
+              <Button variant="danger" onClick={() => delRow(i)}>×</Button>
+            </div>
+          ))}
+        </div>
+        <Button className="mt-2" variant="secondary" onClick={addRow}>+ Zeile</Button>
+        <div className="mt-3 flex justify-end gap-2">
+          <Button variant="ghost" onClick={onCancel}>Abbrechen</Button>
+          <Button onClick={save}>Session speichern</Button>
+        </div>
+      </div>
+    </div>
+  );
+}
