@@ -146,6 +146,35 @@ export function coastdownFit(
   return { crr, cdA, r2, n };
 }
 
+// Auto-detect the best coastdown window in a session: longest contiguous
+// deceleration with a steady negative acceleration and meaningful speed drop.
+export function autoDetectCoastdown(session: Session): { startT: number; endT: number } | null {
+  const recs = session.records;
+  if (recs.length < 10) return null;
+  const vs = smoothCentered(recs.map((r) => r.speedKmh / 3.6), 5);
+  const ts = recs.map((r) => r.t);
+  const a = centralDerivative(vs, ts);
+  let best: { s: number; e: number; score: number } | null = null;
+  let i = 0;
+  while (i < recs.length) {
+    if (a[i] < -0.15 && vs[i] > 5) {
+      let j = i;
+      while (j < recs.length - 1 && a[j + 1] < -0.05) j++;
+      const dv = vs[i] - vs[j];
+      const dt = ts[j] - ts[i];
+      if (dv >= 20 / 3.6 && dt >= 3) {
+        const score = dv * dt;
+        if (!best || score > best.score) best = { s: i, e: j, score };
+      }
+      i = j + 1;
+    } else i++;
+  }
+  if (!best) return null;
+  return { startT: ts[best.s], endT: ts[best.e] };
+}
+
+
+
 // Auto-detect segments: search backward from target speed to lowest point of the preceding rise.
 export function autoDetectSegments(
   records: Record[], startKmh: number, targetKmh: number, minRiseKmh = 30,

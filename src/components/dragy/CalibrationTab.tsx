@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Section, Field, NumInput, Button, Note, Row } from "./ui";
 import { useAppStore } from "@/lib/dragy/store";
-import { coastdownFit } from "@/lib/dragy/physics";
+import { coastdownFit, autoDetectCoastdown } from "@/lib/dragy/physics";
 import { Chart } from "./Chart";
 import type { Session, Segment } from "@/lib/dragy/types";
 
@@ -61,6 +61,14 @@ export function CalibrationTab() {
               <Field label="Start t (s)"><NumInput step="0.1" value={startT} onChange={(e) => setStartT(Math.max(0, +e.target.value))} /></Field>
               <Field label="Ende t (s)"><NumInput step="0.1" value={endT} onChange={(e) => setEndT(Math.min(maxT, +e.target.value))} /></Field>
             </Row>
+            <div className="mt-2">
+              <Button variant="secondary" onClick={() => {
+                const d = autoDetectCoastdown(session);
+                if (!d) { alert("Keine geeignete Ausrollphase gefunden."); return; }
+                setStartT(+d.startT.toFixed(2));
+                setEndT(+d.endT.toFixed(2));
+              }}>Auto-Erkennung</Button>
+            </div>
             <div className="mt-2">
               <Chart series={speedSeries} bands={bands} xLabel="t (s)" yLabel="km/h" xFormat={(v) => v.toFixed(1)} yFormat={(v) => v.toFixed(0)} />
             </div>

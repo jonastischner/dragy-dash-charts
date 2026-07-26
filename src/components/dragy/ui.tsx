@@ -1,4 +1,4 @@
-import type { ReactNode, InputHTMLAttributes, ButtonHTMLAttributes } from "react";
+import { useState, type ReactNode, type InputHTMLAttributes, type ButtonHTMLAttributes } from "react";
 
 export function Section({ title, children, note }: { title: string; children: ReactNode; note?: string }) {
   return (
@@ -27,8 +27,33 @@ export function TextInput(props: InputHTMLAttributes<HTMLInputElement>) {
   );
 }
 
-export function NumInput(props: InputHTMLAttributes<HTMLInputElement>) {
-  return <TextInput type="number" inputMode="decimal" {...props} />;
+export function NumInput({ value, onChange, onBlur, onFocus, ...rest }: InputHTMLAttributes<HTMLInputElement>) {
+  const [draft, setDraft] = useState<string | null>(null);
+  const propStr = value === undefined || value === null || value === "" ? "" : String(value);
+  const display = draft !== null ? draft : propStr;
+  return (
+    <TextInput
+      type="text"
+      inputMode="decimal"
+      {...rest}
+      value={display}
+      onFocus={(e) => { setDraft(propStr); onFocus?.(e); }}
+      onChange={(e) => {
+        const typed = e.target.value;
+        setDraft(typed);
+        const raw = typed.replace(",", ".").trim();
+        if (raw === "" || raw === "-" || raw === "." || raw === "-." || raw.endsWith(".")) return;
+        const n = Number(raw);
+        if (!Number.isFinite(n)) return;
+        const target = { ...e.target, value: String(n) } as HTMLInputElement;
+        onChange?.({ ...e, target, currentTarget: target } as React.ChangeEvent<HTMLInputElement>);
+      }}
+      onBlur={(e) => {
+        setDraft(null);
+        onBlur?.(e);
+      }}
+    />
+  );
 }
 
 export function Button({ children, variant = "primary", ...rest }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "primary" | "secondary" | "danger" | "ghost" }) {
