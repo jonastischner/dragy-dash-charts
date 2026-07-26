@@ -14,7 +14,96 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      cloud_meta: {
+        Row: {
+          active_vehicle_id: string | null
+          updated_at: number
+          user_id: string
+        }
+        Insert: {
+          active_vehicle_id?: string | null
+          updated_at: number
+          user_id: string
+        }
+        Update: {
+          active_vehicle_id?: string | null
+          updated_at?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
+      cloud_segments: {
+        Row: {
+          data: Json
+          deleted: boolean
+          id: string
+          updated_at: number
+          user_id: string
+        }
+        Insert: {
+          data: Json
+          deleted?: boolean
+          id: string
+          updated_at: number
+          user_id: string
+        }
+        Update: {
+          data?: Json
+          deleted?: boolean
+          id?: string
+          updated_at?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
+      cloud_sessions: {
+        Row: {
+          data: Json
+          deleted: boolean
+          id: string
+          updated_at: number
+          user_id: string
+        }
+        Insert: {
+          data: Json
+          deleted?: boolean
+          id: string
+          updated_at: number
+          user_id: string
+        }
+        Update: {
+          data?: Json
+          deleted?: boolean
+          id?: string
+          updated_at?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
+      cloud_vehicles: {
+        Row: {
+          data: Json
+          deleted: boolean
+          id: string
+          updated_at: number
+          user_id: string
+        }
+        Insert: {
+          data: Json
+          deleted?: boolean
+          id: string
+          updated_at: number
+          user_id: string
+        }
+        Update: {
+          data?: Json
+          deleted?: boolean
+          id?: string
+          updated_at?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
