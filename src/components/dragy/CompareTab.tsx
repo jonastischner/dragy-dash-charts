@@ -4,11 +4,16 @@ import { useAppStore } from "@/lib/dragy/store";
 import { computeSegment, W_TO_PS } from "@/lib/dragy/physics";
 import { Chart, type Series } from "./Chart";
 
-type Mode = "pWheel" | "pEngine" | "tqWheel" | "tqEngine";
+type Mode = "pWheel" | "pEngine" | "tqWheel" | "tqEngine" | "accel";
 const MODE_LABEL: Record<Mode, string> = {
-  pWheel: "Radleistung (PS)", pEngine: "Motorleistung geschätzt (PS)",
-  tqWheel: "Rad-Drehmoment (Nm)", tqEngine: "Motor-Drehmoment geschätzt (Nm)",
+  pWheel: "Radleistung (PS)",
+  pEngine: "Motorleistung geschätzt (PS)",
+  tqWheel: "Rad-Drehmoment (Nm)",
+  tqEngine: "Motor-Drehmoment geschätzt (Nm)",
+  accel: "Beschleunigung (km/h vs. s)",
 };
+
+const SPLIT_TARGETS = [60, 100, 150, 200];
 
 export function CompareTab() {
   const { state, saveSegment } = useAppStore();
@@ -23,17 +28,29 @@ export function CompareTab() {
 
   if (!activeVehicle) return <Section title="Leistungsvergleich"><Note>Kein aktives Fahrzeug.</Note></Section>;
 
+  const isAccel = mode === "accel";
+
   const series: Series[] = segments.map((g) => {
     const session = state.sessions.find((s) => s.id === g.sessionId)!;
+    if (isAccel) {
+      // Zeit-vs-Geschwindigkeit direkt aus Session-Rohdaten im Segmentbereich,
+      // gangübergreifend (keine RPM/Drag-Kurven-Annahmen nötig).
+      const points = session.records
+        .filter((r) => r.t >= g.startT && r.t <= g.endT)
+        .map((r) => ({ x: r.t - g.startT, y: r.speedKmh }));
+      return { label: `${session.name} · ${g.name}`, color: g.color, points, visible: g.visible };
+    }
     const samples = computeSegment(session, g, activeVehicle);
-    const points = samples.map((s) => {
-      let y: number = NaN;
-      if (mode === "pWheel") y = s.pWheelW * W_TO_PS;
-      else if (mode === "pEngine") y = s.pEngineW * W_TO_PS;
-      else if (mode === "tqWheel") y = s.torqueWheelNm;
-      else y = s.torqueEngineNm;
-      return { x: s.rpm, y };
-    }).filter((p) => Number.isFinite(p.y));
+    const points = samples
+      .map((s) => {
+        let y: number = NaN;
+        if (mode === "pWheel") y = s.pWheelW * W_TO_PS;
+        else if (mode === "pEngine") y = s.pEngineW * W_TO_PS;
+        else if (mode === "tqWheel") y = s.torqueWheelNm;
+        else y = s.torqueEngineNm;
+        return { x: s.rpm, y };
+      })
+      .filter((p) => Number.isFinite(p.y));
     return { label: `${session.name} · ${g.name}`, color: g.color, points, visible: g.visible };
   });
 
@@ -42,9 +59,41 @@ export function CompareTab() {
     await saveSegment({ ...g, visible: !g.visible });
   };
 
+  // Split-Zeiten (nur im Beschleunigungs-Modus): lineare Interpolation an Zielgeschwindigkeit.
+  const splitRows = isAccel
+    ? segments
+        .filter((g) => g.visible !== false)
+        .map((g) => {
+          const session = state.sessions.find((s) => s.id === g.sessionId)!;
+          const rec = session.records.filter((r) => r.t >= g.startT && r.t <= g.endT);
+          const t0 = rec[0]?.t ?? g.startT;
+          const splits: Record<number, number | null> = {};
+          for (const target of SPLIT_TARGETS) {
+            let found: number | null = null;
+            for (let i = 1; i < rec.length; i++) {
+              const a = rec[i - 1], b = rec[i];
+              if (a.speedKmh <= target && b.speedKmh >= target && b.speedKmh !== a.speedKmh) {
+                const frac = (target - a.speedKmh) / (b.speedKmh - a.speedKmh);
+                found = (a.t + frac * (b.t - a.t)) - t0;
+                break;
+              }
+            }
+            splits[target] = found;
+          }
+          return { label: `${session.name} · ${g.name}`, color: g.color, splits };
+        })
+    : [];
+
   return (
     <div>
-      <Section title="Vergleich" note="Motorleistung/-drehmoment sind Schätzungen (RPM aus Vmax abgeleitet, Schleppkurve als Näherung). Drehmoment ist gegenüber RPM-Faktor-Fehlern empfindlicher als die Leistung.">
+      <Section
+        title="Vergleich"
+        note={
+          isAccel
+            ? "Beschleunigung: rein GPS-basiert, gangübergreifend – zeigt reale Zeit ab Segmentstart bis zur jeweiligen Geschwindigkeit."
+            : "Motorleistung/-drehmoment sind Schätzungen (RPM aus Vmax abgeleitet, Schleppkurve als Näherung). Drehmoment ist gegenüber RPM-Faktor-Fehlern empfindlicher als die Leistung."
+        }
+      >
         <div className="mb-2 flex flex-wrap gap-1">
           {(Object.keys(MODE_LABEL) as Mode[]).map((m) => (
             <button key={m} onClick={() => setMode(m)}
@@ -56,9 +105,47 @@ export function CompareTab() {
         {segments.length === 0 ? (
           <p className="text-xs text-slate-400">Keine Läufe im aktiven Fahrzeug.</p>
         ) : (
-          <Chart series={series} xLabel="U/min" yLabel={MODE_LABEL[mode]}
-            xFormat={(v) => v.toFixed(0)} yFormat={(v) => v.toFixed(0)}
-            onLegendToggle={toggle} height={340} />
+          <>
+            <Chart
+              series={series}
+              xLabel={isAccel ? "t (s)" : "U/min"}
+              yLabel={isAccel ? "km/h" : MODE_LABEL[mode]}
+              xFormat={(v) => (isAccel ? v.toFixed(2) : v.toFixed(0))}
+              yFormat={(v) => v.toFixed(0)}
+              onLegendToggle={toggle}
+              height={340}
+            />
+            {isAccel && splitRows.length > 0 && (
+              <div className="mt-3 overflow-x-auto">
+                <table className="w-full text-xs text-slate-200">
+                  <thead className="text-slate-400">
+                    <tr>
+                      <th className="py-1 pr-2 text-left font-medium">Lauf</th>
+                      {SPLIT_TARGETS.map((t) => (
+                        <th key={t} className="py-1 pr-2 text-right font-medium">0–{t} km/h</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {splitRows.map((r, i) => (
+                      <tr key={i} className="border-t border-slate-800">
+                        <td className="py-1 pr-2">
+                          <span className="mr-1 inline-block h-2 w-3 rounded-sm align-middle" style={{ backgroundColor: r.color }} />
+                          {r.label}
+                        </td>
+                        {SPLIT_TARGETS.map((t) => (
+                          <td key={t} className="py-1 pr-2 text-right tabular-nums">
+                            {r.splits[t] != null ? `${r.splits[t]!.toFixed(2)} s` : "—"}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <p className="mt-1 text-[10px] text-slate-500">Split-Zeiten linear zwischen Samples interpoliert; „—" wenn die Zielgeschwindigkeit im Segment nicht erreicht wurde.</p>
+              </div>
+            )}
+          </>
         )}
       </Section>
     </div>
