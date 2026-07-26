@@ -148,6 +148,45 @@ export function CompareTab() {
           </>
         )}
       </Section>
+
+      <Section title="Grenzen & Annahmen der Berechnung">
+        <ul className="list-disc space-y-1 pl-4 text-xs text-slate-300">
+          <li>
+            <b>Rotierende Massen werden nicht berücksichtigt.</b> Im Beschleunigungsterm geht nur die
+            translatorische Fahrzeugmasse ein; Räder, Antriebsstrang und Motor-Trägheit sind ausgeklammert.
+            Die berechnete Rad-/Motorleistung liegt dadurch systematisch etwas zu niedrig, besonders in
+            niedrigen Gängen.
+          </li>
+          <li>
+            <b>Antriebsstrangverluste unter Last ≠ Schleppleistung.</b> Die eingegebene Schleppkurve
+            (Prüfstand, unbelastet) wird zur Motorleistungsschätzung addiert. Unter Volllast sind die
+            realen Verluste höher; die Motorleistungswerte sind daher eine Näherung, keine echte
+            Prüfstands-Messung.
+          </li>
+          <li>
+            <b>RPM aus Geschwindigkeit abgeleitet.</b> Es gibt keinen Drehzahlsensor – die U/min-Achse
+            wird über den Vmax-Faktor pro Lauf hochgerechnet. Bei Schaltvorgängen, Kupplungsschlupf oder
+            falsch gesetztem Faktor verzerrt das die x-Achse; Drehmoment-Kurven reagieren darauf
+            empfindlicher als Leistungs-Kurven.
+          </li>
+          <li>
+            <b>Auto-Erkennung der Pulls ist heuristisch.</b> Die Segment-Suche basiert nur auf
+            GPS-Geschwindigkeit, ohne Gaspedal- oder Ruck-Signal. Unvollständige Zwischen-Pulls,
+            Rollen-Lassen oder Schaltpausen können fälschlich als Lauf erkannt oder abgeschnitten werden –
+            Segmentgrenzen ggf. manuell korrigieren.
+          </li>
+          <li>
+            <b>Coastdown-Kalibrierung setzt saubere Bedingungen voraus:</b> ausgekuppelt, ebene Strecke,
+            kein Wind. Bei R² &lt; 0.85 wird gewarnt, aber auch hohe R² garantieren keine physikalisch
+            korrekten Cd·A/Crr-Werte – nur eine gute Anpassung an den gewählten Abschnitt.
+          </li>
+          <li>
+            <b>Luftdichte</b> aus Temperatur, Druck und Luftfeuchte je Session. Werden diese nicht
+            gepflegt, weichen die Leistungswerte entsprechend ab.
+          </li>
+        </ul>
+      </Section>
     </div>
   );
+
 }
