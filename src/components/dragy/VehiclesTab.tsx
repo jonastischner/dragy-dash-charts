@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Section, Field, TextInput, NumInput, Button, Note, Row } from "./ui";
 import { useAppStore, newVehicle } from "@/lib/dragy/store";
 import type { Vehicle, DragPoint } from "@/lib/dragy/types";
@@ -89,9 +89,16 @@ function VehicleEditor({ vehicle, onSave, onCancel }: { vehicle: Vehicle; onSave
     }
   };
 
+  useLockBodyScroll();
   return (
-    <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/70 p-2 sm:items-center" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
-      <div className="max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-t-xl bg-slate-900 p-3 sm:rounded-xl">
+    <div
+      className="fixed inset-0 z-40 flex items-end justify-center bg-black/70 p-2 sm:items-center"
+      style={{
+        paddingTop: "calc(env(safe-area-inset-top) + 0.5rem)",
+        paddingBottom: "calc(env(safe-area-inset-bottom) + 0.5rem)",
+      }}
+    >
+      <div className="max-h-full w-full max-w-lg overflow-y-auto overscroll-contain rounded-t-xl bg-slate-900 p-3 sm:rounded-xl">
         <h3 className="mb-2 text-base font-semibold text-slate-100">Fahrzeug bearbeiten</h3>
         <Field label="Name"><TextInput value={v.name} onChange={(e) => setV({ ...v, name: e.target.value })} /></Field>
 
@@ -168,9 +175,10 @@ function VehicleEditor({ vehicle, onSave, onCancel }: { vehicle: Vehicle; onSave
 }
 
 function ConfirmDelete({ vehicle, sessionCount, onConfirm, onCancel }: { vehicle: Vehicle; sessionCount: number; onConfirm: () => void; onCancel: () => void }) {
+  useLockBodyScroll();
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/70 p-4">
-      <div className="w-full max-w-sm rounded-lg bg-slate-900 p-3">
+      <div className="w-full max-w-sm overscroll-contain rounded-lg bg-slate-900 p-3">
         <h3 className="text-sm font-semibold text-slate-100">Fahrzeug löschen?</h3>
         <p className="mt-2 text-xs text-slate-300"><b>{vehicle.name}</b> wird gelöscht. Dabei werden auch {sessionCount} zugehörige Session(s) inklusive aller Läufe entfernt.</p>
         <div className="mt-3 flex justify-end gap-2">
