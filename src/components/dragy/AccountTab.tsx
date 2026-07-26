@@ -12,6 +12,7 @@ function formatDate(ts: number | null) {
 
 export function AccountTab() {
   const { userEmail, refresh } = useAppStore();
+  const [mode, setMode] = useState<"login" | "signup">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -95,16 +96,42 @@ export function AccountTab() {
     );
   }
 
+  const isSignup = mode === "signup";
   return (
     <div>
-      <Section title="Optionaler Useraccount" note="Ohne Login läuft die App wie bisher komplett lokal. Der Account ist nur, wenn du deine Daten in die Cloud sichern oder auf mehreren Geräten nutzen willst.">
+      <Section
+        title={isSignup ? "Neuen Account erstellen" : "Anmelden"}
+        note="Ohne Login läuft die App wie bisher komplett lokal. Der Account ist nur nötig, wenn du deine Daten in die Cloud sichern oder auf mehreren Geräten nutzen willst."
+      >
+        <div className="mb-3 inline-flex rounded-md border border-slate-700 bg-slate-800 p-0.5 text-xs">
+          <button
+            type="button"
+            onClick={() => { setMode("login"); setErr(null); setMsg(null); }}
+            className={`rounded px-3 py-1.5 font-medium ${!isSignup ? "bg-sky-500 text-white" : "text-slate-300"}`}
+          >Anmelden</button>
+          <button
+            type="button"
+            onClick={() => { setMode("signup"); setErr(null); setMsg(null); }}
+            className={`rounded px-3 py-1.5 font-medium ${isSignup ? "bg-sky-500 text-white" : "text-slate-300"}`}
+          >Konto erstellen</button>
+        </div>
         <div className="grid gap-2">
           <Field label="E-Mail"><TextInput type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} /></Field>
-          <Field label="Passwort"><TextInput type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} /></Field>
+          <Field label="Passwort"><TextInput type="password" autoComplete={isSignup ? "new-password" : "current-password"} value={password} onChange={(e) => setPassword(e.target.value)} /></Field>
           <div className="flex flex-wrap gap-2">
-            <Button onClick={doLogin} disabled={busy || !email || !password}>Anmelden</Button>
-            <Button variant="secondary" onClick={doSignup} disabled={busy || !email || !password}>Neu registrieren</Button>
+            {isSignup ? (
+              <Button onClick={doSignup} disabled={busy || !email || !password}>Konto erstellen</Button>
+            ) : (
+              <Button onClick={doLogin} disabled={busy || !email || !password}>Anmelden</Button>
+            )}
           </div>
+          <p className="text-[11px] text-slate-400">
+            {isSignup ? (
+              <>Schon ein Konto? <button type="button" className="text-sky-400 underline" onClick={() => setMode("login")}>Hier anmelden</button>.</>
+            ) : (
+              <>Noch kein Konto? <button type="button" className="text-sky-400 underline" onClick={() => setMode("signup")}>Jetzt kostenlos erstellen</button>.</>
+            )}
+          </p>
           {msg && <p className="text-xs text-emerald-300">{msg}</p>}
           {err && <p className="text-xs text-red-300">{err}</p>}
         </div>
