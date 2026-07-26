@@ -11,16 +11,18 @@ export function CalibrationTab() {
   const [sessionId, setSessionId] = useState<string>("");
   const [startT, setStartT] = useState(0);
   const [endT, setEndT] = useState(0);
+  const [segTarget, setSegTarget] = useState<string>("");
 
-  if (!activeVehicle) return <Section title="Kalibrierung"><Note>Kein aktives Fahrzeug.</Note></Section>;
-  const sessions = state.sessions.filter((s) => s.vehicleId === activeVehicle.id);
+  const sessions = activeVehicle ? state.sessions.filter((s) => s.vehicleId === activeVehicle.id) : [];
   const session = sessions.find((s) => s.id === sessionId);
   const maxT = session?.records[session.records.length - 1]?.t ?? 0;
 
   const fit = useMemo(() => {
-    if (!session) return null;
+    if (!session || !activeVehicle) return null;
     return coastdownFit(session, startT, endT, activeVehicle.mass);
-  }, [session, startT, endT, activeVehicle.mass]);
+  }, [session, startT, endT, activeVehicle]);
+
+  if (!activeVehicle) return <Section title="Kalibrierung"><Note>Kein aktives Fahrzeug.</Note></Section>;
 
   const speedSeries = session ? [{
     label: "km/h", color: "#38bdf8",
@@ -34,7 +36,6 @@ export function CalibrationTab() {
     alert("Fahrzeug-Standard aktualisiert.");
   };
 
-  const [segTarget, setSegTarget] = useState<string>("");
   const applyToSegment = async () => {
     if (!fit) return;
     const seg = state.segments.find((g) => g.id === segTarget);
