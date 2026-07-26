@@ -12,6 +12,7 @@ export interface Vehicle {
   rpmFactorDefault: number; // rpm per km/h
   rpmMatch: { maxRpm: number; maxKmh: number };
   dragCurve: DragPoint[]; // schleppleistung rpm->ps
+  imageDataUrl?: string; // optional Fahrzeugbild als data:URL (lokal + Cloud-Sync via JSONB)
   updatedAt?: number;
 }
 
