@@ -32,6 +32,7 @@ export interface Session {
   manualRows?: ManualRow[];
   createdAt: number;
   notes?: string;
+  massOverride?: number; // kg, optional per-session Abweichung vom Fahrzeug-Standardgewicht
   updatedAt?: number;
 }
 
