@@ -181,7 +181,15 @@ function SegmentEditor({ seg, maxT, onChange, onDelete }: { seg: Segment; maxT: 
           <input type="checkbox" checked={seg.visible} onChange={(e) => onChange({ visible: e.target.checked })} />
           sichtbar
         </label>
-        <div className="h-3 w-3 rounded" style={{ backgroundColor: seg.color }} />
+        <label className="relative h-6 w-6 flex-none cursor-pointer rounded border border-slate-600" style={{ backgroundColor: seg.color }} title="Farbe ändern">
+          <input
+            type="color"
+            value={seg.color}
+            onChange={(e) => onChange({ color: e.target.value })}
+            className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+            aria-label="Farbe wählen"
+          />
+        </label>
         <TextInput className="flex-1" value={seg.name} onChange={(e) => onChange({ name: e.target.value })} />
         <Button variant="danger" onClick={onDelete}>×</Button>
       </div>
