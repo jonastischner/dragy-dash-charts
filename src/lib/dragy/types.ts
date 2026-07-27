@@ -31,6 +31,7 @@ export interface Session {
   manual: boolean;
   manualRows?: ManualRow[];
   createdAt: number;
+  notes?: string;
   updatedAt?: number;
 }
 
