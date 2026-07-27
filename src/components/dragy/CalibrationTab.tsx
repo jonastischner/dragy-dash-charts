@@ -19,7 +19,8 @@ export function CalibrationTab() {
 
   const fit = useMemo(() => {
     if (!session || !activeVehicle) return null;
-    return coastdownFit(session, startT, endT, activeVehicle.mass);
+    const mass = session.massOverride && session.massOverride > 0 ? session.massOverride : activeVehicle.mass;
+    return coastdownFit(session, startT, endT, mass);
   }, [session, startT, endT, activeVehicle]);
 
   if (!activeVehicle) return <Section title="Kalibrierung"><Note>Kein aktives Fahrzeug.</Note></Section>;
