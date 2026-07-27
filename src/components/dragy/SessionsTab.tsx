@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Section, Field, TextInput, NumInput, Button, Note, Row } from "./ui";
+import { Section, Field, TextInput, TextArea, NumInput, Button, Note, Row } from "./ui";
 import { useAppStore, pickColor } from "@/lib/dragy/store";
 import { autoDetectSegments } from "@/lib/dragy/physics";
 import { uid } from "@/lib/dragy/db";
@@ -109,6 +109,11 @@ function SessionDetail({ session, segments, vehicle, onRename, onDelete, onSaveS
         <Field label="Druck (hPa)"><NumInput value={session.pressureHpa} onChange={(e) => onEnvUpdate({ pressureHpa: +e.target.value })} /></Field>
         <Field label="Luftfeuchte (%)"><NumInput value={session.rh} onChange={(e) => onEnvUpdate({ rh: +e.target.value })} /></Field>
       </Row>
+      <div className="mt-2">
+        <Field label="Notizen zur Session" hint="z.B. Strecke, Wetter, Setup">
+          <TextArea rows={3} value={session.notes ?? ""} onChange={(e) => onEnvUpdate({ notes: e.target.value })} placeholder="Notizen…" />
+        </Field>
+      </div>
 
       <div className="mt-2">
         <Chart series={speedSeries} bands={bands} xLabel="t (s)" yLabel="km/h" xFormat={(v) => v.toFixed(1)} yFormat={(v) => v.toFixed(0)} />
@@ -166,6 +171,11 @@ function SegmentEditor({ seg, maxT, onChange, onDelete }: { seg: Segment; maxT: 
           </Field>
         )}
       </Row>
+      <div className="mt-2">
+        <Field label="Notizen zum Lauf" hint="z.B. Gang, Bedingungen, Auffälligkeiten">
+          <TextArea rows={2} value={seg.notes ?? ""} onChange={(e) => onChange({ notes: e.target.value })} placeholder="Notizen…" />
+        </Field>
+      </div>
     </li>
   );
 }

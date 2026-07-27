@@ -31,6 +31,7 @@ export interface Session {
   manual: boolean;
   manualRows?: ManualRow[];
   createdAt: number;
+  notes?: string;
   updatedAt?: number;
 }
 
@@ -44,6 +45,7 @@ export interface Segment {
   color: string;
   visible: boolean;
   calibration?: { crr: number; cdA: number };
+  notes?: string;
   updatedAt?: number;
 }
 
