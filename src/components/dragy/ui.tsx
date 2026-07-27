@@ -1,4 +1,11 @@
-import { useState, type ReactNode, type InputHTMLAttributes, type ButtonHTMLAttributes } from "react";
+import { useState, type ReactNode, type InputHTMLAttributes, type ButtonHTMLAttributes, type TextareaHTMLAttributes } from "react";
+
+export function TextArea(props: TextareaHTMLAttributes<HTMLTextAreaElement>) {
+  return (
+    <textarea {...props}
+      className={`w-full rounded-md border border-slate-600 bg-slate-800 px-2 py-2 text-sm text-slate-100 focus:border-sky-400 focus:outline-none ${props.className ?? ""}`} />
+  );
+}
 
 export function Section({ title, children, note }: { title: string; children: ReactNode; note?: string }) {
   return (
