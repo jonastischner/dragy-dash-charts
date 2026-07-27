@@ -115,6 +115,32 @@ function SessionDetail({ session, segments, vehicle, onRename, onDelete, onSaveS
         </Field>
       </div>
 
+      <details className="mt-2 rounded-md border border-slate-700 bg-slate-900/50">
+        <summary className="cursor-pointer select-none px-2 py-1.5 text-xs font-semibold text-slate-300">
+          Erweitert
+        </summary>
+        <div className="p-2">
+          <Field
+            label="Gewicht für diese Session (kg)"
+            hint={`Optional. Leer = Fahrzeug-Standard (${vehicle.mass} kg). Wirkt auf Leistung, Drehmoment und Kalibrierung.`}
+          >
+            <NumInput
+              value={session.massOverride ?? ""}
+              placeholder={`${vehicle.mass}`}
+              onChange={(e) => {
+                const raw = e.target.value;
+                if (raw === "" || raw == null) {
+                  onEnvUpdate({ massOverride: undefined });
+                } else {
+                  const n = +raw;
+                  onEnvUpdate({ massOverride: Number.isFinite(n) && n > 0 ? n : undefined });
+                }
+              }}
+            />
+          </Field>
+        </div>
+      </details>
+
       <div className="mt-2">
         <Chart series={speedSeries} bands={bands} xLabel="t (s)" yLabel="km/h" xFormat={(v) => v.toFixed(1)} yFormat={(v) => v.toFixed(0)} />
       </div>

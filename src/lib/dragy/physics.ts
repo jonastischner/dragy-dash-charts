@@ -84,7 +84,7 @@ export function computeSegment(
   const a = centralDerivative(vsMs, times);
   const crr = segment.calibration?.crr ?? vehicle.crr;
   const cdA = segment.calibration?.cdA ?? vehicle.cd * vehicle.area;
-  const m = vehicle.mass;
+  const m = session.massOverride && session.massOverride > 0 ? session.massOverride : vehicle.mass;
   const factor = segment.rpmFactor;
   const out: SegmentSample[] = [];
   for (let i = 0; i < inSeg.length; i++) {
