@@ -45,6 +45,7 @@ export interface Segment {
   color: string;
   visible: boolean;
   calibration?: { crr: number; cdA: number };
+  notes?: string;
   updatedAt?: number;
 }
 
