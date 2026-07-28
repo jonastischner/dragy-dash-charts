@@ -163,7 +163,7 @@ function SessionDetail({ session, segments, vehicle, onRename, onDelete, onSaveS
         </div>
         <ul className="space-y-2">
           {segments.map((g) => (
-            <SegmentEditor key={g.id} seg={g} maxT={session.records[session.records.length - 1]?.t ?? 0}
+            <SegmentEditor key={g.id} seg={g} vehicle={vehicle} maxT={session.records[session.records.length - 1]?.t ?? 0}
               onChange={async (patch) => { await onSaveSeg({ ...g, ...patch }); }}
               onDelete={async () => { if (confirm(`Lauf "${g.name}" löschen?`)) await onDelSeg(g.id); }} />
           ))}
@@ -173,7 +173,8 @@ function SessionDetail({ session, segments, vehicle, onRename, onDelete, onSaveS
   );
 }
 
-function SegmentEditor({ seg, maxT, onChange, onDelete }: { seg: Segment; maxT: number; onChange: (patch: Partial<Segment>) => Promise<void>; onDelete: () => void }) {
+function SegmentEditor({ seg, vehicle, maxT, onChange, onDelete }: { seg: Segment; vehicle: any; maxT: number; onChange: (patch: Partial<Segment>) => Promise<void>; onDelete: () => void }) {
+  const presets: Array<{ id: string; name: string; rpmFactor: number }> = vehicle?.gearPresets ?? [];
   return (
     <li className="rounded-md border border-slate-700 bg-slate-900 p-2">
       <div className="flex items-center gap-2">
@@ -196,7 +197,26 @@ function SegmentEditor({ seg, maxT, onChange, onDelete }: { seg: Segment; maxT: 
       <Row className="mt-2">
         <Field label="Start t (s)"><NumInput step="0.1" value={seg.startT} onChange={(e) => onChange({ startT: Math.max(0, +e.target.value) })} /></Field>
         <Field label="Ende t (s)"><NumInput step="0.1" value={seg.endT} onChange={(e) => onChange({ endT: Math.min(maxT, +e.target.value) })} /></Field>
-        <Field label="rpmFactor (U/min pro km/h)" hint="Schätzung, gilt nur pro Gang"><NumInput step="0.01" value={seg.rpmFactor} onChange={(e) => onChange({ rpmFactor: +e.target.value })} /></Field>
+        {presets.length > 0 && (
+          <Field label="Getriebe-Preset" hint="Setzt rpmFactor aus Fahrzeug-Preset">
+            <select
+              className="w-full rounded-md border border-slate-600 bg-slate-800 px-2 py-2 text-sm text-slate-100 focus:border-sky-400 focus:outline-none"
+              value={seg.gearPresetId ?? ""}
+              onChange={(e) => {
+                const id = e.target.value;
+                if (!id) { onChange({ gearPresetId: undefined }); return; }
+                const p = presets.find((x) => x.id === id);
+                if (p) onChange({ gearPresetId: id, rpmFactor: p.rpmFactor });
+              }}
+            >
+              <option value="">– manuell –</option>
+              {presets.map((p) => (
+                <option key={p.id} value={p.id}>{p.name} ({p.rpmFactor.toFixed(2)})</option>
+              ))}
+            </select>
+          </Field>
+        )}
+        <Field label="rpmFactor (U/min pro km/h)" hint="Manuell überschreibbar"><NumInput step="0.01" value={seg.rpmFactor} onChange={(e) => onChange({ rpmFactor: +e.target.value, gearPresetId: undefined })} /></Field>
         {seg.calibration && (
           <Field label="Segment-Kalibrierung">
             <div className="text-[11px] text-slate-300">Crr {seg.calibration.crr.toFixed(4)} · CdA {seg.calibration.cdA.toFixed(3)}

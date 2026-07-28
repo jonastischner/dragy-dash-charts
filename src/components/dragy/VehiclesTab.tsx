@@ -1,7 +1,9 @@
 import { useState, useEffect } from "react";
 import { Section, Field, TextInput, NumInput, Button, Note, Row } from "./ui";
 import { useAppStore, newVehicle } from "@/lib/dragy/store";
-import type { Vehicle, DragPoint } from "@/lib/dragy/types";
+import { uid } from "@/lib/dragy/db";
+import { computeRpmFactor, tireCircumferenceM } from "@/lib/dragy/gear";
+import type { Vehicle, DragPoint, GearPreset } from "@/lib/dragy/types";
 
 function useLockBodyScroll() {
   useEffect(() => {
@@ -158,6 +160,12 @@ function VehicleEditor({ vehicle, onSave, onCancel }: { vehicle: Vehicle; onSave
           </div>
         </div>
 
+        <GearPresetsEditor
+          presets={v.gearPresets ?? []}
+          onChange={(gp) => setV({ ...v, gearPresets: gp })}
+          onUseAsDefault={(f) => setV({ ...v, rpmFactorDefault: +f.toFixed(3) })}
+        />
+
         <div className="mt-3 rounded-md border border-slate-700 p-2">
           <div className="mb-1 text-xs font-semibold text-slate-200">Schleppleistungskurve (Prüfstand)</div>
           <p className="text-[10px] text-slate-400">Stützpunkte RPM → PS. Lineare Interpolation, außerhalb geklemmt.</p>
@@ -194,6 +202,63 @@ function ConfirmDelete({ vehicle, sessionCount, onConfirm, onCancel }: { vehicle
           <Button variant="danger" onClick={onConfirm}>Endgültig löschen</Button>
         </div>
       </div>
+    </div>
+  );
+}
+
+function GearPresetsEditor({ presets, onChange, onUseAsDefault }: {
+  presets: GearPreset[];
+  onChange: (p: GearPreset[]) => void;
+  onUseAsDefault: (rpmFactor: number) => void;
+}) {
+  const addPreset = () => {
+    const p: GearPreset = { id: uid(), name: `Preset ${presets.length + 1}`, gearRatio: 1, finalDrive: 3.46, tireSpec: "225/45R17", rpmFactor: 0 };
+    const f = computeRpmFactor(p.gearRatio, p.finalDrive, p.tireSpec);
+    if (f) p.rpmFactor = +f.toFixed(3);
+    onChange([...presets, p]);
+  };
+  const update = (i: number, patch: Partial<GearPreset>) => {
+    const arr = presets.slice();
+    const merged = { ...arr[i], ...patch };
+    const f = computeRpmFactor(merged.gearRatio, merged.finalDrive, merged.tireSpec);
+    if (f) merged.rpmFactor = +f.toFixed(3);
+    arr[i] = merged;
+    onChange(arr);
+  };
+  const del = (i: number) => onChange(presets.filter((_, k) => k !== i));
+
+  return (
+    <div className="mt-3 rounded-md border border-slate-700 p-2">
+      <div className="mb-1 text-xs font-semibold text-slate-200">Getriebe-Presets (rpmFactor aus Übersetzung)</div>
+      <p className="text-[10px] text-slate-400">rpm/km/h = 60 · Getriebe · Endübersetzung / (3.6 · Reifenumfang). Reifen z.B. „225/45R17".</p>
+      {presets.length === 0 && <p className="mt-1 text-[11px] text-slate-500">Noch keine Presets. Pro Gang ein Preset anlegen.</p>}
+      <ul className="mt-2 space-y-2">
+        {presets.map((p, i) => {
+          const U = tireCircumferenceM(p.tireSpec);
+          const valid = U !== null && p.gearRatio > 0 && p.finalDrive > 0;
+          return (
+            <li key={p.id} className="rounded-md border border-slate-700 bg-slate-900 p-2">
+              <div className="flex items-center gap-2">
+                <TextInput className="flex-1" value={p.name} onChange={(e) => update(i, { name: e.target.value })} />
+                <Button variant="danger" onClick={() => del(i)}>×</Button>
+              </div>
+              <Row className="mt-2">
+                <Field label="Getriebeübersetzung"><NumInput step="0.001" value={p.gearRatio} onChange={(e) => update(i, { gearRatio: +e.target.value })} /></Field>
+                <Field label="Endübersetzung"><NumInput step="0.001" value={p.finalDrive} onChange={(e) => update(i, { finalDrive: +e.target.value })} /></Field>
+                <Field label="Reifen (z.B. 225/45R17)"><TextInput value={p.tireSpec} onChange={(e) => update(i, { tireSpec: e.target.value })} /></Field>
+                <Field label="rpmFactor (berechnet)">
+                  <div className="flex h-10 items-center gap-2 text-xs text-slate-200">
+                    <b>{valid ? p.rpmFactor.toFixed(3) : "–"}</b>
+                    {valid && <Button variant="ghost" onClick={() => onUseAsDefault(p.rpmFactor)}>als Standard</Button>}
+                  </div>
+                </Field>
+              </Row>
+              {!valid && <p className="mt-1 text-[10px] text-amber-400">Reifenformat oder Übersetzungen ungültig.</p>}
+            </li>
+          );
+        })}
+      </ul>
+      <Button className="mt-2" variant="secondary" onClick={addPreset}>+ Preset</Button>
     </div>
   );
 }

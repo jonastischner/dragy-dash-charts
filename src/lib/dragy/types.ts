@@ -1,5 +1,14 @@
 export interface DragPoint { rpm: number; ps: number }
 
+export interface GearPreset {
+  id: string;
+  name: string;           // z.B. "3. Gang" oder "Serienübersetzung"
+  gearRatio: number;      // Getriebeübersetzung des Gangs (z.B. 1.32)
+  finalDrive: number;     // Hinterachs-/Endübersetzung (z.B. 3.46)
+  tireSpec: string;       // z.B. "225/45R17"
+  rpmFactor: number;      // berechnet: U/min pro km/h
+}
+
 export interface Vehicle {
   id: string;
   name: string;
@@ -12,6 +21,7 @@ export interface Vehicle {
   rpmFactorDefault: number; // rpm per km/h
   rpmMatch: { maxRpm: number; maxKmh: number };
   dragCurve: DragPoint[]; // schleppleistung rpm->ps
+  gearPresets?: GearPreset[]; // optionale Getriebe-/Gang-Presets
   imageDataUrl?: string; // optional Fahrzeugbild als data:URL (lokal + Cloud-Sync via JSONB)
   updatedAt?: number;
 }
@@ -43,6 +53,7 @@ export interface Segment {
   startT: number;
   endT: number;
   rpmFactor: number;
+  gearPresetId?: string; // optionaler Verweis auf ein Fahrzeug-Preset (rpmFactor bleibt der resolvierte Wert)
   color: string;
   visible: boolean;
   calibration?: { crr: number; cdA: number };
