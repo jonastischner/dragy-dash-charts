@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Section, Field, TextInput, TextArea, NumInput, Button, Note, Row } from "./ui";
 import { useAppStore, pickColor } from "@/lib/dragy/store";
 import { autoDetectSegments } from "@/lib/dragy/physics";
-import { computeRpmFactor } from "@/lib/dragy/gear";
+import { computeRpmFactor, resolveAllGears } from "@/lib/dragy/gear";
 import { uid } from "@/lib/dragy/db";
 import type { Session, Segment } from "@/lib/dragy/types";
 import { Chart } from "./Chart";
@@ -177,24 +177,28 @@ function SessionDetail({ session, segments, vehicle, onRename, onDelete, onSaveS
 function SegmentEditor({ seg, vehicle, maxT, onChange, onDelete }: { seg: Segment; vehicle: any; maxT: number; onChange: (patch: Partial<Segment>) => Promise<void>; onDelete: () => void }) {
   const legacyPresets: Array<{ id: string; name: string; rpmFactor: number }> = vehicle?.gearPresets ?? [];
 
-  // Alle Gearboxes einsammeln (neu: gearboxes[]; alt: einzelnes gearbox)
-  const allGearboxes: Array<{ id: string; name: string; finalDrive: number; tireSpec: string; gears: any[] }> = (() => {
-    const list: any[] = Array.isArray(vehicle?.gearboxes) ? vehicle.gearboxes.slice() : [];
-    if (list.length === 0 && vehicle?.gearbox) list.push({ id: "legacy", name: "Getriebe", ...vehicle.gearbox });
-    return list.map((gb, i) => ({ id: gb.id ?? `gb-${i}`, name: gb.name || `Getriebe ${i + 1}`, finalDrive: gb.finalDrive, tireSpec: gb.tireSpec, gears: gb.gears ?? [] }));
-  })();
-
   type GearOpt = { id: string; label: string; rpmFactor: number };
-  const gearboxGroups: Array<{ name: string; options: GearOpt[] }> = allGearboxes.map((gb) => {
+
+  // Neuer entkoppelter Antrieb: resolveAllGears deckt sowohl neue setups[] als auch
+  // migrierte Legacy-gearboxes[] ab.
+  const resolved = resolveAllGears(vehicle);
+  const bySetup = new Map<string, { name: string; options: GearOpt[] }>();
+  for (const r of resolved) {
+    if (!bySetup.has(r.setupId)) bySetup.set(r.setupId, { name: r.setupName, options: [] });
+    bySetup.get(r.setupId)!.options.push({ id: `${r.setupId}:${r.gear.id}`, label: r.gear.name, rpmFactor: r.rpmFactor });
+  }
+  const gearboxGroups = Array.from(bySetup.values());
+
+  // Fallback für ganz alte Fahrzeuge, die noch weder gearboxes[] noch gearbox hatten.
+  if (gearboxGroups.length === 0 && vehicle?.gearbox) {
+    const gb = vehicle.gearbox;
     const options: GearOpt[] = [];
-    for (const g of gb.gears) {
-      const factor = computeRpmFactor(g.ratio ?? 0, gb.finalDrive ?? 0, gb.tireSpec ?? "");
-      if (factor !== null && Number.isFinite(factor) && factor > 0) {
-        options.push({ id: `${gb.id}:${g.id}`, label: g.name, rpmFactor: factor });
-      }
+    for (const g of gb.gears ?? []) {
+      const f = computeRpmFactor(g.ratio ?? 0, gb.finalDrive ?? 0, gb.tireSpec ?? "");
+      if (f && f > 0) options.push({ id: `legacy:${g.id}`, label: g.name, rpmFactor: f });
     }
-    return { name: gb.name, options };
-  }).filter((grp) => grp.options.length > 0);
+    if (options.length > 0) gearboxGroups.push({ name: "Getriebe", options });
+  }
 
   const flatGearOptions: GearOpt[] = gearboxGroups.flatMap((g) => g.options);
   const hasAny = flatGearOptions.length + legacyPresets.length > 0;

@@ -18,9 +18,29 @@ export interface GearRatio {
 export interface Gearbox {
   id?: string;          // optionale ID (für Multi-Gearbox-Setups)
   name?: string;        // optionaler Anzeigename, z.B. "Serie" / "Kurz"
-  finalDrive: number;   // Endübersetzung
+  finalDrive: number;   // Endübersetzung (Legacy: kombiniert)
   tireSpec: string;     // z.B. "225/45R17"
   gears: GearRatio[];   // Liste der Gänge mit Übersetzung
+}
+
+// Entkoppelte Bausteine: Getriebe (nur Gänge + Reifen), Endübersetzung separat,
+// Setup als Kombination beider.
+export interface GearboxDef {
+  id: string;
+  name: string;
+  tireSpec: string;
+  gears: GearRatio[];
+}
+export interface FinalDriveDef {
+  id: string;
+  name: string;
+  ratio: number;
+}
+export interface DriveSetup {
+  id: string;
+  name: string;
+  gearboxId: string;
+  finalDriveId: string;
 }
 
 export interface Vehicle {
@@ -37,8 +57,15 @@ export interface Vehicle {
   dragCurve: DragPoint[]; // schleppleistung rpm->ps
   gearPresets?: GearPreset[]; // optionale Getriebe-/Gang-Presets (Legacy)
   gearbox?: Gearbox; // Legacy: einzelne Getriebedefinition (wird beim Öffnen in gearboxes migriert)
-  gearboxes?: Gearbox[]; // mehrere Getriebe-Konfigurationen (Serie, Kurz, Alt, ...)
-  defaultGearboxId?: string; // welches Getriebe ist Standard für neue Läufe
+  gearboxes?: Gearbox[]; // Legacy: mehrere Getriebe mit Endübersetzung inline
+  defaultGearboxId?: string; // Legacy: welches Getriebe war Standard
+  // Neue, entkoppelte Antriebs-Bausteine:
+  gearboxDefs?: GearboxDef[];
+  finalDrives?: FinalDriveDef[];
+  setups?: DriveSetup[];
+  defaultSetupId?: string;
+  shiftRpm?: number;   // empfohlene Schaltdrehzahl
+  maxRpm?: number;     // Maximaldrehzahl (Begrenzer)
   imageDataUrl?: string; // optional Fahrzeugbild als data:URL (lokal + Cloud-Sync via JSONB)
   updatedAt?: number;
 }
