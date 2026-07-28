@@ -182,7 +182,7 @@ function SegmentEditor({ seg, vehicle, maxT, onChange, onDelete }: { seg: Segmen
     const out: Array<{ id: string; name: string; rpmFactor: number }> = [];
     for (const g of gb.gears) {
       const factor = computeRpmFactor(g.ratio ?? 0, gb.finalDrive ?? 0, gb.tireSpec ?? "");
-      if (Number.isFinite(factor) && factor > 0) out.push({ id: g.id, name: g.name, rpmFactor: factor });
+      if (factor !== null && Number.isFinite(factor) && factor > 0) out.push({ id: g.id, name: g.name, rpmFactor: factor });
     }
     return out;
   })();
