@@ -566,12 +566,22 @@ function GearListEditor({ gears, onChange }: { gears: GearRatio[]; onChange: (g:
   return (
     <div className="mt-2">
       {gears.length === 0 && <p className="text-[11px] text-slate-500">Noch keine Gänge.</p>}
-      <ul className="space-y-1">
+      <ul className="space-y-2">
         {gears.map((g, i) => (
-          <li key={g.id} className="flex items-center gap-2">
-            <TextInput className="flex-1" value={g.name} onChange={(e) => update(i, { name: e.target.value })} />
-            <NumInput className="w-24" step="0.001" value={g.ratio} onChange={(e) => update(i, { ratio: +e.target.value })} />
-            <Button variant="danger" onClick={() => del(i)}>×</Button>
+          <li key={g.id} className="rounded-md border border-slate-700 bg-slate-800/40 p-2">
+            <div className="grid grid-cols-[1fr_auto] gap-2">
+              <Field label="Name">
+                <TextInput value={g.name} onChange={(e) => update(i, { name: e.target.value })} />
+              </Field>
+              <div className="flex items-end">
+                <Button variant="danger" onClick={() => del(i)}>×</Button>
+              </div>
+            </div>
+            <div className="mt-2">
+              <Field label="Übersetzung" hint="z.B. 3.462">
+                <NumInput inputMode="decimal" value={g.ratio} onChange={(e) => update(i, { ratio: +e.target.value })} />
+              </Field>
+            </div>
           </li>
         ))}
       </ul>
@@ -579,6 +589,7 @@ function GearListEditor({ gears, onChange }: { gears: GearRatio[]; onChange: (g:
     </div>
   );
 }
+
 
 async function downscaleImage(file: File, maxSize: number, quality: number): Promise<string> {
   const bitmap = await createImageBitmap(file);
