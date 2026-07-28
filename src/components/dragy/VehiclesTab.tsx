@@ -2,8 +2,9 @@ import { useState, useEffect } from "react";
 import { Section, Field, TextInput, NumInput, Button, Note, Row } from "./ui";
 import { useAppStore, newVehicle } from "@/lib/dragy/store";
 import { uid } from "@/lib/dragy/db";
-import { computeRpmFactor, tireCircumferenceM, normalizeDrive } from "@/lib/dragy/gear";
+import { computeRpmFactor, tireCircumferenceM, normalizeDrive, resolveAllGears } from "@/lib/dragy/gear";
 import type { Vehicle, DragPoint, GearPreset, GearboxDef, FinalDriveDef, DriveSetup, GearRatio } from "@/lib/dragy/types";
+import { Chart, type Series } from "./Chart";
 
 function useLockBodyScroll() {
   useEffect(() => {
@@ -201,6 +202,8 @@ function VehicleEditor({ vehicle, onSave, onCancel }: { vehicle: Vehicle; onSave
           onChange={(patch) => setV({ ...v, ...patch })}
           onUseAsDefault={(f) => setV({ ...v, rpmFactorDefault: +f.toFixed(3) })}
         />
+
+        <ShiftDiagramCompare vehicle={v} />
 
         <GearPresetsEditor
           presets={v.gearPresets ?? []}
@@ -523,4 +526,95 @@ async function downscaleImage(file: File, maxSize: number, quality: number): Pro
   ctx.drawImage(bitmap, 0, 0, w, h);
   bitmap.close?.();
   return canvas.toDataURL("image/jpeg", quality);
+}
+
+// ================= Schaltdiagramm-Vergleich (im Fahrzeugdialog) =================
+function ShiftDiagramCompare({ vehicle }: { vehicle: Vehicle }) {
+  const { setups } = normalizeDrive(vehicle);
+  const [selected, setSelected] = useState<string[] | null>(null);
+  const effective = selected ?? setups.map((s) => s.id);
+  const resolved = resolveAllGears(vehicle).filter((r) => effective.includes(r.setupId));
+  const maxRpm = vehicle.maxRpm && vehicle.maxRpm > 0 ? vehicle.maxRpm : 8000;
+  const shiftRpm = vehicle.shiftRpm;
+  const setupIds = Array.from(new Set(resolved.map((r) => r.setupId)));
+  const baseColors = ["#38bdf8", "#f472b6", "#a3e635", "#fbbf24", "#c084fc", "#f97316"];
+  const gearIdxBySetup = new Map<string, number>();
+
+  const series: Series[] = resolved.map((r) => {
+    const setupIdx = setupIds.indexOf(r.setupId);
+    const gearIdx = gearIdxBySetup.get(r.setupId) ?? 0;
+    gearIdxBySetup.set(r.setupId, gearIdx + 1);
+    const color = shadeColor(baseColors[setupIdx % baseColors.length], gearIdx * 0.12 - 0.24);
+    return {
+      label: `${r.setupName} · ${r.gear.name}`,
+      color,
+      points: [{ x: 0, y: 0 }, { x: maxRpm, y: maxRpm / r.rpmFactor }],
+    };
+  });
+
+  const bands = [
+    ...(shiftRpm ? [{ xStart: shiftRpm - 25, xEnd: shiftRpm + 25, color: "#f59e0b", label: "Schalt" }] : []),
+    ...(vehicle.maxRpm ? [{ xStart: vehicle.maxRpm - 25, xEnd: vehicle.maxRpm + 25, color: "#ef4444", label: "Max" }] : []),
+  ];
+
+  return (
+    <div className="mt-3 rounded-md border border-slate-700 p-2">
+      <div className="mb-1 text-xs font-semibold text-slate-200">Schaltdiagramm (Setups vergleichen)</div>
+      <p className="text-[10px] text-slate-400">Berechnet aus Getriebe- und Endübersetzung sowie Reifenumfang: km/h(rpm) je Gang. Bänder markieren Schalt- und Maximaldrehzahl.</p>
+      {setups.length === 0 ? (
+        <p className="mt-2 text-[11px] text-slate-500">Erst mindestens ein Setup oben anlegen.</p>
+      ) : (
+        <>
+          <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-200">
+            {setups.map((s) => {
+              const on = effective.includes(s.id);
+              return (
+                <label key={s.id} className="flex items-center gap-1 rounded bg-slate-800 px-2 py-1">
+                  <input
+                    type="checkbox"
+                    checked={on}
+                    onChange={(e) => {
+                      const base = effective;
+                      const next = e.target.checked
+                        ? Array.from(new Set([...base, s.id]))
+                        : base.filter((x) => x !== s.id);
+                      setSelected(next);
+                    }}
+                  />
+                  {s.name}
+                </label>
+              );
+            })}
+          </div>
+          <div className="mt-2">
+            <Chart
+              series={series}
+              bands={bands}
+              xLabel="U/min"
+              yLabel="km/h"
+              xFormat={(v) => v.toFixed(0)}
+              yFormat={(v) => v.toFixed(0)}
+              height={280}
+            />
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// Hex-Farbe um einen Faktor aufhellen/abdunkeln (−1..+1).
+function shadeColor(hex: string, amount: number): string {
+  const m = hex.replace("#", "");
+  if (m.length !== 6) return hex;
+  const r = parseInt(m.slice(0, 2), 16);
+  const g = parseInt(m.slice(2, 4), 16);
+  const b = parseInt(m.slice(4, 6), 16);
+  const adj = (c: number) => {
+    const t = amount < 0 ? 0 : 255;
+    const p = Math.abs(amount);
+    return Math.round((t - c) * p + c);
+  };
+  const toHex = (n: number) => Math.max(0, Math.min(255, n)).toString(16).padStart(2, "0");
+  return `#${toHex(adj(r))}${toHex(adj(g))}${toHex(adj(b))}`;
 }
