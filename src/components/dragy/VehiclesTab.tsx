@@ -3,7 +3,7 @@ import { Section, Field, TextInput, NumInput, Button, Note, Row } from "./ui";
 import { useAppStore, newVehicle } from "@/lib/dragy/store";
 import { uid } from "@/lib/dragy/db";
 import { computeRpmFactor, tireCircumferenceM, normalizeDrive, resolveAllGears } from "@/lib/dragy/gear";
-import type { Vehicle, DragPoint, GearPreset, GearboxDef, FinalDriveDef, DriveSetup, GearRatio } from "@/lib/dragy/types";
+import type { Vehicle, DragPoint, GearPreset, GearboxDef, FinalDriveDef, TireDef, DriveSetup, GearRatio } from "@/lib/dragy/types";
 import { Chart, type Series } from "./Chart";
 
 function useLockBodyScroll() {
@@ -86,6 +86,7 @@ function VehicleEditor({ vehicle, onSave, onCancel }: { vehicle: Vehicle; onSave
       const norm = normalizeDrive(base);
       base.gearboxDefs = norm.gearboxDefs;
       base.finalDrives = norm.finalDrives;
+      base.tires = norm.tires;
       base.setups = norm.setups;
       base.defaultSetupId = norm.defaultSetupId;
       // Legacy-Felder leeren, sobald migriert wurde
@@ -94,9 +95,19 @@ function VehicleEditor({ vehicle, onSave, onCancel }: { vehicle: Vehicle; onSave
         base.defaultGearboxId = undefined;
         base.gearbox = undefined;
       }
+    } else {
+      // Bereits migriert, aber ggf. neue Reifen-Ebene nachziehen (aus GearboxDef.tireSpec).
+      const hasTires = (base.tires && base.tires.length > 0);
+      const gbTireSpec = base.gearboxDefs?.some((g) => g.tireSpec);
+      if (!hasTires && gbTireSpec) {
+        const norm = normalizeDrive(base);
+        base.tires = norm.tires;
+        base.setups = norm.setups;
+      }
     }
     if (!base.gearboxDefs) base.gearboxDefs = [];
     if (!base.finalDrives) base.finalDrives = [];
+    if (!base.tires) base.tires = [];
     if (!base.setups) base.setups = [];
     return base;
   });
