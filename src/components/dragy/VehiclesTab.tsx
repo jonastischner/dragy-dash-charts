@@ -2,8 +2,9 @@ import { useState, useEffect } from "react";
 import { Section, Field, TextInput, NumInput, Button, Note, Row } from "./ui";
 import { useAppStore, newVehicle } from "@/lib/dragy/store";
 import { uid } from "@/lib/dragy/db";
-import { computeRpmFactor, tireCircumferenceM, normalizeDrive } from "@/lib/dragy/gear";
+import { computeRpmFactor, tireCircumferenceM, normalizeDrive, resolveAllGears } from "@/lib/dragy/gear";
 import type { Vehicle, DragPoint, GearPreset, GearboxDef, FinalDriveDef, DriveSetup, GearRatio } from "@/lib/dragy/types";
+import { Chart, type Series } from "./Chart";
 
 function useLockBodyScroll() {
   useEffect(() => {
