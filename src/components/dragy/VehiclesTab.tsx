@@ -336,18 +336,6 @@ function GearboxesManager({ gearboxes, defaultId, onChange, onUseAsDefault }: {
 }
 
 
-              gearbox={gb}
-              onChange={(patch) => updateGearbox(i, patch)}
-              onUseAsDefault={onUseAsDefault}
-            />
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
-function delGterEnsureId(i: number, fn: (i: number) => void) { fn(i); }
 
 function GearboxEditor({ gearbox, onChange, onUseAsDefault }: {
   gearbox: Gearbox;
