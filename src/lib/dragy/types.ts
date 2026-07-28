@@ -53,6 +53,7 @@ export interface Segment {
   startT: number;
   endT: number;
   rpmFactor: number;
+  gearPresetId?: string; // optionaler Verweis auf ein Fahrzeug-Preset (rpmFactor bleibt der resolvierte Wert)
   color: string;
   visible: boolean;
   calibration?: { crr: number; cdA: number };
