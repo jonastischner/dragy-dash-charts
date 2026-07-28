@@ -57,8 +57,15 @@ export interface Vehicle {
   dragCurve: DragPoint[]; // schleppleistung rpm->ps
   gearPresets?: GearPreset[]; // optionale Getriebe-/Gang-Presets (Legacy)
   gearbox?: Gearbox; // Legacy: einzelne Getriebedefinition (wird beim Öffnen in gearboxes migriert)
-  gearboxes?: Gearbox[]; // mehrere Getriebe-Konfigurationen (Serie, Kurz, Alt, ...)
-  defaultGearboxId?: string; // welches Getriebe ist Standard für neue Läufe
+  gearboxes?: Gearbox[]; // Legacy: mehrere Getriebe mit Endübersetzung inline
+  defaultGearboxId?: string; // Legacy: welches Getriebe war Standard
+  // Neue, entkoppelte Antriebs-Bausteine:
+  gearboxDefs?: GearboxDef[];
+  finalDrives?: FinalDriveDef[];
+  setups?: DriveSetup[];
+  defaultSetupId?: string;
+  shiftRpm?: number;   // empfohlene Schaltdrehzahl
+  maxRpm?: number;     // Maximaldrehzahl (Begrenzer)
   imageDataUrl?: string; // optional Fahrzeugbild als data:URL (lokal + Cloud-Sync via JSONB)
   updatedAt?: number;
 }
