@@ -2,15 +2,17 @@ import { useMemo, useState } from "react";
 import { Section, Note } from "./ui";
 import { useAppStore } from "@/lib/dragy/store";
 import { computeSegment, W_TO_PS } from "@/lib/dragy/physics";
+import { resolveAllGears, normalizeDrive } from "@/lib/dragy/gear";
 import { Chart, type Series } from "./Chart";
 
-type Mode = "pWheel" | "pEngine" | "tqWheel" | "tqEngine" | "accel";
+type Mode = "pWheel" | "pEngine" | "tqWheel" | "tqEngine" | "accel" | "shift";
 const MODE_LABEL: Record<Mode, string> = {
   pWheel: "Radleistung (PS)",
   pEngine: "Motorleistung geschätzt (PS)",
   tqWheel: "Rad-Drehmoment (Nm)",
   tqEngine: "Motor-Drehmoment geschätzt (Nm)",
   accel: "Beschleunigung (km/h vs. s)",
+  shift: "Schaltdiagramm (km/h vs. U/min)",
 };
 
 const SPLIT_TARGETS = [60, 100, 150, 200];
