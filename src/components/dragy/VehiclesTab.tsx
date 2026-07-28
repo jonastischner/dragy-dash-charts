@@ -202,6 +202,8 @@ function VehicleEditor({ vehicle, onSave, onCancel }: { vehicle: Vehicle; onSave
           onUseAsDefault={(f) => setV({ ...v, rpmFactorDefault: +f.toFixed(3) })}
         />
 
+        <ShiftDiagramCompare vehicle={v} />
+
         <GearPresetsEditor
           presets={v.gearPresets ?? []}
           onChange={(gp) => setV({ ...v, gearPresets: gp })}
