@@ -281,33 +281,86 @@ function GearPresetsEditor({ presets, onChange, onUseAsDefault }: {
   );
 }
 
-function GearboxEditor({ gearbox, onChange, onUseAsDefault }: {
-  gearbox: Gearbox | undefined;
-  onChange: (g: Gearbox) => void;
+function GearboxesManager({ gearboxes, defaultId, onChange, onUseAsDefault }: {
+  gearboxes: Gearbox[];
+  defaultId: string | undefined;
+  onChange: (gbs: Gearbox[], defaultId: string | undefined) => void;
   onUseAsDefault: (rpmFactor: number) => void;
 }) {
-  const gb: Gearbox = gearbox ?? { finalDrive: 3.46, tireSpec: "225/45R17", gears: [] };
+  const addGearbox = () => {
+    const gb: Gearbox = { id: uid(), name: `Getriebe ${gearboxes.length + 1}`, finalDrive: 3.46, tireSpec: "225/45R17", gears: [] };
+    const nextDefault = defaultId ?? gb.id;
+    onChange([...gearboxes, gb], nextDefault);
+  };
+  const updateGearbox = (i: number, patch: Partial<Gearbox>) => {
+    const arr = gearboxes.slice(); arr[i] = { ...arr[i], ...patch }; onChange(arr, defaultId);
+  };
+  const delGearbox = (i: number) => {
+    const removed = gearboxes[i];
+    const arr = gearboxes.filter((_, k) => k !== i);
+    const nextDefault = defaultId === removed.id ? arr[0]?.id : defaultId;
+    onChange(arr, nextDefault);
+  };
+  const setDefault = (id: string | undefined) => onChange(gearboxes, id);
+
+  return (
+    <div className="mt-3 rounded-md border border-slate-700 p-2">
+      <div className="mb-1 flex items-center justify-between">
+        <div className="text-xs font-semibold text-slate-200">Getriebe-Konfigurationen</div>
+        <Button variant="secondary" onClick={addGearbox}>+ Getriebe</Button>
+      </div>
+      <p className="text-[10px] text-slate-400">Mehrere Getriebe (z.B. Serie/Kurz) hinterlegen und eines als Standard markieren. Der Standard wird für neue Läufe verwendet.</p>
+      {gearboxes.length === 0 && <p className="mt-2 text-[11px] text-slate-500">Noch keine Getriebe. „+ Getriebe" hinzufügen.</p>}
+      <ul className="mt-2 space-y-2">
+        {gearboxes.map((gb, i) => (
+          <li key={gb.id ?? i} className="rounded-md border border-slate-700 bg-slate-900 p-2">
+            <div className="flex items-center gap-2">
+              <TextInput className="flex-1" value={gb.name ?? ""} placeholder="Name (z.B. Serie)" onChange={(e) => updateGearbox(i, { name: e.target.value })} />
+              {gb.id && defaultId === gb.id ? (
+                <span className="rounded bg-sky-600 px-2 py-1 text-[10px] text-white">Standard</span>
+              ) : (
+                <Button variant="ghost" onClick={() => setDefault(gb.id)}>als Standard</Button>
+              )}
+              <Button variant="danger" onClick={() => delGterEnsureId(i, delGearbox)}>×</Button>
+            </div>
+            <GearboxEditor
+              gearbox={gb}
+              onChange={(patch) => updateGearbox(i, patch)}
+              onUseAsDefault={onUseAsDefault}
+            />
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function delGterEnsureId(i: number, fn: (i: number) => void) { fn(i); }
+
+function GearboxEditor({ gearbox, onChange, onUseAsDefault }: {
+  gearbox: Gearbox;
+  onChange: (patch: Partial<Gearbox>) => void;
+  onUseAsDefault: (rpmFactor: number) => void;
+}) {
+  const gb = gearbox;
   const U = tireCircumferenceM(gb.tireSpec);
-  const setField = (patch: Partial<Gearbox>) => onChange({ ...gb, ...patch });
   const addGear = () => {
     const n = gb.gears.length + 1;
     const gear: GearRatio = { id: uid(), name: `${n}. Gang`, ratio: 1 };
-    setField({ gears: [...gb.gears, gear] });
+    onChange({ gears: [...gb.gears, gear] });
   };
   const updateGear = (i: number, patch: Partial<GearRatio>) => {
-    const arr = gb.gears.slice(); arr[i] = { ...arr[i], ...patch }; setField({ gears: arr });
+    const arr = gb.gears.slice(); arr[i] = { ...arr[i], ...patch }; onChange({ gears: arr });
   };
-  const delGear = (i: number) => setField({ gears: gb.gears.filter((_, k) => k !== i) });
+  const delGear = (i: number) => onChange({ gears: gb.gears.filter((_, k) => k !== i) });
 
   const factorFor = (ratio: number) => computeRpmFactor(ratio, gb.finalDrive, gb.tireSpec);
 
   return (
-    <div className="mt-3 rounded-md border border-slate-700 p-2">
-      <div className="mb-1 text-xs font-semibold text-slate-200">Getriebe (Gänge)</div>
-      <p className="text-[10px] text-slate-400">Endübersetzung und Reifen gelten für alle Gänge. Pro Gang wird die Übersetzung eingetragen; rpmFactor wird automatisch berechnet.</p>
-      <Row className="mt-2">
-        <Field label="Endübersetzung"><NumInput step="0.001" value={gb.finalDrive} onChange={(e) => setField({ finalDrive: +e.target.value })} /></Field>
-        <Field label="Reifen (z.B. 225/45R17)"><TextInput value={gb.tireSpec} onChange={(e) => setField({ tireSpec: e.target.value })} /></Field>
+    <div className="mt-2">
+      <Row>
+        <Field label="Endübersetzung"><NumInput step="0.001" value={gb.finalDrive} onChange={(e) => onChange({ finalDrive: +e.target.value })} /></Field>
+        <Field label="Reifen (z.B. 225/45R17)"><TextInput value={gb.tireSpec} onChange={(e) => onChange({ tireSpec: e.target.value })} /></Field>
       </Row>
       {gb.gears.length === 0 && <p className="mt-2 text-[11px] text-slate-500">Noch keine Gänge. „+ Gang" hinzufügen.</p>}
       <ul className="mt-2 space-y-2">
@@ -315,7 +368,7 @@ function GearboxEditor({ gearbox, onChange, onUseAsDefault }: {
           const f = factorFor(g.ratio);
           const valid = U !== null && g.ratio > 0 && gb.finalDrive > 0 && f !== null;
           return (
-            <li key={g.id} className="rounded-md border border-slate-700 bg-slate-900 p-2">
+            <li key={g.id} className="rounded-md border border-slate-700 bg-slate-950 p-2">
               <Row>
                 <Field label="Bezeichnung"><TextInput value={g.name} onChange={(e) => updateGear(i, { name: e.target.value })} /></Field>
                 <Field label="Übersetzung"><NumInput step="0.001" value={g.ratio} onChange={(e) => updateGear(i, { ratio: +e.target.value })} /></Field>
@@ -336,6 +389,7 @@ function GearboxEditor({ gearbox, onChange, onUseAsDefault }: {
     </div>
   );
 }
+
 
 
 async function downscaleImage(file: File, maxSize: number, quality: number): Promise<string> {
