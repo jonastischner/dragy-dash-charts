@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Section, Field, TextInput, TextArea, NumInput, Button, Note, Row } from "./ui";
 import { useAppStore, pickColor } from "@/lib/dragy/store";
 import { autoDetectSegments } from "@/lib/dragy/physics";
+import { computeRpmFactor } from "@/lib/dragy/gear";
 import { uid } from "@/lib/dragy/db";
 import type { Session, Segment } from "@/lib/dragy/types";
 import { Chart } from "./Chart";
@@ -174,7 +175,18 @@ function SessionDetail({ session, segments, vehicle, onRename, onDelete, onSaveS
 }
 
 function SegmentEditor({ seg, vehicle, maxT, onChange, onDelete }: { seg: Segment; vehicle: any; maxT: number; onChange: (patch: Partial<Segment>) => Promise<void>; onDelete: () => void }) {
-  const presets: Array<{ id: string; name: string; rpmFactor: number }> = vehicle?.gearPresets ?? [];
+  const legacyPresets: Array<{ id: string; name: string; rpmFactor: number }> = vehicle?.gearPresets ?? [];
+  const gearboxGears: Array<{ id: string; name: string; rpmFactor: number }> = (() => {
+    const gb = vehicle?.gearbox;
+    if (!gb || !Array.isArray(gb.gears)) return [];
+    const out: Array<{ id: string; name: string; rpmFactor: number }> = [];
+    for (const g of gb.gears) {
+      const factor = computeRpmFactor(g.ratio ?? 0, gb.finalDrive ?? 0, gb.tireSpec ?? "");
+      if (factor !== null && Number.isFinite(factor) && factor > 0) out.push({ id: g.id, name: g.name, rpmFactor: factor });
+    }
+    return out;
+  })();
+  const hasAny = gearboxGears.length + legacyPresets.length > 0;
   return (
     <li className="rounded-md border border-slate-700 bg-slate-900 p-2">
       <div className="flex items-center gap-2">
@@ -197,25 +209,37 @@ function SegmentEditor({ seg, vehicle, maxT, onChange, onDelete }: { seg: Segmen
       <Row className="mt-2">
         <Field label="Start t (s)"><NumInput step="0.1" value={seg.startT} onChange={(e) => onChange({ startT: Math.max(0, +e.target.value) })} /></Field>
         <Field label="Ende t (s)"><NumInput step="0.1" value={seg.endT} onChange={(e) => onChange({ endT: Math.min(maxT, +e.target.value) })} /></Field>
-        {presets.length > 0 && (
-          <Field label="Getriebe-Preset" hint="Setzt rpmFactor aus Fahrzeug-Preset">
+        {hasAny && (
+          <Field label="Gemessener Gang" hint="Setzt rpmFactor aus Fahrzeug-Getriebe/Preset">
             <select
               className="w-full rounded-md border border-slate-600 bg-slate-800 px-2 py-2 text-sm text-slate-100 focus:border-sky-400 focus:outline-none"
               value={seg.gearPresetId ?? ""}
               onChange={(e) => {
                 const id = e.target.value;
                 if (!id) { onChange({ gearPresetId: undefined }); return; }
-                const p = presets.find((x) => x.id === id);
-                if (p) onChange({ gearPresetId: id, rpmFactor: p.rpmFactor });
+                const p = [...gearboxGears, ...legacyPresets].find((x) => x.id === id);
+                if (p) onChange({ gearPresetId: id, rpmFactor: +p.rpmFactor.toFixed(3) });
               }}
             >
               <option value="">– manuell –</option>
-              {presets.map((p) => (
-                <option key={p.id} value={p.id}>{p.name} ({p.rpmFactor.toFixed(2)})</option>
-              ))}
+              {gearboxGears.length > 0 && (
+                <optgroup label="Getriebe (Gänge)">
+                  {gearboxGears.map((p) => (
+                    <option key={p.id} value={p.id}>{p.name} ({p.rpmFactor.toFixed(2)})</option>
+                  ))}
+                </optgroup>
+              )}
+              {legacyPresets.length > 0 && (
+                <optgroup label="Presets">
+                  {legacyPresets.map((p) => (
+                    <option key={p.id} value={p.id}>{p.name} ({p.rpmFactor.toFixed(2)})</option>
+                  ))}
+                </optgroup>
+              )}
             </select>
           </Field>
         )}
+
         <Field label="rpmFactor (U/min pro km/h)" hint="Manuell überschreibbar"><NumInput step="0.01" value={seg.rpmFactor} onChange={(e) => onChange({ rpmFactor: +e.target.value, gearPresetId: undefined })} /></Field>
         {seg.calibration && (
           <Field label="Segment-Kalibrierung">

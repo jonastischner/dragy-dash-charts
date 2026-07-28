@@ -9,6 +9,18 @@ export interface GearPreset {
   rpmFactor: number;      // berechnet: U/min pro km/h
 }
 
+export interface GearRatio {
+  id: string;
+  name: string;   // z.B. "1. Gang"
+  ratio: number;  // Getriebeübersetzung dieses Gangs
+}
+
+export interface Gearbox {
+  finalDrive: number;   // Endübersetzung
+  tireSpec: string;     // z.B. "225/45R17"
+  gears: GearRatio[];   // Liste der Gänge mit Übersetzung
+}
+
 export interface Vehicle {
   id: string;
   name: string;
@@ -21,7 +33,8 @@ export interface Vehicle {
   rpmFactorDefault: number; // rpm per km/h
   rpmMatch: { maxRpm: number; maxKmh: number };
   dragCurve: DragPoint[]; // schleppleistung rpm->ps
-  gearPresets?: GearPreset[]; // optionale Getriebe-/Gang-Presets
+  gearPresets?: GearPreset[]; // optionale Getriebe-/Gang-Presets (Legacy)
+  gearbox?: Gearbox; // strukturierte Getriebedefinition mit Gängen
   imageDataUrl?: string; // optional Fahrzeugbild als data:URL (lokal + Cloud-Sync via JSONB)
   updatedAt?: number;
 }
