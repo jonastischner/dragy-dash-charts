@@ -169,11 +169,13 @@ function VehicleEditor({ vehicle, onSave, onCancel }: { vehicle: Vehicle; onSave
           </div>
         </div>
 
-        <GearboxEditor
-          gearbox={v.gearbox}
-          onChange={(gb) => setV({ ...v, gearbox: gb })}
+        <GearboxesManager
+          gearboxes={v.gearboxes ?? []}
+          defaultId={v.defaultGearboxId}
+          onChange={(gbs, defaultId) => setV({ ...v, gearboxes: gbs, defaultGearboxId: defaultId })}
           onUseAsDefault={(f) => setV({ ...v, rpmFactorDefault: +f.toFixed(3) })}
         />
+
 
         <GearPresetsEditor
           presets={v.gearPresets ?? []}
