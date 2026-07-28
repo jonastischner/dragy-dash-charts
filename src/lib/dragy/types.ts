@@ -16,6 +16,8 @@ export interface GearRatio {
 }
 
 export interface Gearbox {
+  id?: string;          // optionale ID (für Multi-Gearbox-Setups)
+  name?: string;        // optionaler Anzeigename, z.B. "Serie" / "Kurz"
   finalDrive: number;   // Endübersetzung
   tireSpec: string;     // z.B. "225/45R17"
   gears: GearRatio[];   // Liste der Gänge mit Übersetzung
