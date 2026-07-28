@@ -611,32 +611,78 @@ function ShiftDiagramCompare({ vehicle }: { vehicle: Vehicle }) {
   const effective = selected ?? setups.map((s) => s.id);
   const resolved = resolveAllGears(vehicle).filter((r) => effective.includes(r.setupId));
   const maxRpm = vehicle.maxRpm && vehicle.maxRpm > 0 ? vehicle.maxRpm : 8000;
-  const shiftRpm = vehicle.shiftRpm;
+  const shiftRpm = vehicle.shiftRpm && vehicle.shiftRpm > 0 ? vehicle.shiftRpm : undefined;
+  // Obergrenze der Gang-Linien: Schaltdrehzahl (falls gepflegt), sonst Maximaldrehzahl.
+  const topRpm = shiftRpm ?? maxRpm;
   const setupIds = Array.from(new Set(resolved.map((r) => r.setupId)));
   const baseColors = ["#38bdf8", "#f472b6", "#a3e635", "#fbbf24", "#c084fc", "#f97316"];
-  const gearIdxBySetup = new Map<string, number>();
 
-  const series: Series[] = resolved.map((r) => {
-    const setupIdx = setupIds.indexOf(r.setupId);
-    const gearIdx = gearIdxBySetup.get(r.setupId) ?? 0;
-    gearIdxBySetup.set(r.setupId, gearIdx + 1);
-    const color = shadeColor(baseColors[setupIdx % baseColors.length], gearIdx * 0.12 - 0.24);
-    return {
-      label: `${r.setupName} · ${r.gear.name}`,
-      color,
-      points: [{ x: 0, y: 0 }, { x: maxRpm, y: maxRpm / r.rpmFactor }],
-    };
-  });
+  const series: Series[] = [];
+  // maximale km/h für horizontale Referenzlinien
+  let kmhMax = 0;
 
-  const bands = [
-    ...(shiftRpm ? [{ xStart: shiftRpm - 25, xEnd: shiftRpm + 25, color: "#f59e0b", label: "Schalt" }] : []),
-    ...(vehicle.maxRpm ? [{ xStart: vehicle.maxRpm - 25, xEnd: vehicle.maxRpm + 25, color: "#ef4444", label: "Max" }] : []),
-  ];
+  for (const setupIdx of setupIds.map((_, i) => i)) {
+    const sid = setupIds[setupIdx];
+    // Gänge dieses Setups in Gang-Reihenfolge (höchster rpmFactor zuerst = 1. Gang).
+    const gears = resolved
+      .filter((r) => r.setupId === sid)
+      .slice()
+      .sort((a, b) => b.rpmFactor - a.rpmFactor);
+    const base = baseColors[setupIdx % baseColors.length];
+
+    gears.forEach((r, gi) => {
+      const color = shadeColor(base, gi * 0.12 - 0.24);
+      // Achsen getauscht: x = km/h, y = U/min. Linie vom Leerlauf-nahe (rpm=0) bis topRpm.
+      const kmhTop = topRpm / r.rpmFactor;
+      if (kmhTop > kmhMax) kmhMax = kmhTop;
+      series.push({
+        label: `${r.setupName} · ${r.gear.name}`,
+        color,
+        points: [{ x: 0, y: 0 }, { x: kmhTop, y: topRpm }],
+      });
+
+      // Gangsprung: vertikaler Abfall an der Schaltdrehzahl zum nächsten Gang bei
+      // gleicher Geschwindigkeit. Nur wenn Schaltdrehzahl definiert ist.
+      const next = gears[gi + 1];
+      if (shiftRpm && next) {
+        const kmhShift = shiftRpm / r.rpmFactor;
+        const rpmNext = shiftRpm * (next.rpmFactor / r.rpmFactor);
+        series.push({
+          label: `${r.setupName} · Schaltsprung ${r.gear.name}→${next.gear.name}`,
+          color,
+          points: [
+            { x: kmhShift, y: shiftRpm },
+            { x: kmhShift, y: rpmNext },
+          ],
+        });
+      }
+    });
+  }
+
+  // Horizontale Referenzlinien (Schalt-/Maximaldrehzahl) über die volle x-Breite.
+  if (kmhMax > 0) {
+    if (shiftRpm) {
+      series.push({
+        label: "Schaltdrehzahl",
+        color: "#f59e0b",
+        points: [{ x: 0, y: shiftRpm }, { x: kmhMax, y: shiftRpm }],
+      });
+    }
+    if (vehicle.maxRpm && vehicle.maxRpm > 0) {
+      series.push({
+        label: "Maximaldrehzahl",
+        color: "#ef4444",
+        points: [{ x: 0, y: vehicle.maxRpm }, { x: kmhMax, y: vehicle.maxRpm }],
+      });
+    }
+  }
 
   return (
     <div className="mt-3 rounded-md border border-slate-700 p-2">
       <div className="mb-1 text-xs font-semibold text-slate-200">Schaltdiagramm (Setups vergleichen)</div>
-      <p className="text-[10px] text-slate-400">Berechnet aus Getriebe- und Endübersetzung sowie Reifenumfang: km/h(rpm) je Gang. Bänder markieren Schalt- und Maximaldrehzahl.</p>
+      <p className="text-[10px] text-slate-400">
+        U/min über km/h je Gang. Senkrechte Linien zeigen den Drehzahlabfall beim Schalten (bei gepflegter Schaltdrehzahl); waagerechte Linien markieren Schalt- (orange) und Maximaldrehzahl (rot).
+      </p>
       {setups.length === 0 ? (
         <p className="mt-2 text-[11px] text-slate-500">Erst mindestens ein Setup oben anlegen.</p>
       ) : (
@@ -665,9 +711,8 @@ function ShiftDiagramCompare({ vehicle }: { vehicle: Vehicle }) {
           <div className="mt-2">
             <Chart
               series={series}
-              bands={bands}
-              xLabel="U/min"
-              yLabel="km/h"
+              xLabel="km/h"
+              yLabel="U/min"
               xFormat={(v) => v.toFixed(0)}
               yFormat={(v) => v.toFixed(0)}
               height={280}
