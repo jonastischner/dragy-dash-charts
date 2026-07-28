@@ -77,7 +77,16 @@ export function VehiclesTab() {
 }
 
 function VehicleEditor({ vehicle, onSave, onCancel }: { vehicle: Vehicle; onSave: (v: Vehicle) => void; onCancel: () => void }) {
-  const [v, setV] = useState<Vehicle>({ ...vehicle });
+  const [v, setV] = useState<Vehicle>(() => {
+    const base: Vehicle = { ...vehicle };
+    // Migration: Legacy `gearbox` einmalig in `gearboxes` überführen
+    if ((!base.gearboxes || base.gearboxes.length === 0) && base.gearbox) {
+      const migrated: Gearbox = { id: uid(), name: "Serie", ...base.gearbox };
+      base.gearboxes = [migrated];
+      if (!base.defaultGearboxId) base.defaultGearboxId = migrated.id;
+    }
+    return base;
+  });
 
   const applyRpmMatch = () => {
     if (v.rpmMatch.maxKmh > 0) setV({ ...v, rpmFactorDefault: +(v.rpmMatch.maxRpm / v.rpmMatch.maxKmh).toFixed(3) });
