@@ -130,7 +130,9 @@ export function CompareTab() {
         note={
           isAccel
             ? "Beschleunigung: rein GPS-basiert, gangübergreifend – zeigt reale Zeit ab Segmentstart bis zur jeweiligen Geschwindigkeit."
-            : "Motorleistung/-drehmoment sind Schätzungen (RPM aus Vmax abgeleitet, Schleppkurve als Näherung). Drehmoment ist gegenüber RPM-Faktor-Fehlern empfindlicher als die Leistung."
+            : isShift
+              ? "Schaltdiagramm: km/h(rpm) je Setup und Gang aus Getriebe- und Endübersetzung sowie Reifenumfang berechnet. Bänder markieren Schalt- und Maximaldrehzahl."
+              : "Motorleistung/-drehmoment sind Schätzungen (RPM aus Vmax abgeleitet, Schleppkurve als Näherung). Drehmoment ist gegenüber RPM-Faktor-Fehlern empfindlicher als die Leistung."
         }
       >
         <div className="mb-2 flex flex-wrap gap-1">
@@ -141,7 +143,43 @@ export function CompareTab() {
             </button>
           ))}
         </div>
-        {segments.length === 0 ? (
+
+        {isShift ? (
+          allSetups.length === 0 ? (
+            <p className="text-xs text-slate-400">Keine Setups am aktiven Fahrzeug – erst Getriebe, Endübersetzung und Setup anlegen.</p>
+          ) : (
+            <>
+              <div className="mb-2 flex flex-wrap gap-2 text-xs text-slate-200">
+                {allSetups.map((s) => {
+                  const on = effectiveSelected.includes(s.id);
+                  return (
+                    <label key={s.id} className="flex items-center gap-1 rounded bg-slate-800 px-2 py-1">
+                      <input
+                        type="checkbox"
+                        checked={on}
+                        onChange={(e) => {
+                          const base = effectiveSelected;
+                          const next = e.target.checked ? Array.from(new Set([...base, s.id])) : base.filter((x) => x !== s.id);
+                          setSelectedSetupIds(next);
+                        }}
+                      />
+                      {s.name}
+                    </label>
+                  );
+                })}
+              </div>
+              <Chart
+                series={shiftSeries}
+                bands={shiftBands}
+                xLabel="U/min"
+                yLabel="km/h"
+                xFormat={(v) => v.toFixed(0)}
+                yFormat={(v) => v.toFixed(0)}
+                height={340}
+              />
+            </>
+          )
+        ) : segments.length === 0 ? (
           <p className="text-xs text-slate-400">Keine Läufe im aktiven Fahrzeug.</p>
         ) : (
           <>
