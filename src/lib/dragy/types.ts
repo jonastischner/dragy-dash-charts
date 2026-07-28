@@ -16,6 +16,8 @@ export interface GearRatio {
 }
 
 export interface Gearbox {
+  id?: string;          // optionale ID (für Multi-Gearbox-Setups)
+  name?: string;        // optionaler Anzeigename, z.B. "Serie" / "Kurz"
   finalDrive: number;   // Endübersetzung
   tireSpec: string;     // z.B. "225/45R17"
   gears: GearRatio[];   // Liste der Gänge mit Übersetzung
@@ -34,7 +36,9 @@ export interface Vehicle {
   rpmMatch: { maxRpm: number; maxKmh: number };
   dragCurve: DragPoint[]; // schleppleistung rpm->ps
   gearPresets?: GearPreset[]; // optionale Getriebe-/Gang-Presets (Legacy)
-  gearbox?: Gearbox; // strukturierte Getriebedefinition mit Gängen
+  gearbox?: Gearbox; // Legacy: einzelne Getriebedefinition (wird beim Öffnen in gearboxes migriert)
+  gearboxes?: Gearbox[]; // mehrere Getriebe-Konfigurationen (Serie, Kurz, Alt, ...)
+  defaultGearboxId?: string; // welches Getriebe ist Standard für neue Läufe
   imageDataUrl?: string; // optional Fahrzeugbild als data:URL (lokal + Cloud-Sync via JSONB)
   updatedAt?: number;
 }

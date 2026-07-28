@@ -176,17 +176,29 @@ function SessionDetail({ session, segments, vehicle, onRename, onDelete, onSaveS
 
 function SegmentEditor({ seg, vehicle, maxT, onChange, onDelete }: { seg: Segment; vehicle: any; maxT: number; onChange: (patch: Partial<Segment>) => Promise<void>; onDelete: () => void }) {
   const legacyPresets: Array<{ id: string; name: string; rpmFactor: number }> = vehicle?.gearPresets ?? [];
-  const gearboxGears: Array<{ id: string; name: string; rpmFactor: number }> = (() => {
-    const gb = vehicle?.gearbox;
-    if (!gb || !Array.isArray(gb.gears)) return [];
-    const out: Array<{ id: string; name: string; rpmFactor: number }> = [];
+
+  // Alle Gearboxes einsammeln (neu: gearboxes[]; alt: einzelnes gearbox)
+  const allGearboxes: Array<{ id: string; name: string; finalDrive: number; tireSpec: string; gears: any[] }> = (() => {
+    const list: any[] = Array.isArray(vehicle?.gearboxes) ? vehicle.gearboxes.slice() : [];
+    if (list.length === 0 && vehicle?.gearbox) list.push({ id: "legacy", name: "Getriebe", ...vehicle.gearbox });
+    return list.map((gb, i) => ({ id: gb.id ?? `gb-${i}`, name: gb.name || `Getriebe ${i + 1}`, finalDrive: gb.finalDrive, tireSpec: gb.tireSpec, gears: gb.gears ?? [] }));
+  })();
+
+  type GearOpt = { id: string; label: string; rpmFactor: number };
+  const gearboxGroups: Array<{ name: string; options: GearOpt[] }> = allGearboxes.map((gb) => {
+    const options: GearOpt[] = [];
     for (const g of gb.gears) {
       const factor = computeRpmFactor(g.ratio ?? 0, gb.finalDrive ?? 0, gb.tireSpec ?? "");
-      if (factor !== null && Number.isFinite(factor) && factor > 0) out.push({ id: g.id, name: g.name, rpmFactor: factor });
+      if (factor !== null && Number.isFinite(factor) && factor > 0) {
+        options.push({ id: `${gb.id}:${g.id}`, label: g.name, rpmFactor: factor });
+      }
     }
-    return out;
-  })();
-  const hasAny = gearboxGears.length + legacyPresets.length > 0;
+    return { name: gb.name, options };
+  }).filter((grp) => grp.options.length > 0);
+
+  const flatGearOptions: GearOpt[] = gearboxGroups.flatMap((g) => g.options);
+  const hasAny = flatGearOptions.length + legacyPresets.length > 0;
+
   return (
     <li className="rounded-md border border-slate-700 bg-slate-900 p-2">
       <div className="flex items-center gap-2">
@@ -217,18 +229,18 @@ function SegmentEditor({ seg, vehicle, maxT, onChange, onDelete }: { seg: Segmen
               onChange={(e) => {
                 const id = e.target.value;
                 if (!id) { onChange({ gearPresetId: undefined }); return; }
-                const p = [...gearboxGears, ...legacyPresets].find((x) => x.id === id);
+                const p = [...flatGearOptions, ...legacyPresets.map((lp) => ({ id: lp.id, label: lp.name, rpmFactor: lp.rpmFactor }))].find((x) => x.id === id);
                 if (p) onChange({ gearPresetId: id, rpmFactor: +p.rpmFactor.toFixed(3) });
               }}
             >
               <option value="">– manuell –</option>
-              {gearboxGears.length > 0 && (
-                <optgroup label="Getriebe (Gänge)">
-                  {gearboxGears.map((p) => (
-                    <option key={p.id} value={p.id}>{p.name} ({p.rpmFactor.toFixed(2)})</option>
+              {gearboxGroups.map((grp) => (
+                <optgroup key={grp.name} label={grp.name}>
+                  {grp.options.map((p) => (
+                    <option key={p.id} value={p.id}>{p.label} ({p.rpmFactor.toFixed(2)})</option>
                   ))}
                 </optgroup>
-              )}
+              ))}
               {legacyPresets.length > 0 && (
                 <optgroup label="Presets">
                   {legacyPresets.map((p) => (
