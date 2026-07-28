@@ -229,18 +229,18 @@ function SegmentEditor({ seg, vehicle, maxT, onChange, onDelete }: { seg: Segmen
               onChange={(e) => {
                 const id = e.target.value;
                 if (!id) { onChange({ gearPresetId: undefined }); return; }
-                const p = [...gearboxGears, ...legacyPresets].find((x) => x.id === id);
+                const p = [...flatGearOptions, ...legacyPresets.map((lp) => ({ id: lp.id, label: lp.name, rpmFactor: lp.rpmFactor }))].find((x) => x.id === id);
                 if (p) onChange({ gearPresetId: id, rpmFactor: +p.rpmFactor.toFixed(3) });
               }}
             >
               <option value="">– manuell –</option>
-              {gearboxGears.length > 0 && (
-                <optgroup label="Getriebe (Gänge)">
-                  {gearboxGears.map((p) => (
-                    <option key={p.id} value={p.id}>{p.name} ({p.rpmFactor.toFixed(2)})</option>
+              {gearboxGroups.map((grp) => (
+                <optgroup key={grp.name} label={grp.name}>
+                  {grp.options.map((p) => (
+                    <option key={p.id} value={p.id}>{p.label} ({p.rpmFactor.toFixed(2)})</option>
                   ))}
                 </optgroup>
-              )}
+              ))}
               {legacyPresets.length > 0 && (
                 <optgroup label="Presets">
                   {legacyPresets.map((p) => (
