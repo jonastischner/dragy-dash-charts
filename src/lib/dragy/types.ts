@@ -28,7 +28,7 @@ export interface Gearbox {
 export interface GearboxDef {
   id: string;
   name: string;
-  tireSpec: string;
+  tireSpec?: string; // Legacy: früher am Getriebe gepflegt, jetzt am Setup via tireId
   gears: GearRatio[];
 }
 export interface FinalDriveDef {
@@ -36,11 +36,17 @@ export interface FinalDriveDef {
   name: string;
   ratio: number;
 }
+export interface TireDef {
+  id: string;
+  name: string;
+  spec: string; // z.B. "225/45R17"
+}
 export interface DriveSetup {
   id: string;
   name: string;
   gearboxId: string;
   finalDriveId: string;
+  tireId?: string; // Verweis auf Vehicle.tires[]
 }
 
 export interface Vehicle {
@@ -62,6 +68,7 @@ export interface Vehicle {
   // Neue, entkoppelte Antriebs-Bausteine:
   gearboxDefs?: GearboxDef[];
   finalDrives?: FinalDriveDef[];
+  tires?: TireDef[];
   setups?: DriveSetup[];
   defaultSetupId?: string;
   shiftRpm?: number;   // empfohlene Schaltdrehzahl

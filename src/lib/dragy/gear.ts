@@ -31,31 +31,33 @@ export function computeRpmFactor(
   return (60 * gearRatio * finalDrive) / (3.6 * U);
 }
 
-import type { Vehicle, DriveSetup, GearboxDef, FinalDriveDef, GearRatio } from "./types";
+import type { Vehicle, DriveSetup, GearboxDef, FinalDriveDef, TireDef, GearRatio } from "./types";
 
 export interface ResolvedGear {
   setupId: string;
   setupName: string;
   gearboxId: string;
   finalDriveId: string;
+  tireId?: string;
   gear: GearRatio;
   rpmFactor: number; // U/min pro km/h
   tireSpec: string;
   finalDrive: number;
 }
 
-// Migriert Legacy-`gearboxes[]` (Getriebe mit finalDrive inline) in getrennte
-// GearboxDefs/FinalDrives/Setups. Reine Lese-Migration: verändert das
-// Vehicle-Objekt nicht in der DB, sondern liefert eine normalisierte Sicht.
+// Migriert Legacy-Strukturen in getrennte GearboxDefs/FinalDrives/Tires/Setups.
+// Reine Lese-Migration: verändert das Vehicle-Objekt nicht in der DB.
 export function normalizeDrive(vehicle: Vehicle | null | undefined): {
   gearboxDefs: GearboxDef[];
   finalDrives: FinalDriveDef[];
+  tires: TireDef[];
   setups: DriveSetup[];
   defaultSetupId?: string;
 } {
-  if (!vehicle) return { gearboxDefs: [], finalDrives: [], setups: [] };
+  if (!vehicle) return { gearboxDefs: [], finalDrives: [], tires: [], setups: [] };
   const gearboxDefs = [...(vehicle.gearboxDefs ?? [])];
   const finalDrives = [...(vehicle.finalDrives ?? [])];
+  const tires = [...(vehicle.tires ?? [])];
   const setups = [...(vehicle.setups ?? [])];
   let defaultSetupId = vehicle.defaultSetupId;
 
@@ -65,42 +67,64 @@ export function normalizeDrive(vehicle: Vehicle | null | undefined): {
     for (const gb of legacyList) {
       const gbId = gb.id ?? `gb-${gearboxDefs.length + 1}`;
       gearboxDefs.push({ id: gbId, name: gb.name || "Getriebe", tireSpec: gb.tireSpec, gears: gb.gears });
-      // Endübersetzung deduplizieren (gleiche Ratio -> gleicher FinalDrive-Eintrag)
       let fd = finalDrives.find((f) => Math.abs(f.ratio - gb.finalDrive) < 1e-6);
       if (!fd) {
         fd = { id: `fd-${finalDrives.length + 1}`, name: gb.finalDrive.toFixed(3), ratio: gb.finalDrive };
         finalDrives.push(fd);
+      }
+      let tire = tires.find((t) => t.spec === gb.tireSpec);
+      if (!tire && gb.tireSpec) {
+        tire = { id: `tire-${tires.length + 1}`, name: gb.tireSpec, spec: gb.tireSpec };
+        tires.push(tire);
       }
       const setup: DriveSetup = {
         id: `setup-${setups.length + 1}`,
         name: `${gb.name || "Getriebe"} + ${fd.name}`,
         gearboxId: gbId,
         finalDriveId: fd.id,
+        tireId: tire?.id,
       };
       setups.push(setup);
       if (!defaultSetupId && vehicle.defaultGearboxId === gb.id) defaultSetupId = setup.id;
     }
     if (!defaultSetupId) defaultSetupId = setups[0]?.id;
   }
-  return { gearboxDefs, finalDrives, setups, defaultSetupId };
+
+  // Zweite Migrationsstufe: Reifen aus GearboxDef.tireSpec in Tires anheben und Setups verknüpfen.
+  for (const gb of gearboxDefs) {
+    if (!gb.tireSpec) continue;
+    let tire = tires.find((t) => t.spec === gb.tireSpec);
+    if (!tire) {
+      tire = { id: `tire-${tires.length + 1}`, name: gb.tireSpec, spec: gb.tireSpec };
+      tires.push(tire);
+    }
+    for (const s of setups) {
+      if (s.gearboxId === gb.id && !s.tireId) s.tireId = tire.id;
+    }
+  }
+
+  return { gearboxDefs, finalDrives, tires, setups, defaultSetupId };
 }
 
 // Alle wählbaren Gänge quer über alle Setups auflösen (für Dropdowns/Diagramme).
 export function resolveAllGears(vehicle: Vehicle | null | undefined): ResolvedGear[] {
-  const { gearboxDefs, finalDrives, setups } = normalizeDrive(vehicle);
+  const { gearboxDefs, finalDrives, tires, setups } = normalizeDrive(vehicle);
   const out: ResolvedGear[] = [];
   for (const setup of setups) {
     const gb = gearboxDefs.find((g) => g.id === setup.gearboxId);
     const fd = finalDrives.find((f) => f.id === setup.finalDriveId);
     if (!gb || !fd) continue;
+    const tire = tires.find((t) => t.id === setup.tireId);
+    const tireSpec = tire?.spec ?? gb.tireSpec ?? "";
     for (const g of gb.gears) {
-      const f = computeRpmFactor(g.ratio, fd.ratio, gb.tireSpec);
+      const f = computeRpmFactor(g.ratio, fd.ratio, tireSpec);
       if (f == null || !Number.isFinite(f) || f <= 0) continue;
       out.push({
         setupId: setup.id, setupName: setup.name,
         gearboxId: gb.id, finalDriveId: fd.id,
+        tireId: setup.tireId,
         gear: g, rpmFactor: +f.toFixed(3),
-        tireSpec: gb.tireSpec, finalDrive: fd.ratio,
+        tireSpec, finalDrive: fd.ratio,
       });
     }
   }
