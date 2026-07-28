@@ -621,43 +621,35 @@ function ShiftDiagramCompare({ vehicle }: { vehicle: Vehicle }) {
   // maximale km/h für horizontale Referenzlinien
   let kmhMax = 0;
 
-  for (const setupIdx of setupIds.map((_, i) => i)) {
-    const sid = setupIds[setupIdx];
+  setupIds.forEach((sid, setupIdx) => {
     // Gänge dieses Setups in Gang-Reihenfolge (höchster rpmFactor zuerst = 1. Gang).
     const gears = resolved
       .filter((r) => r.setupId === sid)
       .slice()
       .sort((a, b) => b.rpmFactor - a.rpmFactor);
-    const base = baseColors[setupIdx % baseColors.length];
+    if (gears.length === 0) return;
+    const color = baseColors[setupIdx % baseColors.length];
+    const setupName = gears[0].setupName;
 
+    // Eine durchgehende Sägezahn-Kurve: pro Gang Anstieg 0→shiftRpm
+    // (bzw. maxRpm im letzten Gang), dann senkrechter Sprung auf die
+    // Drehzahl des nächsten Gangs bei gleicher km/h.
+    const pts: Array<{ x: number; y: number }> = [{ x: 0, y: 0 }];
     gears.forEach((r, gi) => {
-      const color = shadeColor(base, gi * 0.12 - 0.24);
-      // Achsen getauscht: x = km/h, y = U/min. Linie vom Leerlauf-nahe (rpm=0) bis topRpm.
-      const kmhTop = topRpm / r.rpmFactor;
+      const isLast = gi === gears.length - 1;
+      const rpmTop = isLast ? maxRpm : (shiftRpm ?? maxRpm);
+      const kmhTop = rpmTop / r.rpmFactor;
       if (kmhTop > kmhMax) kmhMax = kmhTop;
-      series.push({
-        label: `${r.setupName} · ${r.gear.name}`,
-        color,
-        points: [{ x: 0, y: 0 }, { x: kmhTop, y: topRpm }],
-      });
-
-      // Gangsprung: vertikaler Abfall an der Schaltdrehzahl zum nächsten Gang bei
-      // gleicher Geschwindigkeit. Nur wenn Schaltdrehzahl definiert ist.
+      pts.push({ x: kmhTop, y: rpmTop });
       const next = gears[gi + 1];
-      if (shiftRpm && next) {
-        const kmhShift = shiftRpm / r.rpmFactor;
-        const rpmNext = shiftRpm * (next.rpmFactor / r.rpmFactor);
-        series.push({
-          label: `${r.setupName} · Schaltsprung ${r.gear.name}→${next.gear.name}`,
-          color,
-          points: [
-            { x: kmhShift, y: shiftRpm },
-            { x: kmhShift, y: rpmNext },
-          ],
-        });
+      if (next && !isLast) {
+        const rpmNext = rpmTop * (next.rpmFactor / r.rpmFactor);
+        pts.push({ x: kmhTop, y: rpmNext });
       }
     });
-  }
+    series.push({ label: setupName, color, points: pts });
+  });
+
 
   // Horizontale Referenzlinien (Schalt-/Maximaldrehzahl) über die volle x-Breite.
   if (kmhMax > 0) {
