@@ -3,7 +3,7 @@ import { Section, Field, TextInput, NumInput, Button, Note, Row } from "./ui";
 import { useAppStore, newVehicle } from "@/lib/dragy/store";
 import { uid } from "@/lib/dragy/db";
 import { computeRpmFactor, tireCircumferenceM, normalizeDrive, resolveAllGears } from "@/lib/dragy/gear";
-import type { Vehicle, DragPoint, GearPreset, GearboxDef, FinalDriveDef, DriveSetup, GearRatio } from "@/lib/dragy/types";
+import type { Vehicle, DragPoint, GearPreset, GearboxDef, FinalDriveDef, TireDef, DriveSetup, GearRatio } from "@/lib/dragy/types";
 import { Chart, type Series } from "./Chart";
 
 function useLockBodyScroll() {
@@ -86,6 +86,7 @@ function VehicleEditor({ vehicle, onSave, onCancel }: { vehicle: Vehicle; onSave
       const norm = normalizeDrive(base);
       base.gearboxDefs = norm.gearboxDefs;
       base.finalDrives = norm.finalDrives;
+      base.tires = norm.tires;
       base.setups = norm.setups;
       base.defaultSetupId = norm.defaultSetupId;
       // Legacy-Felder leeren, sobald migriert wurde
@@ -94,9 +95,19 @@ function VehicleEditor({ vehicle, onSave, onCancel }: { vehicle: Vehicle; onSave
         base.defaultGearboxId = undefined;
         base.gearbox = undefined;
       }
+    } else {
+      // Bereits migriert, aber ggf. neue Reifen-Ebene nachziehen (aus GearboxDef.tireSpec).
+      const hasTires = (base.tires && base.tires.length > 0);
+      const gbTireSpec = base.gearboxDefs?.some((g) => g.tireSpec);
+      if (!hasTires && gbTireSpec) {
+        const norm = normalizeDrive(base);
+        base.tires = norm.tires;
+        base.setups = norm.setups;
+      }
     }
     if (!base.gearboxDefs) base.gearboxDefs = [];
     if (!base.finalDrives) base.finalDrives = [];
+    if (!base.tires) base.tires = [];
     if (!base.setups) base.setups = [];
     return base;
   });
@@ -197,6 +208,7 @@ function VehicleEditor({ vehicle, onSave, onCancel }: { vehicle: Vehicle; onSave
         <AntriebManager
           gearboxDefs={v.gearboxDefs ?? []}
           finalDrives={v.finalDrives ?? []}
+          tires={v.tires ?? []}
           setups={v.setups ?? []}
           defaultSetupId={v.defaultSetupId}
           onChange={(patch) => setV({ ...v, ...patch })}
@@ -302,17 +314,18 @@ function GearPresetsEditor({ presets, onChange, onUseAsDefault }: {
 
 // ================= Antrieb (Getriebe + Endübersetzung + Setups) =================
 
-function AntriebManager({ gearboxDefs, finalDrives, setups, defaultSetupId, onChange, onUseAsDefault }: {
+function AntriebManager({ gearboxDefs, finalDrives, tires, setups, defaultSetupId, onChange, onUseAsDefault }: {
   gearboxDefs: GearboxDef[];
   finalDrives: FinalDriveDef[];
+  tires: TireDef[];
   setups: DriveSetup[];
   defaultSetupId: string | undefined;
-  onChange: (patch: { gearboxDefs?: GearboxDef[]; finalDrives?: FinalDriveDef[]; setups?: DriveSetup[]; defaultSetupId?: string | undefined }) => void;
+  onChange: (patch: { gearboxDefs?: GearboxDef[]; finalDrives?: FinalDriveDef[]; tires?: TireDef[]; setups?: DriveSetup[]; defaultSetupId?: string | undefined }) => void;
   onUseAsDefault: (rpmFactor: number) => void;
 }) {
   // -- Gearbox actions
   const addGearbox = () => {
-    const gb: GearboxDef = { id: uid(), name: `Getriebe ${gearboxDefs.length + 1}`, tireSpec: "225/45R17", gears: [] };
+    const gb: GearboxDef = { id: uid(), name: `Getriebe ${gearboxDefs.length + 1}`, gears: [] };
     onChange({ gearboxDefs: [...gearboxDefs, gb] });
   };
   const updateGearbox = (i: number, patch: Partial<GearboxDef>) => {
@@ -321,7 +334,6 @@ function AntriebManager({ gearboxDefs, finalDrives, setups, defaultSetupId, onCh
   const delGearbox = (i: number) => {
     const removed = gearboxDefs[i];
     const arr = gearboxDefs.filter((_, k) => k !== i);
-    // Setups, die dieses Getriebe verwenden, entfernen
     const nextSetups = setups.filter((s) => s.gearboxId !== removed.id);
     const nextDefault = nextSetups.find((s) => s.id === defaultSetupId) ? defaultSetupId : nextSetups[0]?.id;
     onChange({ gearboxDefs: arr, setups: nextSetups, defaultSetupId: nextDefault });
@@ -343,16 +355,33 @@ function AntriebManager({ gearboxDefs, finalDrives, setups, defaultSetupId, onCh
     onChange({ finalDrives: arr, setups: nextSetups, defaultSetupId: nextDefault });
   };
 
+  // -- Tire actions
+  const addTire = () => {
+    const t: TireDef = { id: uid(), name: `Reifen ${tires.length + 1}`, spec: "225/45R17" };
+    onChange({ tires: [...tires, t] });
+  };
+  const updateTire = (i: number, patch: Partial<TireDef>) => {
+    const arr = tires.slice(); arr[i] = { ...arr[i], ...patch }; onChange({ tires: arr });
+  };
+  const delTire = (i: number) => {
+    const removed = tires[i];
+    const arr = tires.filter((_, k) => k !== i);
+    const nextSetups = setups.map((s) => s.tireId === removed.id ? { ...s, tireId: undefined } : s);
+    onChange({ tires: arr, setups: nextSetups });
+  };
+
   // -- Setup actions
   const addSetup = () => {
     const gb = gearboxDefs[0];
     const fd = finalDrives[0];
     if (!gb || !fd) { alert("Erst mindestens ein Getriebe und eine Endübersetzung anlegen."); return; }
+    const t = tires[0];
     const setup: DriveSetup = {
       id: uid(),
-      name: `${gb.name} + ${fd.name}`,
+      name: `${gb.name} + ${fd.name}${t ? " + " + t.name : ""}`,
       gearboxId: gb.id,
       finalDriveId: fd.id,
+      tireId: t?.id,
     };
     const next = [...setups, setup];
     onChange({ setups: next, defaultSetupId: defaultSetupId ?? setup.id });
@@ -369,8 +398,8 @@ function AntriebManager({ gearboxDefs, finalDrives, setups, defaultSetupId, onCh
 
   return (
     <div className="mt-3 rounded-md border border-slate-700 p-2">
-      <div className="mb-1 text-xs font-semibold text-slate-200">Antrieb (Getriebe, Endübersetzung, Setups)</div>
-      <p className="text-[10px] text-slate-400">Getriebe (Gänge + Reifen) und Endübersetzungen getrennt pflegen und beliebig zu Setups kombinieren.</p>
+      <div className="mb-1 text-xs font-semibold text-slate-200">Antrieb (Getriebe, Endübersetzung, Reifen, Setups)</div>
+      <p className="text-[10px] text-slate-400">Getriebe (nur Gänge), Endübersetzungen und Reifen getrennt pflegen und beliebig zu Setups kombinieren.</p>
 
       {/* Gearboxes */}
       <div className="mt-2 rounded-md border border-slate-700 bg-slate-900/60 p-2">
@@ -386,9 +415,6 @@ function AntriebManager({ gearboxDefs, finalDrives, setups, defaultSetupId, onCh
                 <TextInput className="flex-1" value={gb.name} onChange={(e) => updateGearbox(i, { name: e.target.value })} />
                 <Button variant="danger" onClick={() => delGearbox(i)}>×</Button>
               </div>
-              <Row className="mt-2">
-                <Field label="Reifen (z.B. 225/45R17)"><TextInput value={gb.tireSpec} onChange={(e) => updateGearbox(i, { tireSpec: e.target.value })} /></Field>
-              </Row>
               <GearListEditor
                 gears={gb.gears}
                 onChange={(gears) => updateGearbox(i, { gears })}
@@ -418,10 +444,34 @@ function AntriebManager({ gearboxDefs, finalDrives, setups, defaultSetupId, onCh
         </ul>
       </div>
 
+      {/* Tires */}
+      <div className="mt-2 rounded-md border border-slate-700 bg-slate-900/60 p-2">
+        <div className="mb-1 flex items-center justify-between">
+          <div className="text-[11px] font-semibold text-slate-200">Reifen</div>
+          <Button variant="secondary" onClick={addTire}>+ Reifen</Button>
+        </div>
+        {tires.length === 0 && <p className="text-[11px] text-slate-500">Noch kein Reifen.</p>}
+        <ul className="space-y-2">
+          {tires.map((t, i) => {
+            const U = tireCircumferenceM(t.spec);
+            return (
+              <li key={t.id} className="rounded-md border border-slate-700 bg-slate-950 p-2">
+                <Row>
+                  <Field label="Name"><TextInput value={t.name} onChange={(e) => updateTire(i, { name: e.target.value })} /></Field>
+                  <Field label="Spec (z.B. 225/45R17)"><TextInput value={t.spec} onChange={(e) => updateTire(i, { spec: e.target.value })} /></Field>
+                  <div className="flex items-end"><Button variant="danger" onClick={() => delTire(i)}>×</Button></div>
+                </Row>
+                <div className="mt-1 text-[10px] text-slate-400">Abrollumfang: {U ? (U * 1000).toFixed(0) + " mm (dyn.)" : "– (ungültig)"}</div>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+
       {/* Setups */}
       <div className="mt-2 rounded-md border border-slate-700 bg-slate-900/60 p-2">
         <div className="mb-1 flex items-center justify-between">
-          <div className="text-[11px] font-semibold text-slate-200">Setups (Getriebe × Endübersetzung)</div>
+          <div className="text-[11px] font-semibold text-slate-200">Setups (Getriebe × Endübersetzung × Reifen)</div>
           <Button variant="secondary" onClick={addSetup}>+ Setup</Button>
         </div>
         {setups.length === 0 && <p className="text-[11px] text-slate-500">Noch kein Setup.</p>}
@@ -429,6 +479,8 @@ function AntriebManager({ gearboxDefs, finalDrives, setups, defaultSetupId, onCh
           {setups.map((s, i) => {
             const gb = gearboxDefs.find((g) => g.id === s.gearboxId);
             const fd = finalDrives.find((f) => f.id === s.finalDriveId);
+            const tire = tires.find((t) => t.id === s.tireId);
+            const tireSpec = tire?.spec ?? gb?.tireSpec ?? "";
             const isDefault = defaultSetupId === s.id;
             return (
               <li key={s.id} className="rounded-md border border-slate-700 bg-slate-950 p-2">
@@ -460,13 +512,23 @@ function AntriebManager({ gearboxDefs, finalDrives, setups, defaultSetupId, onCh
                       {finalDrives.map((f) => <option key={f.id} value={f.id}>{f.name} ({f.ratio.toFixed(3)})</option>)}
                     </select>
                   </Field>
+                  <Field label="Reifen">
+                    <select
+                      className="w-full rounded-md border border-slate-600 bg-slate-800 px-2 py-2 text-sm text-slate-100"
+                      value={s.tireId ?? ""}
+                      onChange={(e) => updateSetup(i, { tireId: e.target.value || undefined })}
+                    >
+                      <option value="">– Reifen wählen –</option>
+                      {tires.map((t) => <option key={t.id} value={t.id}>{t.name} ({t.spec})</option>)}
+                    </select>
+                  </Field>
                 </Row>
-                {gb && fd && gb.gears.length > 0 && (
+                {gb && fd && gb.gears.length > 0 && tireSpec && (
                   <div className="mt-2 text-[11px] text-slate-300">
-                    <div className="text-slate-400">rpmFactor pro Gang (bei {gb.tireSpec}, End {fd.ratio.toFixed(3)}):</div>
+                    <div className="text-slate-400">rpmFactor pro Gang (Reifen {tireSpec}, End {fd.ratio.toFixed(3)}):</div>
                     <div className="mt-1 flex flex-wrap gap-1">
                       {gb.gears.map((g) => {
-                        const f = computeRpmFactor(g.ratio, fd.ratio, gb.tireSpec);
+                        const f = computeRpmFactor(g.ratio, fd.ratio, tireSpec);
                         if (f == null) return null;
                         return (
                           <button key={g.id} className="rounded bg-slate-800 px-2 py-0.5 hover:bg-slate-700"
@@ -478,6 +540,9 @@ function AntriebManager({ gearboxDefs, finalDrives, setups, defaultSetupId, onCh
                       })}
                     </div>
                   </div>
+                )}
+                {(!tireSpec) && (
+                  <p className="mt-2 text-[11px] text-amber-400">Bitte einen Reifen für dieses Setup wählen.</p>
                 )}
               </li>
             );
