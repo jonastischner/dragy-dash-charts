@@ -61,6 +61,38 @@ export function CompareTab() {
     return { label: `${session.name} · ${g.name}`, color: g.color, points, visible: g.visible };
   });
 
+  // Schaltdiagramm-Serien: pro Setup × Gang eine Linie km/h(rpm) = rpm / rpmFactor.
+  const shiftSeries: Series[] = useMemo(() => {
+    if (!isShift) return [];
+    const resolved = resolveAllGears(activeVehicle).filter((r) => effectiveSelected.includes(r.setupId));
+    const maxRpm = activeVehicle.maxRpm && activeVehicle.maxRpm > 0 ? activeVehicle.maxRpm : 8000;
+    const setupIds = Array.from(new Set(resolved.map((r) => r.setupId)));
+    // Farb-Basis pro Setup, Sättigung nach Gang-Index für Unterscheidbarkeit.
+    const baseColors = ["#38bdf8", "#f472b6", "#a3e635", "#fbbf24", "#c084fc", "#f97316"];
+    const gearsBySetup = new Map<string, string[]>();
+    return resolved.map((r) => {
+      const setupIdx = setupIds.indexOf(r.setupId);
+      const list = gearsBySetup.get(r.setupId) ?? [];
+      const gearIdx = list.length;
+      list.push(r.gear.id); gearsBySetup.set(r.setupId, list);
+      const color = shadeColor(baseColors[setupIdx % baseColors.length], gearIdx * 0.12 - 0.24);
+      const points = [
+        { x: 0, y: 0 },
+        { x: maxRpm, y: maxRpm / r.rpmFactor },
+      ];
+      return { label: `${r.setupName} · ${r.gear.name}`, color, points, visible: true };
+    });
+  }, [isShift, activeVehicle, effectiveSelected]);
+
+  const shiftBands = useMemo(() => {
+    if (!isShift) return [];
+    const bands: Array<{ xStart: number; xEnd: number; color: string; label?: string }> = [];
+    if (activeVehicle.shiftRpm) bands.push({ xStart: activeVehicle.shiftRpm - 25, xEnd: activeVehicle.shiftRpm + 25, color: "#f59e0b", label: "Schaltdrehzahl" });
+    if (activeVehicle.maxRpm) bands.push({ xStart: activeVehicle.maxRpm - 25, xEnd: activeVehicle.maxRpm + 25, color: "#ef4444", label: "Max" });
+    return bands;
+  }, [isShift, activeVehicle]);
+
+
   const toggle = async (i: number) => {
     const g = segments[i]; if (!g) return;
     await saveSegment({ ...g, visible: !g.visible });
