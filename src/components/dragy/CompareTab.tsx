@@ -191,19 +191,3 @@ export function CompareTab() {
   );
 
 }
-
-// Hex-Farbe um einen Faktor aufhellen/abdunkeln (−1..+1).
-function shadeColor(hex: string, amount: number): string {
-  const m = hex.replace("#", "");
-  if (m.length !== 6) return hex;
-  const r = parseInt(m.slice(0, 2), 16);
-  const g = parseInt(m.slice(2, 4), 16);
-  const b = parseInt(m.slice(4, 6), 16);
-  const adj = (c: number) => {
-    const t = amount < 0 ? 0 : 255;
-    const p = Math.abs(amount);
-    return Math.round((t - c) * p + c);
-  };
-  const toHex = (n: number) => Math.max(0, Math.min(255, n)).toString(16).padStart(2, "0");
-  return `#${toHex(adj(r))}${toHex(adj(g))}${toHex(adj(b))}`;
-}
