@@ -36,7 +36,9 @@ export interface Vehicle {
   rpmMatch: { maxRpm: number; maxKmh: number };
   dragCurve: DragPoint[]; // schleppleistung rpm->ps
   gearPresets?: GearPreset[]; // optionale Getriebe-/Gang-Presets (Legacy)
-  gearbox?: Gearbox; // strukturierte Getriebedefinition mit Gängen
+  gearbox?: Gearbox; // Legacy: einzelne Getriebedefinition (wird beim Öffnen in gearboxes migriert)
+  gearboxes?: Gearbox[]; // mehrere Getriebe-Konfigurationen (Serie, Kurz, Alt, ...)
+  defaultGearboxId?: string; // welches Getriebe ist Standard für neue Läufe
   imageDataUrl?: string; // optional Fahrzeugbild als data:URL (lokal + Cloud-Sync via JSONB)
   updatedAt?: number;
 }
