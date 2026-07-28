@@ -160,6 +160,12 @@ function VehicleEditor({ vehicle, onSave, onCancel }: { vehicle: Vehicle; onSave
           </div>
         </div>
 
+        <GearPresetsEditor
+          presets={v.gearPresets ?? []}
+          onChange={(gp) => setV({ ...v, gearPresets: gp })}
+          onUseAsDefault={(f) => setV({ ...v, rpmFactorDefault: +f.toFixed(3) })}
+        />
+
         <div className="mt-3 rounded-md border border-slate-700 p-2">
           <div className="mb-1 text-xs font-semibold text-slate-200">Schleppleistungskurve (Prüfstand)</div>
           <p className="text-[10px] text-slate-400">Stützpunkte RPM → PS. Lineare Interpolation, außerhalb geklemmt.</p>
