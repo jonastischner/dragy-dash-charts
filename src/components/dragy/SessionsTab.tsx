@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Section, Field, TextInput, TextArea, NumInput, Button, Note, Row } from "./ui";
 import { useAppStore, pickColor } from "@/lib/dragy/store";
 import { autoDetectSegments } from "@/lib/dragy/physics";
+import { tireCircumferenceM, computeRpmFactor } from "@/lib/dragy/gear";
 import { uid } from "@/lib/dragy/db";
 import type { Session, Segment } from "@/lib/dragy/types";
 import { Chart } from "./Chart";
