@@ -321,9 +321,21 @@ function GearboxesManager({ gearboxes, defaultId, onChange, onUseAsDefault }: {
               ) : (
                 <Button variant="ghost" onClick={() => setDefault(gb.id)}>als Standard</Button>
               )}
-              <Button variant="danger" onClick={() => delGterEnsureId(i, delGearbox)}>×</Button>
+              <Button variant="danger" onClick={() => delGearbox(i)}>×</Button>
             </div>
             <GearboxEditor
+              gearbox={gb}
+              onChange={(patch) => updateGearbox(i, patch)}
+              onUseAsDefault={onUseAsDefault}
+            />
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+
               gearbox={gb}
               onChange={(patch) => updateGearbox(i, patch)}
               onUseAsDefault={onUseAsDefault}
