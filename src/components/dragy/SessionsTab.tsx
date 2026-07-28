@@ -186,7 +186,7 @@ function SegmentEditor({ seg, vehicle, maxT, onChange, onDelete }: { seg: Segmen
           <input
             type="color"
             value={seg.color}
-            onChange={(e) => onChange({ color: e.target.color ?? e.target.value })}
+            onChange={(e) => onChange({ color: e.target.value })}
             className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
             aria-label="Farbe wählen"
           />
