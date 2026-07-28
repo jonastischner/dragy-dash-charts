@@ -79,12 +79,24 @@ export function VehiclesTab() {
 function VehicleEditor({ vehicle, onSave, onCancel }: { vehicle: Vehicle; onSave: (v: Vehicle) => void; onCancel: () => void }) {
   const [v, setV] = useState<Vehicle>(() => {
     const base: Vehicle = { ...vehicle };
-    // Migration: Legacy `gearbox` einmalig in `gearboxes` überführen
-    if ((!base.gearboxes || base.gearboxes.length === 0) && base.gearbox) {
-      const migrated: Gearbox = { id: uid(), name: "Serie", ...base.gearbox };
-      base.gearboxes = [migrated];
-      if (!base.defaultGearboxId) base.defaultGearboxId = migrated.id;
+    // Migration: alte gearboxes[]/gearbox in getrennte gearboxDefs/finalDrives/setups überführen.
+    const alreadyMigrated = (base.setups && base.setups.length > 0) || (base.gearboxDefs && base.gearboxDefs.length > 0);
+    if (!alreadyMigrated) {
+      const norm = normalizeDrive(base);
+      base.gearboxDefs = norm.gearboxDefs;
+      base.finalDrives = norm.finalDrives;
+      base.setups = norm.setups;
+      base.defaultSetupId = norm.defaultSetupId;
+      // Legacy-Felder leeren, sobald migriert wurde
+      if (base.setups.length > 0) {
+        base.gearboxes = undefined;
+        base.defaultGearboxId = undefined;
+        base.gearbox = undefined;
+      }
     }
+    if (!base.gearboxDefs) base.gearboxDefs = [];
+    if (!base.finalDrives) base.finalDrives = [];
+    if (!base.setups) base.setups = [];
     return base;
   });
 
@@ -157,6 +169,18 @@ function VehicleEditor({ vehicle, onSave, onCancel }: { vehicle: Vehicle; onSave
         </Row>
 
         <div className="mt-3 rounded-md border border-slate-700 p-2">
+          <div className="mb-1 text-xs font-semibold text-slate-200">Drehzahlen</div>
+          <Row>
+            <Field label="Schaltdrehzahl (U/min)" hint="Empfohlener Schaltpunkt für Schaltdiagramm">
+              <NumInput value={v.shiftRpm ?? ""} placeholder="z.B. 6500" onChange={(e) => setV({ ...v, shiftRpm: e.target.value === "" ? undefined : +e.target.value })} />
+            </Field>
+            <Field label="Maximaldrehzahl (U/min)" hint="Begrenzer / Redline">
+              <NumInput value={v.maxRpm ?? ""} placeholder="z.B. 7200" onChange={(e) => setV({ ...v, maxRpm: e.target.value === "" ? undefined : +e.target.value })} />
+            </Field>
+          </Row>
+        </div>
+
+        <div className="mt-3 rounded-md border border-slate-700 p-2">
           <div className="mb-1 text-xs font-semibold text-slate-200">RPM-Faktor aus Vmax</div>
           <Note>Nur Vorgabe für neu angelegte Läufe. Bestehende Läufe bleiben unverändert.</Note>
           <Row className="mt-2">
@@ -169,20 +193,20 @@ function VehicleEditor({ vehicle, onSave, onCancel }: { vehicle: Vehicle; onSave
           </div>
         </div>
 
-        <GearboxesManager
-          gearboxes={v.gearboxes ?? []}
-          defaultId={v.defaultGearboxId}
-          onChange={(gbs, defaultId) => setV({ ...v, gearboxes: gbs, defaultGearboxId: defaultId })}
+        <AntriebManager
+          gearboxDefs={v.gearboxDefs ?? []}
+          finalDrives={v.finalDrives ?? []}
+          setups={v.setups ?? []}
+          defaultSetupId={v.defaultSetupId}
+          onChange={(patch) => setV({ ...v, ...patch })}
           onUseAsDefault={(f) => setV({ ...v, rpmFactorDefault: +f.toFixed(3) })}
         />
-
 
         <GearPresetsEditor
           presets={v.gearPresets ?? []}
           onChange={(gp) => setV({ ...v, gearPresets: gp })}
           onUseAsDefault={(f) => setV({ ...v, rpmFactorDefault: +f.toFixed(3) })}
         />
-
 
         <div className="mt-3 rounded-md border border-slate-700 p-2">
           <div className="mb-1 text-xs font-semibold text-slate-200">Schleppleistungskurve (Prüfstand)</div>
@@ -229,12 +253,7 @@ function GearPresetsEditor({ presets, onChange, onUseAsDefault }: {
   onChange: (p: GearPreset[]) => void;
   onUseAsDefault: (rpmFactor: number) => void;
 }) {
-  const addPreset = () => {
-    const p: GearPreset = { id: uid(), name: `Preset ${presets.length + 1}`, gearRatio: 1, finalDrive: 3.46, tireSpec: "225/45R17", rpmFactor: 0 };
-    const f = computeRpmFactor(p.gearRatio, p.finalDrive, p.tireSpec);
-    if (f) p.rpmFactor = +f.toFixed(3);
-    onChange([...presets, p]);
-  };
+  if (presets.length === 0) return null; // Legacy: nur anzeigen, wenn schon Presets existieren
   const update = (i: number, patch: Partial<GearPreset>) => {
     const arr = presets.slice();
     const merged = { ...arr[i], ...patch };
@@ -247,9 +266,8 @@ function GearPresetsEditor({ presets, onChange, onUseAsDefault }: {
 
   return (
     <div className="mt-3 rounded-md border border-slate-700 p-2">
-      <div className="mb-1 text-xs font-semibold text-slate-200">Getriebe-Presets (rpmFactor aus Übersetzung)</div>
-      <p className="text-[10px] text-slate-400">rpm/km/h = 60 · Getriebe · Endübersetzung / (3.6 · Reifenumfang). Reifen z.B. „225/45R17".</p>
-      {presets.length === 0 && <p className="mt-1 text-[11px] text-slate-500">Noch keine Presets. Pro Gang ein Preset anlegen.</p>}
+      <div className="mb-1 text-xs font-semibold text-slate-200">Legacy Getriebe-Presets</div>
+      <p className="text-[10px] text-slate-400">Bestehende Alt-Presets. Neue Konfigurationen bitte oben unter „Antrieb" anlegen.</p>
       <ul className="mt-2 space-y-2">
         {presets.map((p, i) => {
           const U = tireCircumferenceM(p.tireSpec);
@@ -263,134 +281,236 @@ function GearPresetsEditor({ presets, onChange, onUseAsDefault }: {
               <Row className="mt-2">
                 <Field label="Getriebeübersetzung"><NumInput step="0.001" value={p.gearRatio} onChange={(e) => update(i, { gearRatio: +e.target.value })} /></Field>
                 <Field label="Endübersetzung"><NumInput step="0.001" value={p.finalDrive} onChange={(e) => update(i, { finalDrive: +e.target.value })} /></Field>
-                <Field label="Reifen (z.B. 225/45R17)"><TextInput value={p.tireSpec} onChange={(e) => update(i, { tireSpec: e.target.value })} /></Field>
-                <Field label="rpmFactor (berechnet)">
+                <Field label="Reifen"><TextInput value={p.tireSpec} onChange={(e) => update(i, { tireSpec: e.target.value })} /></Field>
+                <Field label="rpmFactor">
                   <div className="flex h-10 items-center gap-2 text-xs text-slate-200">
                     <b>{valid ? p.rpmFactor.toFixed(3) : "–"}</b>
                     {valid && <Button variant="ghost" onClick={() => onUseAsDefault(p.rpmFactor)}>als Standard</Button>}
                   </div>
                 </Field>
               </Row>
-              {!valid && <p className="mt-1 text-[10px] text-amber-400">Reifenformat oder Übersetzungen ungültig.</p>}
             </li>
           );
         })}
       </ul>
-      <Button className="mt-2" variant="secondary" onClick={addPreset}>+ Preset</Button>
     </div>
   );
 }
 
-function GearboxesManager({ gearboxes, defaultId, onChange, onUseAsDefault }: {
-  gearboxes: Gearbox[];
-  defaultId: string | undefined;
-  onChange: (gbs: Gearbox[], defaultId: string | undefined) => void;
+// ================= Antrieb (Getriebe + Endübersetzung + Setups) =================
+
+function AntriebManager({ gearboxDefs, finalDrives, setups, defaultSetupId, onChange, onUseAsDefault }: {
+  gearboxDefs: GearboxDef[];
+  finalDrives: FinalDriveDef[];
+  setups: DriveSetup[];
+  defaultSetupId: string | undefined;
+  onChange: (patch: { gearboxDefs?: GearboxDef[]; finalDrives?: FinalDriveDef[]; setups?: DriveSetup[]; defaultSetupId?: string | undefined }) => void;
   onUseAsDefault: (rpmFactor: number) => void;
 }) {
+  // -- Gearbox actions
   const addGearbox = () => {
-    const gb: Gearbox = { id: uid(), name: `Getriebe ${gearboxes.length + 1}`, finalDrive: 3.46, tireSpec: "225/45R17", gears: [] };
-    const nextDefault = defaultId ?? gb.id;
-    onChange([...gearboxes, gb], nextDefault);
+    const gb: GearboxDef = { id: uid(), name: `Getriebe ${gearboxDefs.length + 1}`, tireSpec: "225/45R17", gears: [] };
+    onChange({ gearboxDefs: [...gearboxDefs, gb] });
   };
-  const updateGearbox = (i: number, patch: Partial<Gearbox>) => {
-    const arr = gearboxes.slice(); arr[i] = { ...arr[i], ...patch }; onChange(arr, defaultId);
+  const updateGearbox = (i: number, patch: Partial<GearboxDef>) => {
+    const arr = gearboxDefs.slice(); arr[i] = { ...arr[i], ...patch }; onChange({ gearboxDefs: arr });
   };
   const delGearbox = (i: number) => {
-    const removed = gearboxes[i];
-    const arr = gearboxes.filter((_, k) => k !== i);
-    const nextDefault = defaultId === removed.id ? arr[0]?.id : defaultId;
-    onChange(arr, nextDefault);
+    const removed = gearboxDefs[i];
+    const arr = gearboxDefs.filter((_, k) => k !== i);
+    // Setups, die dieses Getriebe verwenden, entfernen
+    const nextSetups = setups.filter((s) => s.gearboxId !== removed.id);
+    const nextDefault = nextSetups.find((s) => s.id === defaultSetupId) ? defaultSetupId : nextSetups[0]?.id;
+    onChange({ gearboxDefs: arr, setups: nextSetups, defaultSetupId: nextDefault });
   };
-  const setDefault = (id: string | undefined) => onChange(gearboxes, id);
+
+  // -- Final drive actions
+  const addFinal = () => {
+    const fd: FinalDriveDef = { id: uid(), name: `Endübersetzung ${finalDrives.length + 1}`, ratio: 3.46 };
+    onChange({ finalDrives: [...finalDrives, fd] });
+  };
+  const updateFinal = (i: number, patch: Partial<FinalDriveDef>) => {
+    const arr = finalDrives.slice(); arr[i] = { ...arr[i], ...patch }; onChange({ finalDrives: arr });
+  };
+  const delFinal = (i: number) => {
+    const removed = finalDrives[i];
+    const arr = finalDrives.filter((_, k) => k !== i);
+    const nextSetups = setups.filter((s) => s.finalDriveId !== removed.id);
+    const nextDefault = nextSetups.find((s) => s.id === defaultSetupId) ? defaultSetupId : nextSetups[0]?.id;
+    onChange({ finalDrives: arr, setups: nextSetups, defaultSetupId: nextDefault });
+  };
+
+  // -- Setup actions
+  const addSetup = () => {
+    const gb = gearboxDefs[0];
+    const fd = finalDrives[0];
+    if (!gb || !fd) { alert("Erst mindestens ein Getriebe und eine Endübersetzung anlegen."); return; }
+    const setup: DriveSetup = {
+      id: uid(),
+      name: `${gb.name} + ${fd.name}`,
+      gearboxId: gb.id,
+      finalDriveId: fd.id,
+    };
+    const next = [...setups, setup];
+    onChange({ setups: next, defaultSetupId: defaultSetupId ?? setup.id });
+  };
+  const updateSetup = (i: number, patch: Partial<DriveSetup>) => {
+    const arr = setups.slice(); arr[i] = { ...arr[i], ...patch }; onChange({ setups: arr });
+  };
+  const delSetup = (i: number) => {
+    const removed = setups[i];
+    const arr = setups.filter((_, k) => k !== i);
+    const nextDefault = defaultSetupId === removed.id ? arr[0]?.id : defaultSetupId;
+    onChange({ setups: arr, defaultSetupId: nextDefault });
+  };
 
   return (
     <div className="mt-3 rounded-md border border-slate-700 p-2">
-      <div className="mb-1 flex items-center justify-between">
-        <div className="text-xs font-semibold text-slate-200">Getriebe-Konfigurationen</div>
-        <Button variant="secondary" onClick={addGearbox}>+ Getriebe</Button>
+      <div className="mb-1 text-xs font-semibold text-slate-200">Antrieb (Getriebe, Endübersetzung, Setups)</div>
+      <p className="text-[10px] text-slate-400">Getriebe (Gänge + Reifen) und Endübersetzungen getrennt pflegen und beliebig zu Setups kombinieren.</p>
+
+      {/* Gearboxes */}
+      <div className="mt-2 rounded-md border border-slate-700 bg-slate-900/60 p-2">
+        <div className="mb-1 flex items-center justify-between">
+          <div className="text-[11px] font-semibold text-slate-200">Getriebe</div>
+          <Button variant="secondary" onClick={addGearbox}>+ Getriebe</Button>
+        </div>
+        {gearboxDefs.length === 0 && <p className="text-[11px] text-slate-500">Noch kein Getriebe.</p>}
+        <ul className="space-y-2">
+          {gearboxDefs.map((gb, i) => (
+            <li key={gb.id} className="rounded-md border border-slate-700 bg-slate-950 p-2">
+              <div className="flex items-center gap-2">
+                <TextInput className="flex-1" value={gb.name} onChange={(e) => updateGearbox(i, { name: e.target.value })} />
+                <Button variant="danger" onClick={() => delGearbox(i)}>×</Button>
+              </div>
+              <Row className="mt-2">
+                <Field label="Reifen (z.B. 225/45R17)"><TextInput value={gb.tireSpec} onChange={(e) => updateGearbox(i, { tireSpec: e.target.value })} /></Field>
+              </Row>
+              <GearListEditor
+                gears={gb.gears}
+                onChange={(gears) => updateGearbox(i, { gears })}
+              />
+            </li>
+          ))}
+        </ul>
       </div>
-      <p className="text-[10px] text-slate-400">Mehrere Getriebe (z.B. Serie/Kurz) hinterlegen und eines als Standard markieren. Der Standard wird für neue Läufe verwendet.</p>
-      {gearboxes.length === 0 && <p className="mt-2 text-[11px] text-slate-500">Noch keine Getriebe. „+ Getriebe" hinzufügen.</p>}
-      <ul className="mt-2 space-y-2">
-        {gearboxes.map((gb, i) => (
-          <li key={gb.id ?? i} className="rounded-md border border-slate-700 bg-slate-900 p-2">
-            <div className="flex items-center gap-2">
-              <TextInput className="flex-1" value={gb.name ?? ""} placeholder="Name (z.B. Serie)" onChange={(e) => updateGearbox(i, { name: e.target.value })} />
-              {gb.id && defaultId === gb.id ? (
-                <span className="rounded bg-sky-600 px-2 py-1 text-[10px] text-white">Standard</span>
-              ) : (
-                <Button variant="ghost" onClick={() => setDefault(gb.id)}>als Standard</Button>
-              )}
-              <Button variant="danger" onClick={() => delGearbox(i)}>×</Button>
-            </div>
-            <GearboxEditor
-              gearbox={gb}
-              onChange={(patch) => updateGearbox(i, patch)}
-              onUseAsDefault={onUseAsDefault}
-            />
-          </li>
-        ))}
-      </ul>
+
+      {/* Final drives */}
+      <div className="mt-2 rounded-md border border-slate-700 bg-slate-900/60 p-2">
+        <div className="mb-1 flex items-center justify-between">
+          <div className="text-[11px] font-semibold text-slate-200">Endübersetzungen</div>
+          <Button variant="secondary" onClick={addFinal}>+ Endübersetzung</Button>
+        </div>
+        {finalDrives.length === 0 && <p className="text-[11px] text-slate-500">Noch keine Endübersetzung.</p>}
+        <ul className="space-y-2">
+          {finalDrives.map((fd, i) => (
+            <li key={fd.id} className="rounded-md border border-slate-700 bg-slate-950 p-2">
+              <Row>
+                <Field label="Name"><TextInput value={fd.name} onChange={(e) => updateFinal(i, { name: e.target.value })} /></Field>
+                <Field label="Übersetzung"><NumInput step="0.001" value={fd.ratio} onChange={(e) => updateFinal(i, { ratio: +e.target.value })} /></Field>
+                <div className="flex items-end"><Button variant="danger" onClick={() => delFinal(i)}>×</Button></div>
+              </Row>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      {/* Setups */}
+      <div className="mt-2 rounded-md border border-slate-700 bg-slate-900/60 p-2">
+        <div className="mb-1 flex items-center justify-between">
+          <div className="text-[11px] font-semibold text-slate-200">Setups (Getriebe × Endübersetzung)</div>
+          <Button variant="secondary" onClick={addSetup}>+ Setup</Button>
+        </div>
+        {setups.length === 0 && <p className="text-[11px] text-slate-500">Noch kein Setup.</p>}
+        <ul className="space-y-2">
+          {setups.map((s, i) => {
+            const gb = gearboxDefs.find((g) => g.id === s.gearboxId);
+            const fd = finalDrives.find((f) => f.id === s.finalDriveId);
+            const isDefault = defaultSetupId === s.id;
+            return (
+              <li key={s.id} className="rounded-md border border-slate-700 bg-slate-950 p-2">
+                <div className="flex items-center gap-2">
+                  <TextInput className="flex-1" value={s.name} onChange={(e) => updateSetup(i, { name: e.target.value })} />
+                  {isDefault ? (
+                    <span className="rounded bg-sky-600 px-2 py-1 text-[10px] text-white">Standard</span>
+                  ) : (
+                    <Button variant="ghost" onClick={() => onChange({ defaultSetupId: s.id })}>als Standard</Button>
+                  )}
+                  <Button variant="danger" onClick={() => delSetup(i)}>×</Button>
+                </div>
+                <Row className="mt-2">
+                  <Field label="Getriebe">
+                    <select
+                      className="w-full rounded-md border border-slate-600 bg-slate-800 px-2 py-2 text-sm text-slate-100"
+                      value={s.gearboxId}
+                      onChange={(e) => updateSetup(i, { gearboxId: e.target.value })}
+                    >
+                      {gearboxDefs.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+                    </select>
+                  </Field>
+                  <Field label="Endübersetzung">
+                    <select
+                      className="w-full rounded-md border border-slate-600 bg-slate-800 px-2 py-2 text-sm text-slate-100"
+                      value={s.finalDriveId}
+                      onChange={(e) => updateSetup(i, { finalDriveId: e.target.value })}
+                    >
+                      {finalDrives.map((f) => <option key={f.id} value={f.id}>{f.name} ({f.ratio.toFixed(3)})</option>)}
+                    </select>
+                  </Field>
+                </Row>
+                {gb && fd && gb.gears.length > 0 && (
+                  <div className="mt-2 text-[11px] text-slate-300">
+                    <div className="text-slate-400">rpmFactor pro Gang (bei {gb.tireSpec}, End {fd.ratio.toFixed(3)}):</div>
+                    <div className="mt-1 flex flex-wrap gap-1">
+                      {gb.gears.map((g) => {
+                        const f = computeRpmFactor(g.ratio, fd.ratio, gb.tireSpec);
+                        if (f == null) return null;
+                        return (
+                          <button key={g.id} className="rounded bg-slate-800 px-2 py-0.5 hover:bg-slate-700"
+                            onClick={() => onUseAsDefault(f)}
+                            title="Als Standard-rpmFactor setzen">
+                            {g.name}: {f.toFixed(2)}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      </div>
     </div>
   );
 }
 
-
-
-function GearboxEditor({ gearbox, onChange, onUseAsDefault }: {
-  gearbox: Gearbox;
-  onChange: (patch: Partial<Gearbox>) => void;
-  onUseAsDefault: (rpmFactor: number) => void;
-}) {
-  const gb = gearbox;
-  const U = tireCircumferenceM(gb.tireSpec);
-  const addGear = () => {
-    const n = gb.gears.length + 1;
-    const gear: GearRatio = { id: uid(), name: `${n}. Gang`, ratio: 1 };
-    onChange({ gears: [...gb.gears, gear] });
+function GearListEditor({ gears, onChange }: { gears: GearRatio[]; onChange: (g: GearRatio[]) => void }) {
+  const add = () => {
+    const n = gears.length + 1;
+    onChange([...gears, { id: uid(), name: `${n}. Gang`, ratio: 1 }]);
   };
-  const updateGear = (i: number, patch: Partial<GearRatio>) => {
-    const arr = gb.gears.slice(); arr[i] = { ...arr[i], ...patch }; onChange({ gears: arr });
+  const update = (i: number, patch: Partial<GearRatio>) => {
+    const arr = gears.slice(); arr[i] = { ...arr[i], ...patch }; onChange(arr);
   };
-  const delGear = (i: number) => onChange({ gears: gb.gears.filter((_, k) => k !== i) });
-
-  const factorFor = (ratio: number) => computeRpmFactor(ratio, gb.finalDrive, gb.tireSpec);
+  const del = (i: number) => onChange(gears.filter((_, k) => k !== i));
 
   return (
     <div className="mt-2">
-      <Row>
-        <Field label="Endübersetzung"><NumInput step="0.001" value={gb.finalDrive} onChange={(e) => onChange({ finalDrive: +e.target.value })} /></Field>
-        <Field label="Reifen (z.B. 225/45R17)"><TextInput value={gb.tireSpec} onChange={(e) => onChange({ tireSpec: e.target.value })} /></Field>
-      </Row>
-      {gb.gears.length === 0 && <p className="mt-2 text-[11px] text-slate-500">Noch keine Gänge. „+ Gang" hinzufügen.</p>}
-      <ul className="mt-2 space-y-2">
-        {gb.gears.map((g, i) => {
-          const f = factorFor(g.ratio);
-          const valid = U !== null && g.ratio > 0 && gb.finalDrive > 0 && f !== null;
-          return (
-            <li key={g.id} className="rounded-md border border-slate-700 bg-slate-950 p-2">
-              <Row>
-                <Field label="Bezeichnung"><TextInput value={g.name} onChange={(e) => updateGear(i, { name: e.target.value })} /></Field>
-                <Field label="Übersetzung"><NumInput step="0.001" value={g.ratio} onChange={(e) => updateGear(i, { ratio: +e.target.value })} /></Field>
-                <Field label="rpmFactor (berechnet)">
-                  <div className="flex h-10 items-center gap-2 text-xs text-slate-200">
-                    <b>{valid ? f!.toFixed(3) : "–"}</b>
-                    {valid && <Button variant="ghost" onClick={() => onUseAsDefault(f!)}>als Standard</Button>}
-                    <Button variant="danger" onClick={() => delGear(i)}>×</Button>
-                  </div>
-                </Field>
-              </Row>
-              {!valid && <p className="mt-1 text-[10px] text-amber-400">Reifenformat oder Übersetzung ungültig.</p>}
-            </li>
-          );
-        })}
+      {gears.length === 0 && <p className="text-[11px] text-slate-500">Noch keine Gänge.</p>}
+      <ul className="space-y-1">
+        {gears.map((g, i) => (
+          <li key={g.id} className="flex items-center gap-2">
+            <TextInput className="flex-1" value={g.name} onChange={(e) => update(i, { name: e.target.value })} />
+            <NumInput className="w-24" step="0.001" value={g.ratio} onChange={(e) => update(i, { ratio: +e.target.value })} />
+            <Button variant="danger" onClick={() => del(i)}>×</Button>
+          </li>
+        ))}
       </ul>
-      <Button className="mt-2" variant="secondary" onClick={addGear}>+ Gang</Button>
+      <Button className="mt-2" variant="secondary" onClick={add}>+ Gang</Button>
     </div>
   );
 }
-
-
 
 async function downscaleImage(file: File, maxSize: number, quality: number): Promise<string> {
   const bitmap = await createImageBitmap(file);
