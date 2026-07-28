@@ -22,6 +22,10 @@ export function CompareTab() {
   const activeVehicle = state.vehicles.find((v) => v.id === state.activeVehicleId);
   const [mode, setMode] = useState<Mode>("pWheel");
 
+  const { setups: allSetups } = useMemo(() => normalizeDrive(activeVehicle), [activeVehicle]);
+  const [selectedSetupIds, setSelectedSetupIds] = useState<string[] | null>(null);
+  const effectiveSelected = selectedSetupIds ?? allSetups.map((s) => s.id);
+
   const segments = useMemo(() => {
     if (!activeVehicle) return [];
     const own = state.sessions.filter((s) => s.vehicleId === activeVehicle.id);
@@ -31,6 +35,7 @@ export function CompareTab() {
   if (!activeVehicle) return <Section title="Leistungsvergleich"><Note>Kein aktives Fahrzeug.</Note></Section>;
 
   const isAccel = mode === "accel";
+  const isShift = mode === "shift";
 
   const series: Series[] = segments.map((g) => {
     const session = state.sessions.find((s) => s.id === g.sessionId)!;
