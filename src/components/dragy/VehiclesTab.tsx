@@ -270,6 +270,63 @@ function GearPresetsEditor({ presets, onChange, onUseAsDefault }: {
   );
 }
 
+function GearboxEditor({ gearbox, onChange, onUseAsDefault }: {
+  gearbox: Gearbox | undefined;
+  onChange: (g: Gearbox) => void;
+  onUseAsDefault: (rpmFactor: number) => void;
+}) {
+  const gb: Gearbox = gearbox ?? { finalDrive: 3.46, tireSpec: "225/45R17", gears: [] };
+  const U = tireCircumferenceM(gb.tireSpec);
+  const setField = (patch: Partial<Gearbox>) => onChange({ ...gb, ...patch });
+  const addGear = () => {
+    const n = gb.gears.length + 1;
+    const gear: GearRatio = { id: uid(), name: `${n}. Gang`, ratio: 1 };
+    setField({ gears: [...gb.gears, gear] });
+  };
+  const updateGear = (i: number, patch: Partial<GearRatio>) => {
+    const arr = gb.gears.slice(); arr[i] = { ...arr[i], ...patch }; setField({ gears: arr });
+  };
+  const delGear = (i: number) => setField({ gears: gb.gears.filter((_, k) => k !== i) });
+
+  const factorFor = (ratio: number) => computeRpmFactor(ratio, gb.finalDrive, gb.tireSpec);
+
+  return (
+    <div className="mt-3 rounded-md border border-slate-700 p-2">
+      <div className="mb-1 text-xs font-semibold text-slate-200">Getriebe (Gänge)</div>
+      <p className="text-[10px] text-slate-400">Endübersetzung und Reifen gelten für alle Gänge. Pro Gang wird die Übersetzung eingetragen; rpmFactor wird automatisch berechnet.</p>
+      <Row className="mt-2">
+        <Field label="Endübersetzung"><NumInput step="0.001" value={gb.finalDrive} onChange={(e) => setField({ finalDrive: +e.target.value })} /></Field>
+        <Field label="Reifen (z.B. 225/45R17)"><TextInput value={gb.tireSpec} onChange={(e) => setField({ tireSpec: e.target.value })} /></Field>
+      </Row>
+      {gb.gears.length === 0 && <p className="mt-2 text-[11px] text-slate-500">Noch keine Gänge. „+ Gang" hinzufügen.</p>}
+      <ul className="mt-2 space-y-2">
+        {gb.gears.map((g, i) => {
+          const f = factorFor(g.ratio);
+          const valid = U !== null && g.ratio > 0 && gb.finalDrive > 0 && f !== null;
+          return (
+            <li key={g.id} className="rounded-md border border-slate-700 bg-slate-900 p-2">
+              <Row>
+                <Field label="Bezeichnung"><TextInput value={g.name} onChange={(e) => updateGear(i, { name: e.target.value })} /></Field>
+                <Field label="Übersetzung"><NumInput step="0.001" value={g.ratio} onChange={(e) => updateGear(i, { ratio: +e.target.value })} /></Field>
+                <Field label="rpmFactor (berechnet)">
+                  <div className="flex h-10 items-center gap-2 text-xs text-slate-200">
+                    <b>{valid ? f!.toFixed(3) : "–"}</b>
+                    {valid && <Button variant="ghost" onClick={() => onUseAsDefault(f!)}>als Standard</Button>}
+                    <Button variant="danger" onClick={() => delGear(i)}>×</Button>
+                  </div>
+                </Field>
+              </Row>
+              {!valid && <p className="mt-1 text-[10px] text-amber-400">Reifenformat oder Übersetzung ungültig.</p>}
+            </li>
+          );
+        })}
+      </ul>
+      <Button className="mt-2" variant="secondary" onClick={addGear}>+ Gang</Button>
+    </div>
+  );
+}
+
+
 async function downscaleImage(file: File, maxSize: number, quality: number): Promise<string> {
   const bitmap = await createImageBitmap(file);
   const scale = Math.min(1, maxSize / Math.max(bitmap.width, bitmap.height));
