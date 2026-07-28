@@ -3,7 +3,7 @@ import { Section, Field, TextInput, NumInput, Button, Note, Row } from "./ui";
 import { useAppStore, newVehicle } from "@/lib/dragy/store";
 import { uid } from "@/lib/dragy/db";
 import { computeRpmFactor, tireCircumferenceM } from "@/lib/dragy/gear";
-import type { Vehicle, DragPoint, GearPreset } from "@/lib/dragy/types";
+import type { Vehicle, DragPoint, GearPreset, Gearbox, GearRatio } from "@/lib/dragy/types";
 
 function useLockBodyScroll() {
   useEffect(() => {
