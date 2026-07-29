@@ -5,7 +5,7 @@ import { coastdownFit, autoDetectCoastdown } from "@/lib/dragy/physics";
 import { Chart } from "./Chart";
 import type { Session, Segment } from "@/lib/dragy/types";
 
-export function CalibrationTab() {
+export function CalibrationTab({ onOpenVehicles }: { onOpenVehicles?: () => void } = {}) {
   const { state, saveVehicle, saveSegment } = useAppStore();
   const activeVehicle = state.vehicles.find((v) => v.id === state.activeVehicleId);
   const [sessionId, setSessionId] = useState<string>("");
@@ -23,7 +23,8 @@ export function CalibrationTab() {
     return coastdownFit(session, startT, endT, mass);
   }, [session, startT, endT, activeVehicle]);
 
-  if (!activeVehicle) return <Section title="Kalibrierung"><Note>Kein aktives Fahrzeug.</Note></Section>;
+  if (!activeVehicle) return <Section title="Kalibrierung"><EmptyState title="Kein aktives Fahrzeug" description="Kalibrierung benötigt ein aktives Fahrzeug mit Sessions." actionLabel="Zu Fahrzeuge" onAction={onOpenVehicles} /></Section>;
+
 
   const speedSeries = session ? [{
     label: "km/h", color: "#38bdf8",
