@@ -3,9 +3,10 @@ import { useState, type ReactNode, type InputHTMLAttributes, type ButtonHTMLAttr
 export function TextArea(props: TextareaHTMLAttributes<HTMLTextAreaElement>) {
   return (
     <textarea {...props}
-      className={`w-full rounded-md border border-input bg-muted px-2 py-2 text-sm text-foreground focus:border-ring focus:outline-none ${props.className ?? ""}`} />
+      className={`w-full rounded-md border border-input bg-muted px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${props.className ?? ""}`} />
   );
 }
+
 
 export function Section({ title, children, note }: { title: string; children: ReactNode; note?: string }) {
   return (
