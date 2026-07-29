@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Section, Note } from "./ui";
+import { Section, Note, EmptyState } from "./ui";
 import { useAppStore } from "@/lib/dragy/store";
 import { computeSegment, W_TO_PS } from "@/lib/dragy/physics";
 import { Chart, type Series } from "./Chart";
