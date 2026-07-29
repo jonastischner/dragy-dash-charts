@@ -402,27 +402,12 @@ function AntriebManager({ gearboxDefs, finalDrives, tires, setups, defaultSetupI
       <p className="text-[10px] text-slate-400">Getriebe (nur Gänge), Endübersetzungen und Reifen getrennt pflegen und beliebig zu Setups kombinieren.</p>
 
       {/* Gearboxes */}
-      <div className="mt-2 rounded-md border border-slate-700 bg-slate-900/60 p-2">
-        <div className="mb-1 flex items-center justify-between">
-          <div className="text-[11px] font-semibold text-slate-200">Getriebe</div>
-          <Button variant="secondary" onClick={addGearbox}>+ Getriebe</Button>
-        </div>
-        {gearboxDefs.length === 0 && <p className="text-[11px] text-slate-500">Noch kein Getriebe.</p>}
-        <ul className="space-y-2">
-          {gearboxDefs.map((gb, i) => (
-            <li key={gb.id} className="rounded-md border border-slate-700 bg-slate-950 p-2">
-              <div className="flex items-center gap-2">
-                <TextInput className="flex-1" value={gb.name} onChange={(e) => updateGearbox(i, { name: e.target.value })} />
-                <Button variant="danger" onClick={() => delGearbox(i)}>×</Button>
-              </div>
-              <GearListEditor
-                gears={gb.gears}
-                onChange={(gears) => updateGearbox(i, { gears })}
-              />
-            </li>
-          ))}
-        </ul>
-      </div>
+      <GearboxesCollapsibleList
+        gearboxDefs={gearboxDefs}
+        onAdd={addGearbox}
+        onUpdate={updateGearbox}
+        onDelete={delGearbox}
+      />
 
       {/* Final drives */}
       <div className="mt-2 rounded-md border border-slate-700 bg-slate-900/60 p-2">
