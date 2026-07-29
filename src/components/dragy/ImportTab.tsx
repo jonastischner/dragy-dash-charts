@@ -5,7 +5,7 @@ import { parseUbx } from "@/lib/dragy/ubx";
 import { uid } from "@/lib/dragy/db";
 import type { Session, ManualRow, Record as R } from "@/lib/dragy/types";
 
-export function ImportTab() {
+export function ImportTab({ onOpenVehicles }: { onOpenVehicles?: () => void } = {}) {
   const { state, saveSession } = useAppStore();
   const activeVehicle = state.vehicles.find((v) => v.id === state.activeVehicleId);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -15,7 +15,8 @@ export function ImportTab() {
   const [log, setLog] = useState<string[]>([]);
   const [manualOpen, setManualOpen] = useState(false);
 
-  if (!activeVehicle) return <Section title="Import"><Note>Bitte zuerst ein Fahrzeug anlegen und aktivieren (Reiter Fahrzeuge).</Note></Section>;
+  if (!activeVehicle) return <Section title="Import"><EmptyState title="Kein aktives Fahrzeug" description="Import benötigt ein aktives Fahrzeug." actionLabel="Fahrzeug anlegen" onAction={onOpenVehicles} /></Section>;
+
 
   const importFiles = async (files: FileList | null) => {
     if (!files) return;
