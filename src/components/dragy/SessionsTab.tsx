@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Section, Field, TextInput, TextArea, NumInput, Button, Note, Row } from "./ui";
+import { Section, Field, TextInput, TextArea, NumInput, Button, Note, Row, EmptyState } from "./ui";
 import { useAppStore, pickColor } from "@/lib/dragy/store";
 import { autoDetectSegments } from "@/lib/dragy/physics";
 import { computeRpmFactor, resolveAllGears } from "@/lib/dragy/gear";
@@ -7,32 +7,33 @@ import { uid } from "@/lib/dragy/db";
 import type { Session, Segment } from "@/lib/dragy/types";
 import { Chart } from "./Chart";
 
-export function SessionsTab() {
+export function SessionsTab({ onOpenVehicles }: { onOpenVehicles?: () => void } = {}) {
   const { state, saveSession, deleteSession, saveSegment, deleteSegment } = useAppStore();
   const activeVehicle = state.vehicles.find((v) => v.id === state.activeVehicleId);
   const [expanded, setExpanded] = useState<string | null>(null);
 
-  if (!activeVehicle) return <Section title="Sessions & Läufe"><Note>Kein aktives Fahrzeug.</Note></Section>;
+  if (!activeVehicle) return <Section title="Sessions & Läufe"><EmptyState title="Kein aktives Fahrzeug" description="Lege zuerst ein Fahrzeug an und aktiviere es." actionLabel="Zu Fahrzeuge" onAction={onOpenVehicles} /></Section>;
+
 
   const sessions = state.sessions.filter((s) => s.vehicleId === activeVehicle.id).sort((a, b) => b.createdAt - a.createdAt);
 
   return (
     <div>
       <Section title={`Sessions – ${activeVehicle.name}`}>
-        {sessions.length === 0 && <p className="text-xs text-slate-400">Noch keine Sessions. Reiter „Import" nutzen.</p>}
+        {sessions.length === 0 && <p className="text-xs text-muted-foreground">Noch keine Sessions. Reiter „Import" nutzen.</p>}
         <ul className="space-y-2">
           {sessions.map((s) => {
             const segs = state.segments.filter((g) => g.sessionId === s.id);
             const isOpen = expanded === s.id;
             const dur = s.records.length ? s.records[s.records.length - 1].t : 0;
             return (
-              <li key={s.id} className="rounded-md border border-slate-700 bg-slate-800">
+              <li key={s.id} className="rounded-md border border-border bg-muted">
                 <button className="flex w-full items-center justify-between p-2 text-left" onClick={() => setExpanded(isOpen ? null : s.id)}>
                   <div>
-                    <div className="text-sm font-medium text-slate-100">{s.name} {s.manual && <span className="ml-1 rounded bg-amber-700 px-1 text-[10px]">manuell</span>}</div>
-                    <div className="text-[11px] text-slate-400">{dur.toFixed(1)} s · {s.records.length} Punkte · {segs.length} Lauf/Läufe</div>
+                    <div className="text-sm font-medium text-foreground">{s.name} {s.manual && <span className="ml-1 rounded bg-amber-700 px-1 text-[10px]">manuell</span>}</div>
+                    <div className="text-[11px] text-muted-foreground">{dur.toFixed(1)} s · {s.records.length} Punkte · {segs.length} Lauf/Läufe</div>
                   </div>
-                  <span className="text-slate-400">{isOpen ? "▾" : "▸"}</span>
+                  <span className="text-muted-foreground">{isOpen ? "▾" : "▸"}</span>
                 </button>
                 {isOpen && (
                   <SessionDetail
@@ -100,7 +101,7 @@ function SessionDetail({ session, segments, vehicle, onRename, onDelete, onSaveS
   };
 
   return (
-    <div className="border-t border-slate-700 p-2">
+    <div className="border-t border-border p-2">
       <Row>
         <Field label="Name"><TextInput value={name} onChange={(e) => setName(e.target.value)} onBlur={() => onRename(name)} /></Field>
         <div className="flex items-end justify-end"><Button variant="danger" onClick={onDelete}>Session löschen</Button></div>
@@ -116,8 +117,8 @@ function SessionDetail({ session, segments, vehicle, onRename, onDelete, onSaveS
         </Field>
       </div>
 
-      <details className="mt-2 rounded-md border border-slate-700 bg-slate-900/50">
-        <summary className="cursor-pointer select-none px-2 py-1.5 text-xs font-semibold text-slate-300">
+      <details className="mt-2 rounded-md border border-border bg-card/50">
+        <summary className="cursor-pointer select-none px-2 py-1.5 text-xs font-semibold text-muted-foreground">
           Erweitert
         </summary>
         <div className="p-2">
@@ -146,8 +147,8 @@ function SessionDetail({ session, segments, vehicle, onRename, onDelete, onSaveS
         <Chart series={speedSeries} bands={bands} xLabel="t (s)" yLabel="km/h" xFormat={(v) => v.toFixed(1)} yFormat={(v) => v.toFixed(0)} />
       </div>
 
-      <div className="mt-3 rounded-md border border-slate-700 p-2">
-        <div className="text-xs font-semibold text-slate-200">Auto-Erkennung (Vorschlag, danach prüfen)</div>
+      <div className="mt-3 rounded-md border border-border p-2">
+        <div className="text-xs font-semibold text-foreground">Auto-Erkennung (Vorschlag, danach prüfen)</div>
         <Note>Sucht rückwärts von Zielgeschwindigkeit zum tiefsten Punkt des vorangegangenen Anstiegs.</Note>
         <Row className="mt-2">
           <Field label="Start ≈ (km/h)"><NumInput value={autoStart} onChange={(e) => setAutoStart(+e.target.value)} /></Field>
@@ -159,7 +160,7 @@ function SessionDetail({ session, segments, vehicle, onRename, onDelete, onSaveS
 
       <div className="mt-3">
         <div className="mb-1 flex items-center justify-between">
-          <h4 className="text-sm font-semibold text-slate-200">Läufe</h4>
+          <h4 className="text-sm font-semibold text-foreground">Läufe</h4>
           <Button variant="secondary" onClick={addSegment}>+ Lauf</Button>
         </div>
         <ul className="space-y-2">
@@ -204,13 +205,13 @@ function SegmentEditor({ seg, vehicle, maxT, onChange, onDelete }: { seg: Segmen
   const hasAny = flatGearOptions.length + legacyPresets.length > 0;
 
   return (
-    <li className="rounded-md border border-slate-700 bg-slate-900 p-2">
+    <li className="rounded-md border border-border bg-card p-2">
       <div className="flex items-center gap-2">
-        <label className="flex items-center gap-1 text-xs text-slate-300">
+        <label className="flex items-center gap-1 text-xs text-muted-foreground">
           <input type="checkbox" checked={seg.visible} onChange={(e) => onChange({ visible: e.target.checked })} />
           sichtbar
         </label>
-        <label className="relative h-6 w-6 flex-none cursor-pointer rounded border border-slate-600" style={{ backgroundColor: seg.color }} title="Farbe ändern">
+        <label className="relative h-6 w-6 flex-none cursor-pointer rounded border border-input" style={{ backgroundColor: seg.color }} title="Farbe ändern">
           <input
             type="color"
             value={seg.color}
@@ -228,7 +229,7 @@ function SegmentEditor({ seg, vehicle, maxT, onChange, onDelete }: { seg: Segmen
         {hasAny && (
           <Field label="Gemessener Gang" hint="Setzt rpmFactor aus Fahrzeug-Getriebe/Preset">
             <select
-              className="w-full rounded-md border border-slate-600 bg-slate-800 px-2 py-2 text-sm text-slate-100 focus:border-sky-400 focus:outline-none"
+              className="w-full rounded-md border border-input bg-muted px-2 py-2 text-sm text-foreground focus:border-ring focus:outline-none"
               value={seg.gearPresetId ?? ""}
               onChange={(e) => {
                 const id = e.target.value;
@@ -259,7 +260,7 @@ function SegmentEditor({ seg, vehicle, maxT, onChange, onDelete }: { seg: Segmen
         <Field label="rpmFactor (U/min pro km/h)" hint="Manuell überschreibbar"><NumInput step="0.01" value={seg.rpmFactor} onChange={(e) => onChange({ rpmFactor: +e.target.value, gearPresetId: undefined })} /></Field>
         {seg.calibration && (
           <Field label="Segment-Kalibrierung">
-            <div className="text-[11px] text-slate-300">Crr {seg.calibration.crr.toFixed(4)} · CdA {seg.calibration.cdA.toFixed(3)}
+            <div className="text-[11px] text-muted-foreground">Crr {seg.calibration.crr.toFixed(4)} · CdA {seg.calibration.cdA.toFixed(3)}
               <button className="ml-2 text-red-400 underline" onClick={() => onChange({ calibration: undefined })}>entfernen</button>
             </div>
           </Field>

@@ -1,11 +1,11 @@
 import { useMemo, useState } from "react";
-import { Section, Field, NumInput, Button, Note, Row } from "./ui";
+import { Section, Field, NumInput, Button, Note, Row, EmptyState } from "./ui";
 import { useAppStore } from "@/lib/dragy/store";
 import { coastdownFit, autoDetectCoastdown } from "@/lib/dragy/physics";
 import { Chart } from "./Chart";
 import type { Session, Segment } from "@/lib/dragy/types";
 
-export function CalibrationTab() {
+export function CalibrationTab({ onOpenVehicles }: { onOpenVehicles?: () => void } = {}) {
   const { state, saveVehicle, saveSegment } = useAppStore();
   const activeVehicle = state.vehicles.find((v) => v.id === state.activeVehicleId);
   const [sessionId, setSessionId] = useState<string>("");
@@ -23,7 +23,8 @@ export function CalibrationTab() {
     return coastdownFit(session, startT, endT, mass);
   }, [session, startT, endT, activeVehicle]);
 
-  if (!activeVehicle) return <Section title="Kalibrierung"><Note>Kein aktives Fahrzeug.</Note></Section>;
+  if (!activeVehicle) return <Section title="Kalibrierung"><EmptyState title="Kein aktives Fahrzeug" description="Kalibrierung benötigt ein aktives Fahrzeug mit Sessions." actionLabel="Zu Fahrzeuge" onAction={onOpenVehicles} /></Section>;
+
 
   const speedSeries = session ? [{
     label: "km/h", color: "#38bdf8",
@@ -49,7 +50,7 @@ export function CalibrationTab() {
     <div>
       <Section title="Coastdown-Kalibrierung" note="Bereich in Ausrollphase (ausgekuppelt, kein Gefälle, kein Wind) markieren.">
         <Field label="Session">
-          <select className="w-full rounded-md border border-slate-600 bg-slate-800 px-2 py-2 text-sm text-slate-100"
+          <select className="w-full rounded-md border border-input bg-muted px-2 py-2 text-sm text-foreground"
             value={sessionId} onChange={(e) => { setSessionId(e.target.value); setStartT(0); setEndT(0); }}>
             <option value="">—</option>
             {sessions.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
@@ -75,14 +76,14 @@ export function CalibrationTab() {
             </div>
 
             {fit && (
-              <div className="mt-2 rounded-md border border-slate-700 p-2 text-xs text-slate-200">
+              <div className="mt-2 rounded-md border border-border p-2 text-xs text-foreground">
                 <div>Crr: <b>{fit.crr.toFixed(5)}</b></div>
                 <div>Cd·A: <b>{fit.cdA.toFixed(3)}</b> m² (→ Cd ≈ {(fit.cdA / activeVehicle.area).toFixed(3)} bei A={activeVehicle.area})</div>
                 <div>R²: <b>{fit.r2.toFixed(3)}</b> ({fit.n} Punkte)</div>
                 {fit.r2 < 0.85 && <p className="mt-1 text-amber-300">Warnung: R² &lt; 0.85 – möglicherweise Gefälle/Wind im gewählten Abschnitt.</p>}
                 <div className="mt-2 flex flex-wrap gap-2">
                   <Button onClick={applyToVehicle}>Als Fahrzeug-Standard</Button>
-                  <select className="rounded-md border border-slate-600 bg-slate-800 px-2 py-1 text-xs text-slate-100"
+                  <select className="rounded-md border border-input bg-muted px-2 py-1 text-xs text-foreground"
                     value={segTarget} onChange={(e) => setSegTarget(e.target.value)}>
                     <option value="">— nur für Lauf …</option>
                     {state.segments.filter((g) => g.sessionId === session.id).map((g) => (

@@ -54,14 +54,14 @@ export function BackupTab() {
           <Button variant="secondary" onClick={() => fileRef.current?.click()}>Import aus JSON</Button>
           <Button variant="danger" onClick={doClear}>Alles löschen…</Button>
         </div>
-        {log && <p className="mt-2 text-xs text-slate-300">{log}</p>}
-        <div className="mt-3 text-xs text-slate-400">
+        {log && <p className="mt-2 text-xs text-muted-foreground">{log}</p>}
+        <div className="mt-3 text-xs text-muted-foreground">
           Bestand: {state.vehicles.length} Fahrzeuge · {state.sessions.length} Sessions · {state.segments.length} Läufe.
         </div>
       </Section>
 
       <Section title="Hinweise & Grenzen">
-        <ul className="list-disc space-y-1 pl-4 text-xs text-slate-300">
+        <ul className="list-disc space-y-1 pl-4 text-xs text-muted-foreground">
           <li>Rotierende Massen (Schwungrad, Getriebe, Räder) werden im Beschleunigungsterm nicht berücksichtigt.</li>
           <li>Antriebsstrangverluste unter Last unterscheiden sich von der Schleppleistung – die Schleppkurve ist eine Näherung.</li>
           <li>RPM ist eine Schätzung aus Geschwindigkeit × Faktor, gilt nur innerhalb eines Ganges ohne Schaltvorgang.</li>
