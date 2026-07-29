@@ -7,12 +7,13 @@ import { uid } from "@/lib/dragy/db";
 import type { Session, Segment } from "@/lib/dragy/types";
 import { Chart } from "./Chart";
 
-export function SessionsTab() {
+export function SessionsTab({ onOpenVehicles }: { onOpenVehicles?: () => void } = {}) {
   const { state, saveSession, deleteSession, saveSegment, deleteSegment } = useAppStore();
   const activeVehicle = state.vehicles.find((v) => v.id === state.activeVehicleId);
   const [expanded, setExpanded] = useState<string | null>(null);
 
-  if (!activeVehicle) return <Section title="Sessions & Läufe"><Note>Kein aktives Fahrzeug.</Note></Section>;
+  if (!activeVehicle) return <Section title="Sessions & Läufe"><EmptyState title="Kein aktives Fahrzeug" description="Lege zuerst ein Fahrzeug an und aktiviere es." actionLabel="Zu Fahrzeuge" onAction={onOpenVehicles} /></Section>;
+
 
   const sessions = state.sessions.filter((s) => s.vehicleId === activeVehicle.id).sort((a, b) => b.createdAt - a.createdAt);
 
