@@ -97,14 +97,14 @@ export function CompareTab() {
         <div className="mb-2 flex flex-wrap gap-1">
           {(Object.keys(MODE_LABEL) as Mode[]).map((m) => (
             <button key={m} onClick={() => setMode(m)}
-              className={`rounded px-2 py-1 text-xs ${mode === m ? "bg-sky-500 text-white" : "bg-slate-700 text-slate-200"}`}>
+              className={`rounded px-2 py-1 text-xs ${mode === m ? "bg-primary text-white" : "bg-secondary text-foreground"}`}>
               {MODE_LABEL[m]}
             </button>
           ))}
         </div>
 
         {segments.length === 0 ? (
-          <p className="text-xs text-slate-400">Keine Läufe im aktiven Fahrzeug.</p>
+          <p className="text-xs text-muted-foreground">Keine Läufe im aktiven Fahrzeug.</p>
         ) : (
           <>
             <Chart
@@ -118,8 +118,8 @@ export function CompareTab() {
             />
             {isAccel && splitRows.length > 0 && (
               <div className="mt-3 overflow-x-auto">
-                <table className="w-full text-xs text-slate-200">
-                  <thead className="text-slate-400">
+                <table className="w-full text-xs text-foreground">
+                  <thead className="text-muted-foreground">
                     <tr>
                       <th className="py-1 pr-2 text-left font-medium">Lauf</th>
                       {SPLIT_TARGETS.map((t) => (
@@ -129,7 +129,7 @@ export function CompareTab() {
                   </thead>
                   <tbody>
                     {splitRows.map((r, i) => (
-                      <tr key={i} className="border-t border-slate-800">
+                      <tr key={i} className="border-t border-border">
                         <td className="py-1 pr-2">
                           <span className="mr-1 inline-block h-2 w-3 rounded-sm align-middle" style={{ backgroundColor: r.color }} />
                           {r.label}
@@ -143,7 +143,7 @@ export function CompareTab() {
                     ))}
                   </tbody>
                 </table>
-                <p className="mt-1 text-[10px] text-slate-500">Split-Zeiten linear zwischen Samples interpoliert; „—" wenn die Zielgeschwindigkeit im Segment nicht erreicht wurde.</p>
+                <p className="mt-1 text-[10px] text-muted-foreground">Split-Zeiten linear zwischen Samples interpoliert; „—" wenn die Zielgeschwindigkeit im Segment nicht erreicht wurde.</p>
               </div>
             )}
           </>
@@ -151,7 +151,7 @@ export function CompareTab() {
       </Section>
 
       <Section title="Grenzen & Annahmen der Berechnung">
-        <ul className="list-disc space-y-1 pl-4 text-xs text-slate-300">
+        <ul className="list-disc space-y-1 pl-4 text-xs text-muted-foreground">
           <li>
             <b>Rotierende Massen werden nicht berücksichtigt.</b> Im Beschleunigungsterm geht nur die
             translatorische Fahrzeugmasse ein; Räder, Antriebsstrang und Motor-Trägheit sind ausgeklammert.

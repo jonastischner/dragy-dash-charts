@@ -49,7 +49,7 @@ export function ImportTab() {
       </Section>
 
       <Section title="Dragy-Rohdaten importieren (.data / .ubx)">
-        <p className="text-xs text-slate-300">Aktives Fahrzeug: <b>{activeVehicle.name}</b>. Mehrfachauswahl möglich – eine Datei = eine Session.</p>
+        <p className="text-xs text-muted-foreground">Aktives Fahrzeug: <b>{activeVehicle.name}</b>. Mehrfachauswahl möglich – eine Datei = eine Session.</p>
         <input ref={inputRef} type="file" accept=".data,.ubx,application/octet-stream" multiple className="hidden"
           onChange={(e) => importFiles(e.target.files)} />
         <div className="mt-2 flex gap-2">
@@ -57,7 +57,7 @@ export function ImportTab() {
           <Button variant="secondary" onClick={() => setManualOpen(true)}>Manuell eingeben…</Button>
         </div>
         {log.length > 0 && (
-          <ul className="mt-2 space-y-1 text-xs text-slate-300">
+          <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
             {log.map((l, i) => <li key={i}>• {l}</li>)}
           </ul>
         )}
@@ -107,11 +107,11 @@ function ManualEditor({ vehicleId, tempC, pressureHpa, rh, onSave, onCancel }: {
 
   return (
     <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/70 p-2 sm:items-center" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
-      <div className="max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-t-xl bg-slate-900 p-3 sm:rounded-xl">
-        <h3 className="mb-2 text-base font-semibold text-slate-100">Manuelle Session</h3>
+      <div className="max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-t-xl bg-card p-3 sm:rounded-xl">
+        <h3 className="mb-2 text-base font-semibold text-foreground">Manuelle Session</h3>
         <Field label="Name"><TextInput value={name} onChange={(e) => setName(e.target.value)} /></Field>
         <Note>Bei manuellen Sessions ist die Geschwindigkeits-Glättung deaktiviert (zu wenige Stützpunkte).</Note>
-        <div className="mt-2 grid grid-cols-[1fr_1fr_auto] gap-1 text-[11px] text-slate-400">
+        <div className="mt-2 grid grid-cols-[1fr_1fr_auto] gap-1 text-[11px] text-muted-foreground">
           <div>Geschw. (km/h)</div><div>Zeit (s)</div><div></div>
         </div>
         <div className="mt-1 space-y-1">

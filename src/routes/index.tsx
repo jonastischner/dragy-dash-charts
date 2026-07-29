@@ -37,14 +37,14 @@ function Index() {
 
   return (
     <div
-      className="min-h-screen text-slate-100"
+      className="min-h-screen text-foreground"
       style={{
         backgroundColor: "#020617",
         paddingTop: "env(safe-area-inset-top)",
         paddingBottom: "env(safe-area-inset-bottom)",
       }}
     >
-      <header className="sticky top-0 z-30 border-b border-slate-800 bg-slate-950/95 backdrop-blur">
+      <header className="sticky top-0 z-30 border-b border-border bg-background/95 backdrop-blur">
         <div className="mx-auto max-w-2xl px-3 py-2">
           <h1 className="text-base font-semibold">Dragy Leistungsanalyse</h1>
           <nav className="mt-2 -mx-1 flex gap-1 overflow-x-auto pb-1">
@@ -52,7 +52,7 @@ function Index() {
               <button
                 key={t.id}
                 onClick={() => setTab(t.id)}
-                className={`whitespace-nowrap rounded-md px-3 py-2 text-xs font-medium ${tab === t.id ? "bg-sky-500 text-white" : "bg-slate-800 text-slate-200"}`}
+                className={`whitespace-nowrap rounded-md px-3 py-2 text-xs font-medium ${tab === t.id ? "bg-primary text-white" : "bg-muted text-foreground"}`}
               >
                 {t.label}
               </button>

@@ -25,23 +25,23 @@ export function VehiclesTab() {
   return (
     <div>
       <Section title="Fahrzeuge">
-        {state.vehicles.length === 0 && <p className="text-xs text-slate-400">Noch keine Fahrzeuge angelegt.</p>}
+        {state.vehicles.length === 0 && <p className="text-xs text-muted-foreground">Noch keine Fahrzeuge angelegt.</p>}
         <ul className="space-y-2">
           {state.vehicles.map((v) => {
             const sessions = state.sessions.filter((s) => s.vehicleId === v.id).length;
             const isActive = state.activeVehicleId === v.id;
             return (
-              <li key={v.id} className="rounded-md border border-slate-700 bg-slate-800 p-2">
+              <li key={v.id} className="rounded-md border border-border bg-muted p-2">
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2 min-w-0">
                     {v.imageDataUrl && (
-                      <img src={v.imageDataUrl} alt={v.name} className="h-12 w-12 flex-none rounded object-cover border border-slate-700" />
+                      <img src={v.imageDataUrl} alt={v.name} className="h-12 w-12 flex-none rounded object-cover border border-border" />
                     )}
                     <div className="min-w-0">
-                      <div className="text-sm font-medium text-slate-100 truncate">
-                        {v.name} {isActive && <span className="ml-1 rounded bg-sky-600 px-1 text-[10px]">aktiv</span>}
+                      <div className="text-sm font-medium text-foreground truncate">
+                        {v.name} {isActive && <span className="ml-1 rounded bg-primary px-1 text-[10px]">aktiv</span>}
                       </div>
-                      <div className="text-[11px] text-slate-400">{v.mass} kg · Cd {v.cd} · A {v.area} m² · {sessions} Sessions</div>
+                      <div className="text-[11px] text-muted-foreground">{v.mass} kg · Cd {v.cd} · A {v.area} m² · {sessions} Sessions</div>
                     </div>
                   </div>
                   <div className="flex gap-1">
@@ -141,27 +141,27 @@ function VehicleEditor({ vehicle, onSave, onCancel }: { vehicle: Vehicle; onSave
         paddingBottom: "calc(env(safe-area-inset-bottom) + 0.5rem)",
       }}
     >
-      <div className="max-h-full w-full max-w-lg overflow-y-auto overscroll-contain rounded-t-xl bg-slate-900 p-3 sm:rounded-xl">
-        <h3 className="mb-2 text-base font-semibold text-slate-100">Fahrzeug bearbeiten</h3>
+      <div className="max-h-full w-full max-w-lg overflow-y-auto overscroll-contain rounded-t-xl bg-card p-3 sm:rounded-xl">
+        <h3 className="mb-2 text-base font-semibold text-foreground">Fahrzeug bearbeiten</h3>
         <Field label="Name"><TextInput value={v.name} onChange={(e) => setV({ ...v, name: e.target.value })} /></Field>
 
-        <div className="mt-2 rounded-md border border-slate-700 p-2">
-          <div className="mb-1 text-xs font-semibold text-slate-200">Fahrzeugbild</div>
+        <div className="mt-2 rounded-md border border-border p-2">
+          <div className="mb-1 text-xs font-semibold text-foreground">Fahrzeugbild</div>
           <div className="flex items-center gap-3">
             {v.imageDataUrl ? (
-              <img src={v.imageDataUrl} alt={v.name} className="h-20 w-20 flex-none rounded object-cover border border-slate-700" />
+              <img src={v.imageDataUrl} alt={v.name} className="h-20 w-20 flex-none rounded object-cover border border-border" />
             ) : (
-              <div className="h-20 w-20 flex-none rounded border border-dashed border-slate-600 bg-slate-800 text-center text-[10px] text-slate-500 flex items-center justify-center">kein Bild</div>
+              <div className="h-20 w-20 flex-none rounded border border-dashed border-input bg-muted text-center text-[10px] text-muted-foreground flex items-center justify-center">kein Bild</div>
             )}
             <div className="flex flex-col gap-1">
-              <label className="cursor-pointer rounded-md bg-slate-700 px-3 py-1.5 text-xs text-slate-100 hover:bg-slate-600 w-fit">
+              <label className="cursor-pointer rounded-md bg-secondary px-3 py-1.5 text-xs text-foreground hover:bg-secondary w-fit">
                 Bild wählen
                 <input type="file" accept="image/*" className="hidden" onChange={(e) => onPickImage(e.target.files?.[0] ?? null)} />
               </label>
               {v.imageDataUrl && (
                 <Button variant="ghost" onClick={() => setV({ ...v, imageDataUrl: undefined })}>Bild entfernen</Button>
               )}
-              <span className="text-[10px] text-slate-400">Wird auf max. 800 px verkleinert und lokal + in der Cloud gespeichert.</span>
+              <span className="text-[10px] text-muted-foreground">Wird auf max. 800 px verkleinert und lokal + in der Cloud gespeichert.</span>
             </div>
           </div>
         </div>
@@ -173,15 +173,15 @@ function VehicleEditor({ vehicle, onSave, onCancel }: { vehicle: Vehicle; onSave
           <Field label="Stirnfläche A (m²)"><NumInput step="0.01" value={v.area} onChange={(e) => setV({ ...v, area: +e.target.value })} /></Field>
           <Field label="Glättungsfenster (Punkte)" hint="1 = keine Glättung"><NumInput value={v.smoothingWindow} onChange={(e) => setV({ ...v, smoothingWindow: Math.max(1, +e.target.value) })} /></Field>
           <Field label="Cd·A kalibriert?">
-            <label className="flex h-10 items-center gap-2 text-xs text-slate-300">
+            <label className="flex h-10 items-center gap-2 text-xs text-muted-foreground">
               <input type="checkbox" checked={v.calibrated} onChange={(e) => setV({ ...v, calibrated: e.target.checked })} />
               per Coastdown gemessen
             </label>
           </Field>
         </Row>
 
-        <div className="mt-3 rounded-md border border-slate-700 p-2">
-          <div className="mb-1 text-xs font-semibold text-slate-200">Drehzahlen</div>
+        <div className="mt-3 rounded-md border border-border p-2">
+          <div className="mb-1 text-xs font-semibold text-foreground">Drehzahlen</div>
           <Row>
             <Field label="Schaltdrehzahl (U/min)" hint="Empfohlener Schaltpunkt für Schaltdiagramm">
               <NumInput value={v.shiftRpm ?? ""} placeholder="z.B. 6500" onChange={(e) => setV({ ...v, shiftRpm: e.target.value === "" ? undefined : +e.target.value })} />
@@ -192,8 +192,8 @@ function VehicleEditor({ vehicle, onSave, onCancel }: { vehicle: Vehicle; onSave
           </Row>
         </div>
 
-        <div className="mt-3 rounded-md border border-slate-700 p-2">
-          <div className="mb-1 text-xs font-semibold text-slate-200">RPM-Faktor aus Vmax</div>
+        <div className="mt-3 rounded-md border border-border p-2">
+          <div className="mb-1 text-xs font-semibold text-foreground">RPM-Faktor aus Vmax</div>
           <Note>Nur Vorgabe für neu angelegte Läufe. Bestehende Läufe bleiben unverändert.</Note>
           <Row className="mt-2">
             <Field label="Höchste erreichte Drehzahl"><NumInput value={v.rpmMatch.maxRpm} onChange={(e) => setV({ ...v, rpmMatch: { ...v.rpmMatch, maxRpm: +e.target.value } })} /></Field>
@@ -201,7 +201,7 @@ function VehicleEditor({ vehicle, onSave, onCancel }: { vehicle: Vehicle; onSave
           </Row>
           <div className="mt-2 flex items-center gap-2">
             <Button variant="secondary" onClick={applyRpmMatch}>Faktor berechnen</Button>
-            <span className="text-xs text-slate-300">rpmFactor: <b>{v.rpmFactorDefault.toFixed(3)}</b> U/min pro km/h</span>
+            <span className="text-xs text-muted-foreground">rpmFactor: <b>{v.rpmFactorDefault.toFixed(3)}</b> U/min pro km/h</span>
           </div>
         </div>
 
@@ -223,9 +223,9 @@ function VehicleEditor({ vehicle, onSave, onCancel }: { vehicle: Vehicle; onSave
           onUseAsDefault={(f) => setV({ ...v, rpmFactorDefault: +f.toFixed(3) })}
         />
 
-        <div className="mt-3 rounded-md border border-slate-700 p-2">
-          <div className="mb-1 text-xs font-semibold text-slate-200">Schleppleistungskurve (Prüfstand)</div>
-          <p className="text-[10px] text-slate-400">Stützpunkte RPM → PS. Lineare Interpolation, außerhalb geklemmt.</p>
+        <div className="mt-3 rounded-md border border-border p-2">
+          <div className="mb-1 text-xs font-semibold text-foreground">Schleppleistungskurve (Prüfstand)</div>
+          <p className="text-[10px] text-muted-foreground">Stützpunkte RPM → PS. Lineare Interpolation, außerhalb geklemmt.</p>
           <div className="mt-2 space-y-1">
             {v.dragCurve.map((d, i) => (
               <div key={i} className="flex items-center gap-2">
@@ -251,9 +251,9 @@ function ConfirmDelete({ vehicle, sessionCount, onConfirm, onCancel }: { vehicle
   useLockBodyScroll();
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/70 p-4">
-      <div className="w-full max-w-sm overscroll-contain rounded-lg bg-slate-900 p-3">
-        <h3 className="text-sm font-semibold text-slate-100">Fahrzeug löschen?</h3>
-        <p className="mt-2 text-xs text-slate-300"><b>{vehicle.name}</b> wird gelöscht. Dabei werden auch {sessionCount} zugehörige Session(s) inklusive aller Läufe entfernt.</p>
+      <div className="w-full max-w-sm overscroll-contain rounded-lg bg-card p-3">
+        <h3 className="text-sm font-semibold text-foreground">Fahrzeug löschen?</h3>
+        <p className="mt-2 text-xs text-muted-foreground"><b>{vehicle.name}</b> wird gelöscht. Dabei werden auch {sessionCount} zugehörige Session(s) inklusive aller Läufe entfernt.</p>
         <div className="mt-3 flex justify-end gap-2">
           <Button variant="ghost" onClick={onCancel}>Abbrechen</Button>
           <Button variant="danger" onClick={onConfirm}>Endgültig löschen</Button>
@@ -280,15 +280,15 @@ function GearPresetsEditor({ presets, onChange, onUseAsDefault }: {
   const del = (i: number) => onChange(presets.filter((_, k) => k !== i));
 
   return (
-    <div className="mt-3 rounded-md border border-slate-700 p-2">
-      <div className="mb-1 text-xs font-semibold text-slate-200">Legacy Getriebe-Presets</div>
-      <p className="text-[10px] text-slate-400">Bestehende Alt-Presets. Neue Konfigurationen bitte oben unter „Antrieb" anlegen.</p>
+    <div className="mt-3 rounded-md border border-border p-2">
+      <div className="mb-1 text-xs font-semibold text-foreground">Legacy Getriebe-Presets</div>
+      <p className="text-[10px] text-muted-foreground">Bestehende Alt-Presets. Neue Konfigurationen bitte oben unter „Antrieb" anlegen.</p>
       <ul className="mt-2 space-y-2">
         {presets.map((p, i) => {
           const U = tireCircumferenceM(p.tireSpec);
           const valid = U !== null && p.gearRatio > 0 && p.finalDrive > 0;
           return (
-            <li key={p.id} className="rounded-md border border-slate-700 bg-slate-900 p-2">
+            <li key={p.id} className="rounded-md border border-border bg-card p-2">
               <div className="flex items-center gap-2">
                 <TextInput className="flex-1" value={p.name} onChange={(e) => update(i, { name: e.target.value })} />
                 <Button variant="danger" onClick={() => del(i)}>×</Button>
@@ -298,7 +298,7 @@ function GearPresetsEditor({ presets, onChange, onUseAsDefault }: {
                 <Field label="Endübersetzung"><NumInput step="0.001" value={p.finalDrive} onChange={(e) => update(i, { finalDrive: +e.target.value })} /></Field>
                 <Field label="Reifen"><TextInput value={p.tireSpec} onChange={(e) => update(i, { tireSpec: e.target.value })} /></Field>
                 <Field label="rpmFactor">
-                  <div className="flex h-10 items-center gap-2 text-xs text-slate-200">
+                  <div className="flex h-10 items-center gap-2 text-xs text-foreground">
                     <b>{valid ? p.rpmFactor.toFixed(3) : "–"}</b>
                     {valid && <Button variant="ghost" onClick={() => onUseAsDefault(p.rpmFactor)}>als Standard</Button>}
                   </div>
@@ -397,9 +397,9 @@ function AntriebManager({ gearboxDefs, finalDrives, tires, setups, defaultSetupI
   };
 
   return (
-    <div className="mt-3 rounded-md border border-slate-700 p-2">
-      <div className="mb-1 text-xs font-semibold text-slate-200">Antrieb (Getriebe, Endübersetzung, Reifen, Setups)</div>
-      <p className="text-[10px] text-slate-400">Getriebe (nur Gänge), Endübersetzungen und Reifen getrennt pflegen und beliebig zu Setups kombinieren.</p>
+    <div className="mt-3 rounded-md border border-border p-2">
+      <div className="mb-1 text-xs font-semibold text-foreground">Antrieb (Getriebe, Endübersetzung, Reifen, Setups)</div>
+      <p className="text-[10px] text-muted-foreground">Getriebe (nur Gänge), Endübersetzungen und Reifen getrennt pflegen und beliebig zu Setups kombinieren.</p>
 
       {/* Gearboxes */}
       <GearboxesCollapsibleList
@@ -410,15 +410,15 @@ function AntriebManager({ gearboxDefs, finalDrives, tires, setups, defaultSetupI
       />
 
       {/* Final drives */}
-      <div className="mt-2 rounded-md border border-slate-700 bg-slate-900/60 p-2">
+      <div className="mt-2 rounded-md border border-border bg-card/60 p-2">
         <div className="mb-1 flex items-center justify-between">
-          <div className="text-[11px] font-semibold text-slate-200">Endübersetzungen</div>
+          <div className="text-[11px] font-semibold text-foreground">Endübersetzungen</div>
           <Button variant="secondary" onClick={addFinal}>+ Endübersetzung</Button>
         </div>
-        {finalDrives.length === 0 && <p className="text-[11px] text-slate-500">Noch keine Endübersetzung.</p>}
+        {finalDrives.length === 0 && <p className="text-[11px] text-muted-foreground">Noch keine Endübersetzung.</p>}
         <ul className="space-y-2">
           {finalDrives.map((fd, i) => (
-            <li key={fd.id} className="rounded-md border border-slate-700 bg-slate-950 p-2">
+            <li key={fd.id} className="rounded-md border border-border bg-background p-2">
               <Row>
                 <Field label="Name"><TextInput value={fd.name} onChange={(e) => updateFinal(i, { name: e.target.value })} /></Field>
                 <Field label="Übersetzung"><NumInput step="0.001" value={fd.ratio} onChange={(e) => updateFinal(i, { ratio: +e.target.value })} /></Field>
@@ -430,23 +430,23 @@ function AntriebManager({ gearboxDefs, finalDrives, tires, setups, defaultSetupI
       </div>
 
       {/* Tires */}
-      <div className="mt-2 rounded-md border border-slate-700 bg-slate-900/60 p-2">
+      <div className="mt-2 rounded-md border border-border bg-card/60 p-2">
         <div className="mb-1 flex items-center justify-between">
-          <div className="text-[11px] font-semibold text-slate-200">Reifen</div>
+          <div className="text-[11px] font-semibold text-foreground">Reifen</div>
           <Button variant="secondary" onClick={addTire}>+ Reifen</Button>
         </div>
-        {tires.length === 0 && <p className="text-[11px] text-slate-500">Noch kein Reifen.</p>}
+        {tires.length === 0 && <p className="text-[11px] text-muted-foreground">Noch kein Reifen.</p>}
         <ul className="space-y-2">
           {tires.map((t, i) => {
             const U = tireCircumferenceM(t.spec);
             return (
-              <li key={t.id} className="rounded-md border border-slate-700 bg-slate-950 p-2">
+              <li key={t.id} className="rounded-md border border-border bg-background p-2">
                 <Row>
                   <Field label="Name"><TextInput value={t.name} onChange={(e) => updateTire(i, { name: e.target.value })} /></Field>
                   <Field label="Spec (z.B. 225/45R17)"><TextInput value={t.spec} onChange={(e) => updateTire(i, { spec: e.target.value })} /></Field>
                   <div className="flex items-end"><Button variant="danger" onClick={() => delTire(i)}>×</Button></div>
                 </Row>
-                <div className="mt-1 text-[10px] text-slate-400">Abrollumfang: {U ? (U * 1000).toFixed(0) + " mm (dyn.)" : "– (ungültig)"}</div>
+                <div className="mt-1 text-[10px] text-muted-foreground">Abrollumfang: {U ? (U * 1000).toFixed(0) + " mm (dyn.)" : "– (ungültig)"}</div>
               </li>
             );
           })}
@@ -454,12 +454,12 @@ function AntriebManager({ gearboxDefs, finalDrives, tires, setups, defaultSetupI
       </div>
 
       {/* Setups */}
-      <div className="mt-2 rounded-md border border-slate-700 bg-slate-900/60 p-2">
+      <div className="mt-2 rounded-md border border-border bg-card/60 p-2">
         <div className="mb-1 flex items-center justify-between">
-          <div className="text-[11px] font-semibold text-slate-200">Setups (Getriebe × Endübersetzung × Reifen)</div>
+          <div className="text-[11px] font-semibold text-foreground">Setups (Getriebe × Endübersetzung × Reifen)</div>
           <Button variant="secondary" onClick={addSetup}>+ Setup</Button>
         </div>
-        {setups.length === 0 && <p className="text-[11px] text-slate-500">Noch kein Setup.</p>}
+        {setups.length === 0 && <p className="text-[11px] text-muted-foreground">Noch kein Setup.</p>}
         <ul className="space-y-2">
           {setups.map((s, i) => {
             const gb = gearboxDefs.find((g) => g.id === s.gearboxId);
@@ -468,11 +468,11 @@ function AntriebManager({ gearboxDefs, finalDrives, tires, setups, defaultSetupI
             const tireSpec = tire?.spec ?? gb?.tireSpec ?? "";
             const isDefault = defaultSetupId === s.id;
             return (
-              <li key={s.id} className="rounded-md border border-slate-700 bg-slate-950 p-2">
+              <li key={s.id} className="rounded-md border border-border bg-background p-2">
                 <div className="flex items-center gap-2">
                   <TextInput className="flex-1" value={s.name} onChange={(e) => updateSetup(i, { name: e.target.value })} />
                   {isDefault ? (
-                    <span className="rounded bg-sky-600 px-2 py-1 text-[10px] text-white">Standard</span>
+                    <span className="rounded bg-primary px-2 py-1 text-[10px] text-white">Standard</span>
                   ) : (
                     <Button variant="ghost" onClick={() => onChange({ defaultSetupId: s.id })}>als Standard</Button>
                   )}
@@ -481,7 +481,7 @@ function AntriebManager({ gearboxDefs, finalDrives, tires, setups, defaultSetupI
                 <Row className="mt-2">
                   <Field label="Getriebe">
                     <select
-                      className="w-full rounded-md border border-slate-600 bg-slate-800 px-2 py-2 text-sm text-slate-100"
+                      className="w-full rounded-md border border-input bg-muted px-2 py-2 text-sm text-foreground"
                       value={s.gearboxId}
                       onChange={(e) => updateSetup(i, { gearboxId: e.target.value })}
                     >
@@ -490,7 +490,7 @@ function AntriebManager({ gearboxDefs, finalDrives, tires, setups, defaultSetupI
                   </Field>
                   <Field label="Endübersetzung">
                     <select
-                      className="w-full rounded-md border border-slate-600 bg-slate-800 px-2 py-2 text-sm text-slate-100"
+                      className="w-full rounded-md border border-input bg-muted px-2 py-2 text-sm text-foreground"
                       value={s.finalDriveId}
                       onChange={(e) => updateSetup(i, { finalDriveId: e.target.value })}
                     >
@@ -499,7 +499,7 @@ function AntriebManager({ gearboxDefs, finalDrives, tires, setups, defaultSetupI
                   </Field>
                   <Field label="Reifen">
                     <select
-                      className="w-full rounded-md border border-slate-600 bg-slate-800 px-2 py-2 text-sm text-slate-100"
+                      className="w-full rounded-md border border-input bg-muted px-2 py-2 text-sm text-foreground"
                       value={s.tireId ?? ""}
                       onChange={(e) => updateSetup(i, { tireId: e.target.value || undefined })}
                     >
@@ -509,14 +509,14 @@ function AntriebManager({ gearboxDefs, finalDrives, tires, setups, defaultSetupI
                   </Field>
                 </Row>
                 {gb && fd && gb.gears.length > 0 && tireSpec && (
-                  <div className="mt-2 text-[11px] text-slate-300">
-                    <div className="text-slate-400">rpmFactor pro Gang (Reifen {tireSpec}, End {fd.ratio.toFixed(3)}):</div>
+                  <div className="mt-2 text-[11px] text-muted-foreground">
+                    <div className="text-muted-foreground">rpmFactor pro Gang (Reifen {tireSpec}, End {fd.ratio.toFixed(3)}):</div>
                     <div className="mt-1 flex flex-wrap gap-1">
                       {gb.gears.map((g) => {
                         const f = computeRpmFactor(g.ratio, fd.ratio, tireSpec);
                         if (f == null) return null;
                         return (
-                          <button key={g.id} className="rounded bg-slate-800 px-2 py-0.5 hover:bg-slate-700"
+                          <button key={g.id} className="rounded bg-muted px-2 py-0.5 hover:bg-secondary"
                             onClick={() => onUseAsDefault(f)}
                             title="Als Standard-rpmFactor setzen">
                             {g.name}: {f.toFixed(2)}
@@ -551,22 +551,22 @@ function GearboxesCollapsibleList({ gearboxDefs, onAdd, onUpdate, onDelete }: {
     return next;
   });
   return (
-    <div className="mt-2 rounded-md border border-slate-700 bg-slate-900/60 p-2">
+    <div className="mt-2 rounded-md border border-border bg-card/60 p-2">
       <div className="mb-1 flex items-center justify-between">
-        <div className="text-[11px] font-semibold text-slate-200">Getriebe</div>
+        <div className="text-[11px] font-semibold text-foreground">Getriebe</div>
         <Button variant="secondary" onClick={onAdd}>+ Getriebe</Button>
       </div>
-      {gearboxDefs.length === 0 && <p className="text-[11px] text-slate-500">Noch kein Getriebe.</p>}
+      {gearboxDefs.length === 0 && <p className="text-[11px] text-muted-foreground">Noch kein Getriebe.</p>}
       <ul className="space-y-2">
         {gearboxDefs.map((gb, i) => {
           const open = openIds.has(gb.id);
           return (
-            <li key={gb.id} className="rounded-md border border-slate-700 bg-slate-950 p-2">
+            <li key={gb.id} className="rounded-md border border-border bg-background p-2">
               <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={() => toggle(gb.id)}
-                  className="flex h-8 w-8 flex-none items-center justify-center rounded bg-slate-800 text-slate-200 hover:bg-slate-700"
+                  className="flex h-8 w-8 flex-none items-center justify-center rounded bg-muted text-foreground hover:bg-secondary"
                   aria-label={open ? "Einklappen" : "Ausklappen"}
                 >
                   <span className={`inline-block transition-transform ${open ? "rotate-90" : ""}`}>▶</span>
@@ -574,8 +574,8 @@ function GearboxesCollapsibleList({ gearboxDefs, onAdd, onUpdate, onDelete }: {
                 {open ? (
                   <TextInput className="flex-1" value={gb.name} onChange={(e) => onUpdate(i, { name: e.target.value })} />
                 ) : (
-                  <button type="button" onClick={() => toggle(gb.id)} className="flex-1 text-left text-sm text-slate-100">
-                    {gb.name} <span className="ml-2 text-[11px] text-slate-400">{gb.gears.length} Gänge</span>
+                  <button type="button" onClick={() => toggle(gb.id)} className="flex-1 text-left text-sm text-foreground">
+                    {gb.name} <span className="ml-2 text-[11px] text-muted-foreground">{gb.gears.length} Gänge</span>
                   </button>
                 )}
                 <Button variant="danger" onClick={() => onDelete(i)}>×</Button>
@@ -606,10 +606,10 @@ function GearListEditor({ gears, onChange }: { gears: GearRatio[]; onChange: (g:
 
   return (
     <div className="mt-2">
-      {gears.length === 0 && <p className="text-[11px] text-slate-500">Noch keine Gänge.</p>}
+      {gears.length === 0 && <p className="text-[11px] text-muted-foreground">Noch keine Gänge.</p>}
       <ul className="space-y-2">
         {gears.map((g, i) => (
-          <li key={g.id} className="rounded-md border border-slate-700 bg-slate-800/40 p-2">
+          <li key={g.id} className="rounded-md border border-border bg-muted/40 p-2">
             <div className="grid grid-cols-[1fr_auto] gap-2">
               <Field label="Name">
                 <TextInput value={g.name} onChange={(e) => update(i, { name: e.target.value })} />
@@ -711,20 +711,20 @@ function ShiftDiagramCompare({ vehicle }: { vehicle: Vehicle }) {
   }
 
   return (
-    <div className="mt-3 rounded-md border border-slate-700 p-2">
-      <div className="mb-1 text-xs font-semibold text-slate-200">Schaltdiagramm (Setups vergleichen)</div>
-      <p className="text-[10px] text-slate-400">
+    <div className="mt-3 rounded-md border border-border p-2">
+      <div className="mb-1 text-xs font-semibold text-foreground">Schaltdiagramm (Setups vergleichen)</div>
+      <p className="text-[10px] text-muted-foreground">
         U/min über km/h je Gang. Senkrechte Linien zeigen den Drehzahlabfall beim Schalten (bei gepflegter Schaltdrehzahl); waagerechte Linien markieren Schalt- (orange) und Maximaldrehzahl (rot).
       </p>
       {setups.length === 0 ? (
-        <p className="mt-2 text-[11px] text-slate-500">Erst mindestens ein Setup oben anlegen.</p>
+        <p className="mt-2 text-[11px] text-muted-foreground">Erst mindestens ein Setup oben anlegen.</p>
       ) : (
         <>
-          <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-200">
+          <div className="mt-2 flex flex-wrap gap-2 text-xs text-foreground">
             {setups.map((s) => {
               const on = effective.includes(s.id);
               return (
-                <label key={s.id} className="flex items-center gap-1 rounded bg-slate-800 px-2 py-1">
+                <label key={s.id} className="flex items-center gap-1 rounded bg-muted px-2 py-1">
                   <input
                     type="checkbox"
                     checked={on}
