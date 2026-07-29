@@ -402,27 +402,12 @@ function AntriebManager({ gearboxDefs, finalDrives, tires, setups, defaultSetupI
       <p className="text-[10px] text-slate-400">Getriebe (nur Gänge), Endübersetzungen und Reifen getrennt pflegen und beliebig zu Setups kombinieren.</p>
 
       {/* Gearboxes */}
-      <div className="mt-2 rounded-md border border-slate-700 bg-slate-900/60 p-2">
-        <div className="mb-1 flex items-center justify-between">
-          <div className="text-[11px] font-semibold text-slate-200">Getriebe</div>
-          <Button variant="secondary" onClick={addGearbox}>+ Getriebe</Button>
-        </div>
-        {gearboxDefs.length === 0 && <p className="text-[11px] text-slate-500">Noch kein Getriebe.</p>}
-        <ul className="space-y-2">
-          {gearboxDefs.map((gb, i) => (
-            <li key={gb.id} className="rounded-md border border-slate-700 bg-slate-950 p-2">
-              <div className="flex items-center gap-2">
-                <TextInput className="flex-1" value={gb.name} onChange={(e) => updateGearbox(i, { name: e.target.value })} />
-                <Button variant="danger" onClick={() => delGearbox(i)}>×</Button>
-              </div>
-              <GearListEditor
-                gears={gb.gears}
-                onChange={(gears) => updateGearbox(i, { gears })}
-              />
-            </li>
-          ))}
-        </ul>
-      </div>
+      <GearboxesCollapsibleList
+        gearboxDefs={gearboxDefs}
+        onAdd={addGearbox}
+        onUpdate={updateGearbox}
+        onDelete={delGearbox}
+      />
 
       {/* Final drives */}
       <div className="mt-2 rounded-md border border-slate-700 bg-slate-900/60 p-2">
@@ -549,6 +534,62 @@ function AntriebManager({ gearboxDefs, finalDrives, tires, setups, defaultSetupI
           })}
         </ul>
       </div>
+    </div>
+  );
+}
+
+function GearboxesCollapsibleList({ gearboxDefs, onAdd, onUpdate, onDelete }: {
+  gearboxDefs: GearboxDef[];
+  onAdd: () => void;
+  onUpdate: (i: number, patch: Partial<GearboxDef>) => void;
+  onDelete: (i: number) => void;
+}) {
+  const [openIds, setOpenIds] = useState<Set<string>>(new Set());
+  const toggle = (id: string) => setOpenIds((prev) => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
+  return (
+    <div className="mt-2 rounded-md border border-slate-700 bg-slate-900/60 p-2">
+      <div className="mb-1 flex items-center justify-between">
+        <div className="text-[11px] font-semibold text-slate-200">Getriebe</div>
+        <Button variant="secondary" onClick={onAdd}>+ Getriebe</Button>
+      </div>
+      {gearboxDefs.length === 0 && <p className="text-[11px] text-slate-500">Noch kein Getriebe.</p>}
+      <ul className="space-y-2">
+        {gearboxDefs.map((gb, i) => {
+          const open = openIds.has(gb.id);
+          return (
+            <li key={gb.id} className="rounded-md border border-slate-700 bg-slate-950 p-2">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => toggle(gb.id)}
+                  className="flex h-8 w-8 flex-none items-center justify-center rounded bg-slate-800 text-slate-200 hover:bg-slate-700"
+                  aria-label={open ? "Einklappen" : "Ausklappen"}
+                >
+                  <span className={`inline-block transition-transform ${open ? "rotate-90" : ""}`}>▶</span>
+                </button>
+                {open ? (
+                  <TextInput className="flex-1" value={gb.name} onChange={(e) => onUpdate(i, { name: e.target.value })} />
+                ) : (
+                  <button type="button" onClick={() => toggle(gb.id)} className="flex-1 text-left text-sm text-slate-100">
+                    {gb.name} <span className="ml-2 text-[11px] text-slate-400">{gb.gears.length} Gänge</span>
+                  </button>
+                )}
+                <Button variant="danger" onClick={() => onDelete(i)}>×</Button>
+              </div>
+              {open && (
+                <GearListEditor
+                  gears={gb.gears}
+                  onChange={(gears) => onUpdate(i, { gears })}
+                />
+              )}
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }
