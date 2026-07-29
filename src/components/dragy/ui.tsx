@@ -31,9 +31,10 @@ export function Field({ label, children, hint }: { label: string; children: Reac
 export function TextInput(props: InputHTMLAttributes<HTMLInputElement>) {
   return (
     <input {...props}
-      className={`w-full rounded-md border border-input bg-muted px-2 py-2 text-sm text-foreground focus:border-ring focus:outline-none ${props.className ?? ""}`} />
+      className={`w-full rounded-md border border-input bg-muted px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${props.className ?? ""}`} />
   );
 }
+
 
 export function NumInput({ value, onChange, onBlur, onFocus, ...rest }: InputHTMLAttributes<HTMLInputElement>) {
   const [draft, setDraft] = useState<string | null>(null);
