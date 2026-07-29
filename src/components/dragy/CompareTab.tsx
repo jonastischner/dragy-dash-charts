@@ -15,7 +15,7 @@ const MODE_LABEL: Record<Mode, string> = {
 
 const SPLIT_TARGETS = [60, 100, 150, 200];
 
-export function CompareTab() {
+export function CompareTab({ onOpenVehicles }: { onOpenVehicles?: () => void } = {}) {
   const { state, saveSegment } = useAppStore();
   const activeVehicle = state.vehicles.find((v) => v.id === state.activeVehicleId);
   const [mode, setMode] = useState<Mode>("pWheel");
@@ -26,7 +26,8 @@ export function CompareTab() {
     return state.segments.filter((g) => own.some((s) => s.id === g.sessionId));
   }, [state, activeVehicle]);
 
-  if (!activeVehicle) return <Section title="Leistungsvergleich"><Note>Kein aktives Fahrzeug.</Note></Section>;
+  if (!activeVehicle) return <Section title="Leistungsvergleich"><EmptyState title="Kein aktives Fahrzeug" description="Wähle ein Fahrzeug, um Läufe zu vergleichen." actionLabel="Zu Fahrzeuge" onAction={onOpenVehicles} /></Section>;
+
 
   const isAccel = mode === "accel";
 
