@@ -100,7 +100,20 @@ export function Chart({ series, bands = [], xLabel, yLabel, height = 280, onLege
     if (xLabel) ctx.fillText(xLabel, W - padR - ctx.measureText(xLabel).width, H - 2);
     if (yLabel) { ctx.save(); ctx.translate(12, padT + 4); ctx.rotate(-Math.PI / 2); ctx.fillText(yLabel, -plotH + 4, 0); ctx.restore(); }
 
-    // hover crosshair
+    // hover crosshair — interpoliere y an der exakten x-Position pro Serie
+    const interpAt = (s: Series, xVal: number): number | null => {
+      const ps = s.points;
+      for (let k = 0; k < ps.length - 1; k++) {
+        const a = ps[k], b = ps[k + 1];
+        if (!Number.isFinite(a.x) || !Number.isFinite(a.y) || !Number.isFinite(b.x) || !Number.isFinite(b.y)) continue;
+        const lo = Math.min(a.x, b.x), hi = Math.max(a.x, b.x);
+        if (xVal < lo || xVal > hi) continue;
+        if (b.x === a.x) continue; // vertikaler Sprung überspringen
+        const t = (xVal - a.x) / (b.x - a.x);
+        return a.y + t * (b.y - a.y);
+      }
+      return null;
+    };
     if (hover) {
       const hx = hover.x;
       ctx.strokeStyle = "#64748b"; ctx.setLineDash([4, 4]);
@@ -108,12 +121,10 @@ export function Chart({ series, bands = [], xLabel, yLabel, height = 280, onLege
       ctx.setLineDash([]);
       const xVal = xMin + ((hx - padL) / plotW) * (xMax - xMin);
       for (const s of visSeries) {
-        // find nearest
-        let best = s.points[0]; let bestD = Infinity;
-        for (const p of s.points) { const d = Math.abs(p.x - xVal); if (d < bestD) { bestD = d; best = p; } }
-        if (!best || !Number.isFinite(best.y)) continue;
+        const y = interpAt(s, xVal);
+        if (y == null || !Number.isFinite(y)) continue;
         ctx.fillStyle = s.color;
-        ctx.beginPath(); ctx.arc(toPx(best.x), toPy(best.y), 4, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(toPx(xVal), toPy(y), 4, 0, Math.PI * 2); ctx.fill();
       }
     }
   }, [series, bands, W, H, hover, xLabel, yLabel, xMin, xMax, yMin, yMax]);
@@ -125,15 +136,27 @@ export function Chart({ series, bands = [], xLabel, yLabel, height = 280, onLege
   };
   const onLeave = () => setHover(null);
 
-  // hover text
+  // hover text — gleiche Interpolation
+  const interpAtOuter = (s: Series, xVal: number): number | null => {
+    const ps = s.points;
+    for (let k = 0; k < ps.length - 1; k++) {
+      const a = ps[k], b = ps[k + 1];
+      if (!Number.isFinite(a.x) || !Number.isFinite(a.y) || !Number.isFinite(b.x) || !Number.isFinite(b.y)) continue;
+      const lo = Math.min(a.x, b.x), hi = Math.max(a.x, b.x);
+      if (xVal < lo || xVal > hi) continue;
+      if (b.x === a.x) continue;
+      const t = (xVal - a.x) / (b.x - a.x);
+      return a.y + t * (b.y - a.y);
+    }
+    return null;
+  };
   let hoverText = "";
   if (hover) {
     const xVal = xMin + ((hover.x - padL) / plotW) * (xMax - xMin);
     const parts = [xLabel ? `${xLabel}: ${xFormat ? xFormat(xVal) : xVal.toFixed(1)}` : (xFormat ? xFormat(xVal) : xVal.toFixed(1))];
     for (const s of visSeries) {
-      let best = s.points[0]; let bestD = Infinity;
-      for (const p of s.points) { const d = Math.abs(p.x - xVal); if (d < bestD) { bestD = d; best = p; } }
-      if (best && Number.isFinite(best.y)) parts.push(`${s.label}: ${yFormat ? yFormat(best.y) : best.y.toFixed(1)}`);
+      const y = interpAtOuter(s, xVal);
+      if (y != null && Number.isFinite(y)) parts.push(`${s.label}: ${yFormat ? yFormat(y) : y.toFixed(1)}`);
     }
     hoverText = parts.join(" · ");
   }
