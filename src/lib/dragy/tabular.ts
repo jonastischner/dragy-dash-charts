@@ -39,21 +39,32 @@ export async function parseSpreadsheet(buf: ArrayBuffer): Promise<Grid> {
 
 type ColMap = { speed: number; time: number | null; dist: number | null; alt: number | null; unitMph: boolean };
 
-function findHeader(grid: Grid): { row: number; cols: ColMap } | null {
+function scanHeader(grid: Grid, strict: boolean): { row: number; cols: ColMap } | null {
   const limit = Math.min(grid.length, 20);
   for (let r = 0; r < limit; r++) {
-    const cells = grid[r].map((c) => String(c ?? "").toLowerCase());
+    const cells = grid[r].map((c) => String(c ?? "").toLowerCase().trim());
+    // Kopfzeile: mind. 2 Spalten, überwiegend Text (keine Datenzeile, kein Titel)
+    const nonEmpty = cells.filter((c) => c !== "");
+    if (nonEmpty.length < 2) continue;
+    if (nonEmpty.filter((c) => num(c) !== null).length > nonEmpty.length / 2) continue;
     const idxOf = (pred: (s: string) => boolean) => cells.findIndex(pred);
-    const speed = idxOf((s) => s.includes("speed") || s.includes("geschw") || s.includes("km/h") || s.includes("mph"));
+    const speed = strict
+      ? idxOf((s) => s.includes("speed") || s.includes("geschw"))
+      : idxOf((s) => s.includes("speed") || s.includes("geschw") || s.includes("km/h") || s.includes("mph"));
     if (speed < 0) continue;
-    const time = idxOf((s) => /^(time|zeit|t)\b/.test(s) || s.includes("time(") || s.includes("elapsed") || s.includes("sekund"));
+    const time = idxOf((s) => /^(time|zeit|t|sec|s)\b/.test(s) || s.startsWith("time") || s.startsWith("zeit") || s.includes("elapsed") || s.includes("sekund"));
     const dist = idxOf((s) => s.includes("distance") || s.includes("distanz") || s.includes("strecke"));
     const alt = idxOf((s) => s.includes("altitude") || s.includes("höhe") || s.includes("hoehe") || s.includes("height"));
     const unitMph = cells[speed].includes("mph") && !cells[speed].includes("km/h");
-    return { row: r, cols: { speed, time: time < 0 ? null : time, dist: dist < 0 ? null : dist, alt: alt < 0 ? null : alt, unitMph } };
+    return { row: r, cols: { speed, time: time < 0 || time === speed ? null : time, dist: dist < 0 ? null : dist, alt: alt < 0 ? null : alt, unitMph } };
   }
   return null;
 }
+
+function findHeader(grid: Grid) {
+  return scanHeader(grid, true) ?? scanHeader(grid, false);
+}
+
 
 export function gridToRecords(grid: Grid): { records: R[]; info: string } {
   const head = findHeader(grid);
