@@ -25,15 +25,24 @@ export function ImportTab({ onOpenVehicles }: { onOpenVehicles?: () => void } = 
     const msgs: string[] = [];
     for (const f of Array.from(files)) {
       try {
-        const buf = await f.arrayBuffer();
-        const records = parseUbx(buf);
-        if (records.length < 3) { msgs.push(`${f.name}: keine gültigen NAV-PVT Datensätze gefunden`); continue; }
+        const isTable = /\.(csv|txt|tsv|xlsx|xlsm|xls)$/i.test(f.name);
+        let records: R[];
+        let extra = "";
+        if (isTable) {
+          const res = await parseTableFile(f);
+          records = res.records;
+          extra = ` – ${res.info}`;
+          if (records.length < 3) { msgs.push(`${f.name}: zu wenige Datenzeilen gefunden`); continue; }
+        } else {
+          records = parseUbx(await f.arrayBuffer());
+          if (records.length < 3) { msgs.push(`${f.name}: keine gültigen NAV-PVT Datensätze gefunden`); continue; }
+        }
         const s: Session = {
-          id: uid(), vehicleId: activeVehicle.id, name: f.name.replace(/\.(data|ubx)$/i, ""),
+          id: uid(), vehicleId: activeVehicle.id, name: f.name.replace(/\.(data|ubx|csv|txt|tsv|xlsx|xlsm|xls)$/i, ""),
           records, tempC, pressureHpa, rh, manual: false, createdAt: Date.now(),
         };
         await saveSession(s);
-        msgs.push(`${f.name}: ${records.length} Punkte importiert (${records[records.length - 1].t.toFixed(1)} s)`);
+        msgs.push(`${f.name}: ${records.length} Punkte importiert (${records[records.length - 1].t.toFixed(1)} s)${extra}`);
       } catch (e: any) {
         msgs.push(`${f.name}: Fehler – ${e.message ?? e}`);
       }
@@ -51,13 +60,15 @@ export function ImportTab({ onOpenVehicles }: { onOpenVehicles?: () => void } = 
         </Row>
       </Section>
 
-      <Section title="Dragy-Rohdaten importieren (.data / .ubx)">
+      <Section title="Läufe importieren (.data / .ubx / .csv / Excel)">
         <p className="text-xs text-muted-foreground">Aktives Fahrzeug: <b>{activeVehicle.name}</b>. Mehrfachauswahl möglich – eine Datei = eine Session.</p>
-        <input ref={inputRef} type="file" accept=".data,.ubx,application/octet-stream" multiple className="hidden"
+        <Note>Neben Dragy-Rohdaten werden Tabellen-Exporte (z.B. P-Gear, Racebox) als CSV/TSV oder Excel gelesen. Erkannt werden Spalten für Geschwindigkeit (km/h oder mph), Zeit, Strecke und Höhe; fehlt eine Zeitspalte, wird die Abtastrate aus Strecke und Geschwindigkeit abgeleitet.</Note>
+        <input ref={inputRef} type="file" accept=".data,.ubx,.csv,.tsv,.txt,.xlsx,.xlsm,.xls,application/octet-stream" multiple className="hidden"
           onChange={(e) => importFiles(e.target.files)} />
         <div className="mt-2 flex gap-2">
           <Button onClick={() => inputRef.current?.click()}>Dateien wählen…</Button>
           <Button variant="secondary" onClick={() => setManualOpen(true)}>Manuell eingeben…</Button>
+
         </div>
         {log.length > 0 && (
           <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
