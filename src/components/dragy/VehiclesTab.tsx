@@ -47,11 +47,12 @@ export function VehiclesTab() {
                       <div className="text-[11px] text-muted-foreground">{v.mass} kg · Cd {v.cd} · A {v.area} m² · {sessions} Sessions</div>
                     </div>
                   </div>
-                  <div className="flex gap-1">
+                  <div className="flex items-center gap-1">
                     {!isActive && <Button variant="secondary" onClick={() => setActive(v.id)}>Aktivieren</Button>}
                     <Button variant="ghost" onClick={() => setEditing(v)}>Bearbeiten</Button>
-                    <Button variant="danger" onClick={() => setConfirmDel(v)}>×</Button>
+                    <IconButton label={`${v.name} löschen`} onClick={() => setConfirmDel(v)} />
                   </div>
+
                 </div>
               </li>
             );
