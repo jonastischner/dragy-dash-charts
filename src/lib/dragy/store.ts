@@ -1,8 +1,9 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { db, uid } from "./db";
-import type { AppState, Vehicle, Session, Segment } from "./types";
+import type { AppState, Vehicle, Session, Segment, GearboxDef, FinalDriveDef, TireDef, DriveSetup } from "./types";
 import { supabase } from "@/integrations/supabase/client";
 import { pushLocal, pushDelete, pushActiveVehicle } from "./sync";
+
 
 const DEFAULT_VEHICLE: Omit<Vehicle, "id" | "name"> = {
   mass: 1500,
@@ -23,7 +24,48 @@ export function newVehicle(name: string): Vehicle {
   return { id: uid(), name, ...DEFAULT_VEHICLE, updatedAt: Date.now() };
 }
 
+export function duplicateVehicle(source: Vehicle): Vehicle {
+  const idMap = new Map<string, string>();
+  const newId = () => { const id = uid(); idMap.set(id, id); return id; };
+
+  const gearboxDefs: GearboxDef[] = (source.gearboxDefs ?? []).map((g) => ({
+    ...g,
+    id: newId(),
+    gears: g.gears.map((gr) => ({ ...gr, id: newId() })),
+  }));
+  const finalDrives: FinalDriveDef[] = (source.finalDrives ?? []).map((f) => ({ ...f, id: newId() }));
+  const tires: TireDef[] = (source.tires ?? []).map((t) => ({ ...t, id: newId() }));
+
+  const setupIdMap = new Map<string, string>();
+  const setups: DriveSetup[] = (source.setups ?? []).map((s) => {
+    const newSetupId = newId();
+    setupIdMap.set(s.id, newSetupId);
+    return {
+      ...s,
+      id: newSetupId,
+      gearboxId: gearboxDefs.find((g) => g.id === s.gearboxId)?.id ?? s.gearboxId,
+      finalDriveId: finalDrives.find((f) => f.id === s.finalDriveId)?.id ?? s.finalDriveId,
+      tireId: tires.find((t) => t.id === s.tireId)?.id ?? s.tireId,
+    };
+  });
+
+  const defaultSetupId = source.defaultSetupId ? setupIdMap.get(source.defaultSetupId) ?? undefined : undefined;
+
+  return {
+    ...source,
+    id: uid(),
+    name: `Kopie von ${source.name}`,
+    gearboxDefs,
+    finalDrives,
+    tires,
+    setups,
+    defaultSetupId,
+    updatedAt: Date.now(),
+  };
+}
+
 const initial: AppState = { vehicles: [], sessions: [], segments: [], activeVehicleId: null };
+
 
 // Simple background push helper (fire-and-forget)
 function bg<T>(p: Promise<T>) { p.catch((e) => console.warn("[sync] push failed", e)); }
@@ -101,7 +143,15 @@ export function useAppStore() {
       }
       await refresh();
     },
+    duplicateVehicle: async (source: Vehicle) => {
+      const copy = duplicateVehicle(source);
+      await db.putVehicle(copy);
+      await refresh();
+      bg(pushLocal("vehicle", copy));
+      return copy;
+    },
     saveSession: async (s: Session) => {
+
       const stamped = stamp(s);
       await db.putSession(stamped);
       await refresh();
