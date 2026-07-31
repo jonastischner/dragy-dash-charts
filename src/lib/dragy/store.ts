@@ -1,8 +1,9 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { db, uid } from "./db";
-import type { AppState, Vehicle, Session, Segment } from "./types";
+import type { AppState, Vehicle, Session, Segment, GearboxDef, FinalDriveDef, TireDef, DriveSetup } from "./types";
 import { supabase } from "@/integrations/supabase/client";
 import { pushLocal, pushDelete, pushActiveVehicle } from "./sync";
+
 
 const DEFAULT_VEHICLE: Omit<Vehicle, "id" | "name"> = {
   mass: 1500,
