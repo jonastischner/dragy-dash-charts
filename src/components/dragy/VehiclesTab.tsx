@@ -58,7 +58,7 @@ export function VehiclesTab() {
             );
           })}
         </ul>
-        <div className="mt-3"><Button onClick={startNew}>+ Fahrzeug anlegen</Button></div>
+        <AddButton onClick={startNew}>Fahrzeug anlegen</AddButton>
       </Section>
 
       {editing && (
