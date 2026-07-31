@@ -637,8 +637,9 @@ async function downscaleImage(file: File, maxSize: number, quality: number): Pro
 // ================= Schaltdiagramm-Vergleich (im Fahrzeugdialog) =================
 function ShiftDiagramCompare({ vehicle }: { vehicle: Vehicle }) {
   const { setups } = normalizeDrive(vehicle);
-  const [selected, setSelected] = useState<string[] | null>(null);
+  const [selected, setSelected] = usePersistedState<string[] | null>(`vehicleEditor.shiftSetups.${vehicle.id}`, null);
   const effective = selected ?? setups.map((s) => s.id);
+
   const resolved = resolveAllGears(vehicle).filter((r) => effective.includes(r.setupId));
   const maxRpm = vehicle.maxRpm && vehicle.maxRpm > 0 ? vehicle.maxRpm : 8000;
   const shiftRpm = vehicle.shiftRpm && vehicle.shiftRpm > 0 ? vehicle.shiftRpm : undefined;
