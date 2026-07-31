@@ -122,6 +122,17 @@ export function TextInput(props: InputHTMLAttributes<HTMLInputElement>) {
   );
 }
 
+export function Select({ children, ...rest }: React.SelectHTMLAttributes<HTMLSelectElement>) {
+  return (
+    <select {...rest}
+      className={`w-full min-h-[44px] rounded-md border border-input bg-muted px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${rest.className ?? ""}`}>
+      {children}
+    </select>
+  );
+}
+
+
+
 
 export function NumInput({ value, onChange, onBlur, onFocus, ...rest }: InputHTMLAttributes<HTMLInputElement>) {
   const [draft, setDraft] = useState<string | null>(null);
