@@ -20,11 +20,15 @@ function useLockBodyScroll() {
 
 export function VehiclesTab() {
   const store = useAppStore();
-  const { state, saveVehicle, deleteVehicle, setActive } = store;
+  const { state, saveVehicle, deleteVehicle, duplicateVehicle, setActive } = store;
   const [editing, setEditing] = useState<Vehicle | null>(null);
   const [confirmDel, setConfirmDel] = useState<Vehicle | null>(null);
 
   const startNew = () => setEditing(newVehicle("Neues Fahrzeug"));
+  const onDuplicate = async (v: Vehicle) => {
+    const copy = await duplicateVehicle(v);
+    setEditing(copy);
+  };
 
   return (
     <div>
@@ -51,6 +55,15 @@ export function VehiclesTab() {
                   <div className="flex items-center gap-1">
                     {!isActive && <Button variant="secondary" onClick={() => setActive(v.id)}>Aktivieren</Button>}
                     <Button variant="ghost" onClick={() => setEditing(v)}>Bearbeiten</Button>
+                    <button
+                      type="button"
+                      aria-label={`${v.name} duplizieren`}
+                      title={`${v.name} duplizieren`}
+                      onClick={() => onDuplicate(v)}
+                      className="inline-flex h-11 w-11 flex-none items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      <Copy className="h-4 w-4" aria-hidden="true" />
+                    </button>
                     <IconButton label={`${v.name} löschen`} onClick={() => setConfirmDel(v)} />
                   </div>
 
@@ -61,6 +74,7 @@ export function VehiclesTab() {
         </ul>
         <AddButton onClick={startNew}>Fahrzeug anlegen</AddButton>
       </Section>
+
 
       {editing && (
         <VehicleEditor
