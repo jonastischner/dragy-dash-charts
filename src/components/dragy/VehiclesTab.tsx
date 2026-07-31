@@ -288,8 +288,7 @@ function GearPresetsEditor({ presets, onChange, onUseAsDefault }: {
   const del = (i: number) => onChange(presets.filter((_, k) => k !== i));
 
   return (
-    <div className="mt-3 rounded-md border border-border p-2">
-      <div className="mb-1 text-xs font-semibold text-foreground">Legacy Getriebe-Presets</div>
+    <Collapsible title="Legacy Getriebe-Presets" persistKey="vehicleEditor.legacyPresets" subtitle={`${presets.length} Alt-Presets`}>
       <p className="text-[10px] text-muted-foreground">Bestehende Alt-Presets. Neue Konfigurationen bitte oben unter „Antrieb" anlegen.</p>
       <ul className="mt-2 space-y-2">
         {presets.map((p, i) => {
@@ -299,7 +298,7 @@ function GearPresetsEditor({ presets, onChange, onUseAsDefault }: {
             <li key={p.id} className="rounded-md border border-border bg-card p-2">
               <div className="flex items-center gap-2">
                 <TextInput className="flex-1" value={p.name} onChange={(e) => update(i, { name: e.target.value })} />
-                <Button variant="danger" onClick={() => del(i)}>×</Button>
+                <IconButton label="Preset löschen" onClick={() => del(i)} />
               </div>
               <Row className="mt-2">
                 <Field label="Getriebeübersetzung"><NumInput step="0.001" value={p.gearRatio} onChange={(e) => update(i, { gearRatio: +e.target.value })} /></Field>
@@ -316,9 +315,10 @@ function GearPresetsEditor({ presets, onChange, onUseAsDefault }: {
           );
         })}
       </ul>
-    </div>
+    </Collapsible>
   );
 }
+
 
 // ================= Antrieb (Getriebe + Endübersetzung + Setups) =================
 
