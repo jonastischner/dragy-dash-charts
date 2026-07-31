@@ -701,8 +701,11 @@ function ShiftDiagramCompare({ vehicle }: { vehicle: Vehicle }) {
   }
 
   return (
-    <div className="mt-3 rounded-md border border-border p-2">
-      <div className="mb-1 text-xs font-semibold text-foreground">Schaltdiagramm (Setups vergleichen)</div>
+    <Collapsible
+      title="Schaltdiagramm (Setups vergleichen)"
+      persistKey="vehicleEditor.shiftDiagram"
+      subtitle={`${effective.length} von ${setups.length} Setups aktiv`}
+    >
       <p className="text-[10px] text-muted-foreground">
         U/min über km/h je Gang. Senkrechte Linien zeigen den Drehzahlabfall beim Schalten (bei gepflegter Schaltdrehzahl); waagerechte Linien markieren Schalt- (orange) und Maximaldrehzahl (rot).
       </p>
@@ -714,7 +717,7 @@ function ShiftDiagramCompare({ vehicle }: { vehicle: Vehicle }) {
             {setups.map((s) => {
               const on = effective.includes(s.id);
               return (
-                <label key={s.id} className="flex items-center gap-1 rounded bg-muted px-2 py-1">
+                <label key={s.id} className="flex min-h-[36px] items-center gap-1.5 rounded-md bg-muted px-2 py-1">
                   <input
                     type="checkbox"
                     checked={on}
@@ -743,9 +746,10 @@ function ShiftDiagramCompare({ vehicle }: { vehicle: Vehicle }) {
           </div>
         </>
       )}
-    </div>
+    </Collapsible>
   );
 }
+
 
 // Hex-Farbe um einen Faktor aufhellen/abdunkeln (−1..+1).
 function shadeColor(hex: string, amount: number): string {
