@@ -2,8 +2,10 @@ import { useRef, useState } from "react";
 import { Section, Field, TextInput, NumInput, Button, Note, Row, EmptyState } from "./ui";
 import { useAppStore } from "@/lib/dragy/store";
 import { parseUbx } from "@/lib/dragy/ubx";
+import { parseTableFile } from "@/lib/dragy/tabular";
 import { uid } from "@/lib/dragy/db";
 import type { Session, ManualRow, Record as R } from "@/lib/dragy/types";
+
 
 export function ImportTab({ onOpenVehicles }: { onOpenVehicles?: () => void } = {}) {
   const { state, saveSession } = useAppStore();
