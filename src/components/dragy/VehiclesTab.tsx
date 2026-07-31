@@ -405,8 +405,12 @@ function AntriebManager({ gearboxDefs, finalDrives, tires, setups, defaultSetupI
   };
 
   return (
-    <div className="mt-3 rounded-md border border-border p-2">
-      <div className="mb-1 text-xs font-semibold text-foreground">Antrieb (Getriebe, Endübersetzung, Reifen, Setups)</div>
+    <Collapsible
+      title="Antrieb (Getriebe, Endübersetzung, Reifen, Setups)"
+      persistKey="vehicleEditor.drive"
+      defaultOpen
+      subtitle={`${gearboxDefs.length} Getriebe · ${finalDrives.length} Endübersetzungen · ${tires.length} Reifen · ${setups.length} Setups`}
+    >
       <p className="text-[10px] text-muted-foreground">Getriebe (nur Gänge), Endübersetzungen und Reifen getrennt pflegen und beliebig zu Setups kombinieren.</p>
 
       {/* Gearboxes */}
@@ -418,55 +422,45 @@ function AntriebManager({ gearboxDefs, finalDrives, tires, setups, defaultSetupI
       />
 
       {/* Final drives */}
-      <div className="mt-2 rounded-md border border-border bg-card/60 p-2">
-        <div className="mb-1 flex items-center justify-between">
-          <div className="text-[11px] font-semibold text-foreground">Endübersetzungen</div>
-          <Button variant="secondary" onClick={addFinal}>+ Endübersetzung</Button>
-        </div>
+      <Collapsible title="Endübersetzungen" level="sub" persistKey="vehicleEditor.finalDrives" subtitle={`${finalDrives.length} angelegt`}>
         {finalDrives.length === 0 && <p className="text-[11px] text-muted-foreground">Noch keine Endübersetzung.</p>}
         <ul className="space-y-2">
           {finalDrives.map((fd, i) => (
             <li key={fd.id} className="rounded-md border border-border bg-background p-2">
-              <Row>
+              <div className="grid grid-cols-[1fr_1fr_auto] gap-2">
                 <Field label="Name"><TextInput value={fd.name} onChange={(e) => updateFinal(i, { name: e.target.value })} /></Field>
                 <Field label="Übersetzung"><NumInput step="0.001" value={fd.ratio} onChange={(e) => updateFinal(i, { ratio: +e.target.value })} /></Field>
-                <div className="flex items-end"><Button variant="danger" onClick={() => delFinal(i)}>×</Button></div>
-              </Row>
+                <div className="flex items-end"><IconButton label="Endübersetzung löschen" onClick={() => delFinal(i)} /></div>
+              </div>
             </li>
           ))}
         </ul>
-      </div>
+        <AddButton onClick={addFinal}>Endübersetzung</AddButton>
+      </Collapsible>
 
       {/* Tires */}
-      <div className="mt-2 rounded-md border border-border bg-card/60 p-2">
-        <div className="mb-1 flex items-center justify-between">
-          <div className="text-[11px] font-semibold text-foreground">Reifen</div>
-          <Button variant="secondary" onClick={addTire}>+ Reifen</Button>
-        </div>
+      <Collapsible title="Reifen" level="sub" persistKey="vehicleEditor.tires" subtitle={`${tires.length} angelegt`}>
         {tires.length === 0 && <p className="text-[11px] text-muted-foreground">Noch kein Reifen.</p>}
         <ul className="space-y-2">
           {tires.map((t, i) => {
             const U = tireCircumferenceM(t.spec);
             return (
               <li key={t.id} className="rounded-md border border-border bg-background p-2">
-                <Row>
+                <div className="grid grid-cols-[1fr_1fr_auto] gap-2">
                   <Field label="Name"><TextInput value={t.name} onChange={(e) => updateTire(i, { name: e.target.value })} /></Field>
                   <Field label="Spec (z.B. 225/45R17)"><TextInput value={t.spec} onChange={(e) => updateTire(i, { spec: e.target.value })} /></Field>
-                  <div className="flex items-end"><Button variant="danger" onClick={() => delTire(i)}>×</Button></div>
-                </Row>
+                  <div className="flex items-end"><IconButton label="Reifen löschen" onClick={() => delTire(i)} /></div>
+                </div>
                 <div className="mt-1 text-[10px] text-muted-foreground">Abrollumfang: {U ? (U * 1000).toFixed(0) + " mm (dyn.)" : "– (ungültig)"}</div>
               </li>
             );
           })}
         </ul>
-      </div>
+        <AddButton onClick={addTire}>Reifen</AddButton>
+      </Collapsible>
 
       {/* Setups */}
-      <div className="mt-2 rounded-md border border-border bg-card/60 p-2">
-        <div className="mb-1 flex items-center justify-between">
-          <div className="text-[11px] font-semibold text-foreground">Setups (Getriebe × Endübersetzung × Reifen)</div>
-          <Button variant="secondary" onClick={addSetup}>+ Setup</Button>
-        </div>
+      <Collapsible title="Setups (Getriebe × Endübersetzung × Reifen)" level="sub" persistKey="vehicleEditor.setups" defaultOpen subtitle={`${setups.length} angelegt`}>
         {setups.length === 0 && <p className="text-[11px] text-muted-foreground">Noch kein Setup.</p>}
         <ul className="space-y-2">
           {setups.map((s, i) => {
@@ -480,40 +474,28 @@ function AntriebManager({ gearboxDefs, finalDrives, tires, setups, defaultSetupI
                 <div className="flex items-center gap-2">
                   <TextInput className="flex-1" value={s.name} onChange={(e) => updateSetup(i, { name: e.target.value })} />
                   {isDefault ? (
-                    <span className="rounded bg-primary px-2 py-1 text-[10px] text-white">Standard</span>
+                    <span className="rounded bg-primary px-2 py-1 text-[10px] text-primary-foreground">Standard</span>
                   ) : (
                     <Button variant="ghost" onClick={() => onChange({ defaultSetupId: s.id })}>als Standard</Button>
                   )}
-                  <Button variant="danger" onClick={() => delSetup(i)}>×</Button>
+                  <IconButton label="Setup löschen" onClick={() => delSetup(i)} />
                 </div>
                 <Row className="mt-2">
                   <Field label="Getriebe">
-                    <select
-                      className="w-full rounded-md border border-input bg-muted px-2 py-2 text-sm text-foreground"
-                      value={s.gearboxId}
-                      onChange={(e) => updateSetup(i, { gearboxId: e.target.value })}
-                    >
+                    <Select value={s.gearboxId} onChange={(e) => updateSetup(i, { gearboxId: e.target.value })}>
                       {gearboxDefs.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
-                    </select>
+                    </Select>
                   </Field>
                   <Field label="Endübersetzung">
-                    <select
-                      className="w-full rounded-md border border-input bg-muted px-2 py-2 text-sm text-foreground"
-                      value={s.finalDriveId}
-                      onChange={(e) => updateSetup(i, { finalDriveId: e.target.value })}
-                    >
+                    <Select value={s.finalDriveId} onChange={(e) => updateSetup(i, { finalDriveId: e.target.value })}>
                       {finalDrives.map((f) => <option key={f.id} value={f.id}>{f.name} ({f.ratio.toFixed(3)})</option>)}
-                    </select>
+                    </Select>
                   </Field>
                   <Field label="Reifen">
-                    <select
-                      className="w-full rounded-md border border-input bg-muted px-2 py-2 text-sm text-foreground"
-                      value={s.tireId ?? ""}
-                      onChange={(e) => updateSetup(i, { tireId: e.target.value || undefined })}
-                    >
+                    <Select value={s.tireId ?? ""} onChange={(e) => updateSetup(i, { tireId: e.target.value || undefined })}>
                       <option value="">– Reifen wählen –</option>
                       {tires.map((t) => <option key={t.id} value={t.id}>{t.name} ({t.spec})</option>)}
-                    </select>
+                    </Select>
                   </Field>
                 </Row>
                 {gb && fd && gb.gears.length > 0 && tireSpec && (
@@ -541,8 +523,10 @@ function AntriebManager({ gearboxDefs, finalDrives, tires, setups, defaultSetupI
             );
           })}
         </ul>
-      </div>
-    </div>
+        <AddButton onClick={addSetup}>Setup</AddButton>
+      </Collapsible>
+    </Collapsible>
+
   );
 }
 
