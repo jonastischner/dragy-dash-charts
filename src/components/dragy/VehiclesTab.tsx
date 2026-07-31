@@ -1,10 +1,13 @@
 import { useState, useEffect } from "react";
-import { Section, Field, TextInput, NumInput, Button, Note, Row } from "./ui";
+import { ChevronRight } from "lucide-react";
+
+import { Section, Field, TextInput, NumInput, Button, Note, Row, Collapsible, IconButton, AddButton, Select, usePersistedState } from "./ui";
 import { useAppStore, newVehicle } from "@/lib/dragy/store";
 import { uid } from "@/lib/dragy/db";
 import { computeRpmFactor, tireCircumferenceM, normalizeDrive, resolveAllGears } from "@/lib/dragy/gear";
 import type { Vehicle, DragPoint, GearPreset, GearboxDef, FinalDriveDef, TireDef, DriveSetup, GearRatio } from "@/lib/dragy/types";
 import { Chart, type Series } from "./Chart";
+
 
 function useLockBodyScroll() {
   useEffect(() => {
@@ -44,17 +47,18 @@ export function VehiclesTab() {
                       <div className="text-[11px] text-muted-foreground">{v.mass} kg · Cd {v.cd} · A {v.area} m² · {sessions} Sessions</div>
                     </div>
                   </div>
-                  <div className="flex gap-1">
+                  <div className="flex items-center gap-1">
                     {!isActive && <Button variant="secondary" onClick={() => setActive(v.id)}>Aktivieren</Button>}
                     <Button variant="ghost" onClick={() => setEditing(v)}>Bearbeiten</Button>
-                    <Button variant="danger" onClick={() => setConfirmDel(v)}>×</Button>
+                    <IconButton label={`${v.name} löschen`} onClick={() => setConfirmDel(v)} />
                   </div>
+
                 </div>
               </li>
             );
           })}
         </ul>
-        <div className="mt-3"><Button onClick={startNew}>+ Fahrzeug anlegen</Button></div>
+        <AddButton onClick={startNew}>Fahrzeug anlegen</AddButton>
       </Section>
 
       {editing && (
@@ -141,12 +145,18 @@ function VehicleEditor({ vehicle, onSave, onCancel }: { vehicle: Vehicle; onSave
         paddingBottom: "calc(env(safe-area-inset-bottom) + 0.5rem)",
       }}
     >
-      <div className="max-h-full w-full max-w-lg overflow-y-auto overscroll-contain rounded-t-xl bg-card p-3 sm:rounded-xl">
-        <h3 className="mb-2 text-base font-semibold text-foreground">Fahrzeug bearbeiten</h3>
+      <div className="max-h-full w-full max-w-lg overflow-y-auto overscroll-contain rounded-t-xl bg-card sm:rounded-xl">
+        <div className="sticky top-0 z-10 flex items-center justify-between gap-2 border-b border-border bg-card/95 px-3 py-2 backdrop-blur">
+          <h3 className="text-base font-semibold text-foreground">Fahrzeug bearbeiten</h3>
+          <div className="flex gap-2">
+            <Button variant="ghost" onClick={onCancel}>Abbrechen</Button>
+            <Button onClick={() => onSave(v)}>Speichern</Button>
+          </div>
+        </div>
+        <div className="p-3">
         <Field label="Name"><TextInput value={v.name} onChange={(e) => setV({ ...v, name: e.target.value })} /></Field>
 
-        <div className="mt-2 rounded-md border border-border p-2">
-          <div className="mb-1 text-xs font-semibold text-foreground">Fahrzeugbild</div>
+        <Collapsible title="Fahrzeugbild" persistKey="vehicleEditor.image" subtitle={v.imageDataUrl ? "Bild hinterlegt" : "kein Bild"}>
           <div className="flex items-center gap-3">
             {v.imageDataUrl ? (
               <img src={v.imageDataUrl} alt={v.name} className="h-20 w-20 flex-none rounded object-cover border border-border" />
@@ -164,24 +174,25 @@ function VehicleEditor({ vehicle, onSave, onCancel }: { vehicle: Vehicle; onSave
               <span className="text-[10px] text-muted-foreground">Wird auf max. 800 px verkleinert und lokal + in der Cloud gespeichert.</span>
             </div>
           </div>
-        </div>
+        </Collapsible>
 
-        <Row className="mt-2">
-          <Field label="Masse (kg, inkl. Fahrer)"><NumInput value={v.mass} onChange={(e) => setV({ ...v, mass: +e.target.value })} /></Field>
-          <Field label="Rollwiderstand Crr"><NumInput step="0.001" value={v.crr} onChange={(e) => setV({ ...v, crr: +e.target.value })} /></Field>
-          <Field label="Cd"><NumInput step="0.01" value={v.cd} onChange={(e) => setV({ ...v, cd: +e.target.value })} /></Field>
-          <Field label="Stirnfläche A (m²)"><NumInput step="0.01" value={v.area} onChange={(e) => setV({ ...v, area: +e.target.value })} /></Field>
-          <Field label="Glättungsfenster (Punkte)" hint="1 = keine Glättung"><NumInput value={v.smoothingWindow} onChange={(e) => setV({ ...v, smoothingWindow: Math.max(1, +e.target.value) })} /></Field>
-          <Field label="Cd·A kalibriert?">
-            <label className="flex h-10 items-center gap-2 text-xs text-muted-foreground">
-              <input type="checkbox" checked={v.calibrated} onChange={(e) => setV({ ...v, calibrated: e.target.checked })} />
-              per Coastdown gemessen
-            </label>
-          </Field>
-        </Row>
+        <Collapsible title="Fahrzeugdaten" persistKey="vehicleEditor.basics" defaultOpen subtitle={`${v.mass} kg · Cd ${v.cd} · A ${v.area} m²`}>
+          <Row>
+            <Field label="Masse (kg, inkl. Fahrer)"><NumInput value={v.mass} onChange={(e) => setV({ ...v, mass: +e.target.value })} /></Field>
+            <Field label="Rollwiderstand Crr"><NumInput step="0.001" value={v.crr} onChange={(e) => setV({ ...v, crr: +e.target.value })} /></Field>
+            <Field label="Cd"><NumInput step="0.01" value={v.cd} onChange={(e) => setV({ ...v, cd: +e.target.value })} /></Field>
+            <Field label="Stirnfläche A (m²)"><NumInput step="0.01" value={v.area} onChange={(e) => setV({ ...v, area: +e.target.value })} /></Field>
+            <Field label="Glättungsfenster (Punkte)" hint="1 = keine Glättung"><NumInput value={v.smoothingWindow} onChange={(e) => setV({ ...v, smoothingWindow: Math.max(1, +e.target.value) })} /></Field>
+            <Field label="Cd·A kalibriert?">
+              <label className="flex h-10 items-center gap-2 text-xs text-muted-foreground">
+                <input type="checkbox" checked={v.calibrated} onChange={(e) => setV({ ...v, calibrated: e.target.checked })} />
+                per Coastdown gemessen
+              </label>
+            </Field>
+          </Row>
+        </Collapsible>
 
-        <div className="mt-3 rounded-md border border-border p-2">
-          <div className="mb-1 text-xs font-semibold text-foreground">Drehzahlen</div>
+        <Collapsible title="Drehzahlen" persistKey="vehicleEditor.rpms" subtitle={`Schalt ${v.shiftRpm ?? "–"} · Max ${v.maxRpm ?? "–"} U/min`}>
           <Row>
             <Field label="Schaltdrehzahl (U/min)" hint="Empfohlener Schaltpunkt für Schaltdiagramm">
               <NumInput value={v.shiftRpm ?? ""} placeholder="z.B. 6500" onChange={(e) => setV({ ...v, shiftRpm: e.target.value === "" ? undefined : +e.target.value })} />
@@ -190,10 +201,9 @@ function VehicleEditor({ vehicle, onSave, onCancel }: { vehicle: Vehicle; onSave
               <NumInput value={v.maxRpm ?? ""} placeholder="z.B. 7200" onChange={(e) => setV({ ...v, maxRpm: e.target.value === "" ? undefined : +e.target.value })} />
             </Field>
           </Row>
-        </div>
+        </Collapsible>
 
-        <div className="mt-3 rounded-md border border-border p-2">
-          <div className="mb-1 text-xs font-semibold text-foreground">RPM-Faktor aus Vmax</div>
+        <Collapsible title="RPM-Faktor aus Vmax" persistKey="vehicleEditor.rpmMatch" subtitle={`${v.rpmFactorDefault.toFixed(3)} U/min pro km/h`}>
           <Note>Nur Vorgabe für neu angelegte Läufe. Bestehende Läufe bleiben unverändert.</Note>
           <Row className="mt-2">
             <Field label="Höchste erreichte Drehzahl"><NumInput value={v.rpmMatch.maxRpm} onChange={(e) => setV({ ...v, rpmMatch: { ...v.rpmMatch, maxRpm: +e.target.value } })} /></Field>
@@ -203,7 +213,7 @@ function VehicleEditor({ vehicle, onSave, onCancel }: { vehicle: Vehicle; onSave
             <Button variant="secondary" onClick={applyRpmMatch}>Faktor berechnen</Button>
             <span className="text-xs text-muted-foreground">rpmFactor: <b>{v.rpmFactorDefault.toFixed(3)}</b> U/min pro km/h</span>
           </div>
-        </div>
+        </Collapsible>
 
         <AntriebManager
           gearboxDefs={v.gearboxDefs ?? []}
@@ -223,29 +233,30 @@ function VehicleEditor({ vehicle, onSave, onCancel }: { vehicle: Vehicle; onSave
           onUseAsDefault={(f) => setV({ ...v, rpmFactorDefault: +f.toFixed(3) })}
         />
 
-        <div className="mt-3 rounded-md border border-border p-2">
-          <div className="mb-1 text-xs font-semibold text-foreground">Schleppleistungskurve (Prüfstand)</div>
+        <Collapsible title="Schleppleistungskurve (Prüfstand)" persistKey="vehicleEditor.dragCurve" subtitle={`${v.dragCurve.length} Stützpunkte`}>
           <p className="text-[10px] text-muted-foreground">Stützpunkte RPM → PS. Lineare Interpolation, außerhalb geklemmt.</p>
           <div className="mt-2 space-y-1">
             {v.dragCurve.map((d, i) => (
               <div key={i} className="flex items-center gap-2">
                 <NumInput className="flex-1" value={d.rpm} onChange={(e) => updateDrag(i, { rpm: +e.target.value })} />
                 <NumInput className="flex-1" value={d.ps} onChange={(e) => updateDrag(i, { ps: +e.target.value })} />
-                <Button variant="danger" onClick={() => delDrag(i)}>×</Button>
+                <IconButton label="Stützpunkt löschen" onClick={() => delDrag(i)} />
               </div>
             ))}
           </div>
-          <Button className="mt-2" variant="secondary" onClick={addDrag}>+ Stützpunkt</Button>
-        </div>
+          <AddButton onClick={addDrag}>Stützpunkt</AddButton>
+        </Collapsible>
 
         <div className="mt-3 flex justify-end gap-2">
           <Button variant="ghost" onClick={onCancel}>Abbrechen</Button>
           <Button onClick={() => onSave(v)}>Speichern</Button>
         </div>
+        </div>
       </div>
     </div>
   );
 }
+
 
 function ConfirmDelete({ vehicle, sessionCount, onConfirm, onCancel }: { vehicle: Vehicle; sessionCount: number; onConfirm: () => void; onCancel: () => void }) {
   useLockBodyScroll();
@@ -280,8 +291,7 @@ function GearPresetsEditor({ presets, onChange, onUseAsDefault }: {
   const del = (i: number) => onChange(presets.filter((_, k) => k !== i));
 
   return (
-    <div className="mt-3 rounded-md border border-border p-2">
-      <div className="mb-1 text-xs font-semibold text-foreground">Legacy Getriebe-Presets</div>
+    <Collapsible title="Legacy Getriebe-Presets" persistKey="vehicleEditor.legacyPresets" subtitle={`${presets.length} Alt-Presets`}>
       <p className="text-[10px] text-muted-foreground">Bestehende Alt-Presets. Neue Konfigurationen bitte oben unter „Antrieb" anlegen.</p>
       <ul className="mt-2 space-y-2">
         {presets.map((p, i) => {
@@ -291,7 +301,7 @@ function GearPresetsEditor({ presets, onChange, onUseAsDefault }: {
             <li key={p.id} className="rounded-md border border-border bg-card p-2">
               <div className="flex items-center gap-2">
                 <TextInput className="flex-1" value={p.name} onChange={(e) => update(i, { name: e.target.value })} />
-                <Button variant="danger" onClick={() => del(i)}>×</Button>
+                <IconButton label="Preset löschen" onClick={() => del(i)} />
               </div>
               <Row className="mt-2">
                 <Field label="Getriebeübersetzung"><NumInput step="0.001" value={p.gearRatio} onChange={(e) => update(i, { gearRatio: +e.target.value })} /></Field>
@@ -308,9 +318,10 @@ function GearPresetsEditor({ presets, onChange, onUseAsDefault }: {
           );
         })}
       </ul>
-    </div>
+    </Collapsible>
   );
 }
+
 
 // ================= Antrieb (Getriebe + Endübersetzung + Setups) =================
 
@@ -397,8 +408,12 @@ function AntriebManager({ gearboxDefs, finalDrives, tires, setups, defaultSetupI
   };
 
   return (
-    <div className="mt-3 rounded-md border border-border p-2">
-      <div className="mb-1 text-xs font-semibold text-foreground">Antrieb (Getriebe, Endübersetzung, Reifen, Setups)</div>
+    <Collapsible
+      title="Antrieb (Getriebe, Endübersetzung, Reifen, Setups)"
+      persistKey="vehicleEditor.drive"
+      defaultOpen
+      subtitle={`${gearboxDefs.length} Getriebe · ${finalDrives.length} Endübersetzungen · ${tires.length} Reifen · ${setups.length} Setups`}
+    >
       <p className="text-[10px] text-muted-foreground">Getriebe (nur Gänge), Endübersetzungen und Reifen getrennt pflegen und beliebig zu Setups kombinieren.</p>
 
       {/* Gearboxes */}
@@ -410,55 +425,45 @@ function AntriebManager({ gearboxDefs, finalDrives, tires, setups, defaultSetupI
       />
 
       {/* Final drives */}
-      <div className="mt-2 rounded-md border border-border bg-card/60 p-2">
-        <div className="mb-1 flex items-center justify-between">
-          <div className="text-[11px] font-semibold text-foreground">Endübersetzungen</div>
-          <Button variant="secondary" onClick={addFinal}>+ Endübersetzung</Button>
-        </div>
+      <Collapsible title="Endübersetzungen" level="sub" persistKey="vehicleEditor.finalDrives" subtitle={`${finalDrives.length} angelegt`}>
         {finalDrives.length === 0 && <p className="text-[11px] text-muted-foreground">Noch keine Endübersetzung.</p>}
         <ul className="space-y-2">
           {finalDrives.map((fd, i) => (
             <li key={fd.id} className="rounded-md border border-border bg-background p-2">
-              <Row>
+              <div className="grid grid-cols-[1fr_1fr_auto] gap-2">
                 <Field label="Name"><TextInput value={fd.name} onChange={(e) => updateFinal(i, { name: e.target.value })} /></Field>
                 <Field label="Übersetzung"><NumInput step="0.001" value={fd.ratio} onChange={(e) => updateFinal(i, { ratio: +e.target.value })} /></Field>
-                <div className="flex items-end"><Button variant="danger" onClick={() => delFinal(i)}>×</Button></div>
-              </Row>
+                <div className="flex items-end"><IconButton label="Endübersetzung löschen" onClick={() => delFinal(i)} /></div>
+              </div>
             </li>
           ))}
         </ul>
-      </div>
+        <AddButton onClick={addFinal}>Endübersetzung</AddButton>
+      </Collapsible>
 
       {/* Tires */}
-      <div className="mt-2 rounded-md border border-border bg-card/60 p-2">
-        <div className="mb-1 flex items-center justify-between">
-          <div className="text-[11px] font-semibold text-foreground">Reifen</div>
-          <Button variant="secondary" onClick={addTire}>+ Reifen</Button>
-        </div>
+      <Collapsible title="Reifen" level="sub" persistKey="vehicleEditor.tires" subtitle={`${tires.length} angelegt`}>
         {tires.length === 0 && <p className="text-[11px] text-muted-foreground">Noch kein Reifen.</p>}
         <ul className="space-y-2">
           {tires.map((t, i) => {
             const U = tireCircumferenceM(t.spec);
             return (
               <li key={t.id} className="rounded-md border border-border bg-background p-2">
-                <Row>
+                <div className="grid grid-cols-[1fr_1fr_auto] gap-2">
                   <Field label="Name"><TextInput value={t.name} onChange={(e) => updateTire(i, { name: e.target.value })} /></Field>
                   <Field label="Spec (z.B. 225/45R17)"><TextInput value={t.spec} onChange={(e) => updateTire(i, { spec: e.target.value })} /></Field>
-                  <div className="flex items-end"><Button variant="danger" onClick={() => delTire(i)}>×</Button></div>
-                </Row>
+                  <div className="flex items-end"><IconButton label="Reifen löschen" onClick={() => delTire(i)} /></div>
+                </div>
                 <div className="mt-1 text-[10px] text-muted-foreground">Abrollumfang: {U ? (U * 1000).toFixed(0) + " mm (dyn.)" : "– (ungültig)"}</div>
               </li>
             );
           })}
         </ul>
-      </div>
+        <AddButton onClick={addTire}>Reifen</AddButton>
+      </Collapsible>
 
       {/* Setups */}
-      <div className="mt-2 rounded-md border border-border bg-card/60 p-2">
-        <div className="mb-1 flex items-center justify-between">
-          <div className="text-[11px] font-semibold text-foreground">Setups (Getriebe × Endübersetzung × Reifen)</div>
-          <Button variant="secondary" onClick={addSetup}>+ Setup</Button>
-        </div>
+      <Collapsible title="Setups (Getriebe × Endübersetzung × Reifen)" level="sub" persistKey="vehicleEditor.setups" defaultOpen subtitle={`${setups.length} angelegt`}>
         {setups.length === 0 && <p className="text-[11px] text-muted-foreground">Noch kein Setup.</p>}
         <ul className="space-y-2">
           {setups.map((s, i) => {
@@ -472,40 +477,28 @@ function AntriebManager({ gearboxDefs, finalDrives, tires, setups, defaultSetupI
                 <div className="flex items-center gap-2">
                   <TextInput className="flex-1" value={s.name} onChange={(e) => updateSetup(i, { name: e.target.value })} />
                   {isDefault ? (
-                    <span className="rounded bg-primary px-2 py-1 text-[10px] text-white">Standard</span>
+                    <span className="rounded bg-primary px-2 py-1 text-[10px] text-primary-foreground">Standard</span>
                   ) : (
                     <Button variant="ghost" onClick={() => onChange({ defaultSetupId: s.id })}>als Standard</Button>
                   )}
-                  <Button variant="danger" onClick={() => delSetup(i)}>×</Button>
+                  <IconButton label="Setup löschen" onClick={() => delSetup(i)} />
                 </div>
                 <Row className="mt-2">
                   <Field label="Getriebe">
-                    <select
-                      className="w-full rounded-md border border-input bg-muted px-2 py-2 text-sm text-foreground"
-                      value={s.gearboxId}
-                      onChange={(e) => updateSetup(i, { gearboxId: e.target.value })}
-                    >
+                    <Select value={s.gearboxId} onChange={(e) => updateSetup(i, { gearboxId: e.target.value })}>
                       {gearboxDefs.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
-                    </select>
+                    </Select>
                   </Field>
                   <Field label="Endübersetzung">
-                    <select
-                      className="w-full rounded-md border border-input bg-muted px-2 py-2 text-sm text-foreground"
-                      value={s.finalDriveId}
-                      onChange={(e) => updateSetup(i, { finalDriveId: e.target.value })}
-                    >
+                    <Select value={s.finalDriveId} onChange={(e) => updateSetup(i, { finalDriveId: e.target.value })}>
                       {finalDrives.map((f) => <option key={f.id} value={f.id}>{f.name} ({f.ratio.toFixed(3)})</option>)}
-                    </select>
+                    </Select>
                   </Field>
                   <Field label="Reifen">
-                    <select
-                      className="w-full rounded-md border border-input bg-muted px-2 py-2 text-sm text-foreground"
-                      value={s.tireId ?? ""}
-                      onChange={(e) => updateSetup(i, { tireId: e.target.value || undefined })}
-                    >
+                    <Select value={s.tireId ?? ""} onChange={(e) => updateSetup(i, { tireId: e.target.value || undefined })}>
                       <option value="">– Reifen wählen –</option>
                       {tires.map((t) => <option key={t.id} value={t.id}>{t.name} ({t.spec})</option>)}
-                    </select>
+                    </Select>
                   </Field>
                 </Row>
                 {gb && fd && gb.gears.length > 0 && tireSpec && (
@@ -533,8 +526,10 @@ function AntriebManager({ gearboxDefs, finalDrives, tires, setups, defaultSetupI
             );
           })}
         </ul>
-      </div>
-    </div>
+        <AddButton onClick={addSetup}>Setup</AddButton>
+      </Collapsible>
+    </Collapsible>
+
   );
 }
 
@@ -544,53 +539,47 @@ function GearboxesCollapsibleList({ gearboxDefs, onAdd, onUpdate, onDelete }: {
   onUpdate: (i: number, patch: Partial<GearboxDef>) => void;
   onDelete: (i: number) => void;
 }) {
-  const [openIds, setOpenIds] = useState<Set<string>>(new Set());
-  const toggle = (id: string) => setOpenIds((prev) => {
-    const next = new Set(prev);
-    if (next.has(id)) next.delete(id); else next.add(id);
-    return next;
-  });
+  const [openIds, setOpenIds] = usePersistedState<string[]>("vehicleEditor.openGearboxes", []);
+  const toggle = (id: string) => setOpenIds((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
   return (
-    <div className="mt-2 rounded-md border border-border bg-card/60 p-2">
-      <div className="mb-1 flex items-center justify-between">
-        <div className="text-[11px] font-semibold text-foreground">Getriebe</div>
-        <Button variant="secondary" onClick={onAdd}>+ Getriebe</Button>
-      </div>
+    <Collapsible title="Getriebe" level="sub" persistKey="vehicleEditor.gearboxes" defaultOpen subtitle={`${gearboxDefs.length} angelegt`}>
       {gearboxDefs.length === 0 && <p className="text-[11px] text-muted-foreground">Noch kein Getriebe.</p>}
       <ul className="space-y-2">
         {gearboxDefs.map((gb, i) => {
-          const open = openIds.has(gb.id);
+          const open = openIds.includes(gb.id);
           return (
             <li key={gb.id} className="rounded-md border border-border bg-background p-2">
               <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={() => toggle(gb.id)}
-                  className="flex h-8 w-8 flex-none items-center justify-center rounded bg-muted text-foreground hover:bg-secondary"
-                  aria-label={open ? "Einklappen" : "Ausklappen"}
+                  aria-expanded={open}
+                  className="flex min-h-[44px] flex-1 items-center gap-2 rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
-                  <span className={`inline-block transition-transform ${open ? "rotate-90" : ""}`}>▶</span>
+                  <ChevronRight className={`h-4 w-4 flex-none text-muted-foreground transition-transform ${open ? "rotate-90" : ""}`} aria-hidden="true" />
+                  <span className="min-w-0 truncate text-sm text-foreground">
+                    {gb.name} <span className="ml-1 text-[11px] text-muted-foreground">{gb.gears.length} Gänge</span>
+                  </span>
                 </button>
-                {open ? (
-                  <TextInput className="flex-1" value={gb.name} onChange={(e) => onUpdate(i, { name: e.target.value })} />
-                ) : (
-                  <button type="button" onClick={() => toggle(gb.id)} className="flex-1 text-left text-sm text-foreground">
-                    {gb.name} <span className="ml-2 text-[11px] text-muted-foreground">{gb.gears.length} Gänge</span>
-                  </button>
-                )}
-                <Button variant="danger" onClick={() => onDelete(i)}>×</Button>
+                <IconButton label="Getriebe löschen" onClick={() => onDelete(i)} />
               </div>
               {open && (
-                <GearListEditor
-                  gears={gb.gears}
-                  onChange={(gears) => onUpdate(i, { gears })}
-                />
+                <>
+                  <div className="mt-2">
+                    <Field label="Name"><TextInput value={gb.name} onChange={(e) => onUpdate(i, { name: e.target.value })} /></Field>
+                  </div>
+                  <GearListEditor
+                    gears={gb.gears}
+                    onChange={(gears) => onUpdate(i, { gears })}
+                  />
+                </>
               )}
             </li>
           );
         })}
       </ul>
-    </div>
+      <AddButton onClick={onAdd}>Getriebe</AddButton>
+    </Collapsible>
   );
 }
 
@@ -615,7 +604,7 @@ function GearListEditor({ gears, onChange }: { gears: GearRatio[]; onChange: (g:
                 <TextInput value={g.name} onChange={(e) => update(i, { name: e.target.value })} />
               </Field>
               <div className="flex items-end">
-                <Button variant="danger" onClick={() => del(i)}>×</Button>
+                <IconButton label="Gang löschen" onClick={() => del(i)} />
               </div>
             </div>
             <div className="mt-2">
@@ -626,10 +615,11 @@ function GearListEditor({ gears, onChange }: { gears: GearRatio[]; onChange: (g:
           </li>
         ))}
       </ul>
-      <Button className="mt-2" variant="secondary" onClick={add}>+ Gang</Button>
+      <AddButton onClick={add}>Gang</AddButton>
     </div>
   );
 }
+
 
 
 async function downscaleImage(file: File, maxSize: number, quality: number): Promise<string> {
@@ -648,13 +638,12 @@ async function downscaleImage(file: File, maxSize: number, quality: number): Pro
 // ================= Schaltdiagramm-Vergleich (im Fahrzeugdialog) =================
 function ShiftDiagramCompare({ vehicle }: { vehicle: Vehicle }) {
   const { setups } = normalizeDrive(vehicle);
-  const [selected, setSelected] = useState<string[] | null>(null);
+  const [selected, setSelected] = usePersistedState<string[] | null>(`vehicleEditor.shiftSetups.${vehicle.id}`, null);
   const effective = selected ?? setups.map((s) => s.id);
+
   const resolved = resolveAllGears(vehicle).filter((r) => effective.includes(r.setupId));
   const maxRpm = vehicle.maxRpm && vehicle.maxRpm > 0 ? vehicle.maxRpm : 8000;
   const shiftRpm = vehicle.shiftRpm && vehicle.shiftRpm > 0 ? vehicle.shiftRpm : undefined;
-  // Obergrenze der Gang-Linien: Schaltdrehzahl (falls gepflegt), sonst Maximaldrehzahl.
-  const topRpm = shiftRpm ?? maxRpm;
   const setupIds = Array.from(new Set(resolved.map((r) => r.setupId)));
   const baseColors = ["#38bdf8", "#f472b6", "#a3e635", "#fbbf24", "#c084fc", "#f97316"];
 
@@ -711,8 +700,11 @@ function ShiftDiagramCompare({ vehicle }: { vehicle: Vehicle }) {
   }
 
   return (
-    <div className="mt-3 rounded-md border border-border p-2">
-      <div className="mb-1 text-xs font-semibold text-foreground">Schaltdiagramm (Setups vergleichen)</div>
+    <Collapsible
+      title="Schaltdiagramm (Setups vergleichen)"
+      persistKey="vehicleEditor.shiftDiagram"
+      subtitle={`${effective.length} von ${setups.length} Setups aktiv`}
+    >
       <p className="text-[10px] text-muted-foreground">
         U/min über km/h je Gang. Senkrechte Linien zeigen den Drehzahlabfall beim Schalten (bei gepflegter Schaltdrehzahl); waagerechte Linien markieren Schalt- (orange) und Maximaldrehzahl (rot).
       </p>
@@ -724,7 +716,7 @@ function ShiftDiagramCompare({ vehicle }: { vehicle: Vehicle }) {
             {setups.map((s) => {
               const on = effective.includes(s.id);
               return (
-                <label key={s.id} className="flex items-center gap-1 rounded bg-muted px-2 py-1">
+                <label key={s.id} className="flex min-h-[36px] items-center gap-1.5 rounded-md bg-muted px-2 py-1">
                   <input
                     type="checkbox"
                     checked={on}
@@ -753,9 +745,10 @@ function ShiftDiagramCompare({ vehicle }: { vehicle: Vehicle }) {
           </div>
         </>
       )}
-    </div>
+    </Collapsible>
   );
 }
+
 
 // Hex-Farbe um einen Faktor aufhellen/abdunkeln (−1..+1).
 function shadeColor(hex: string, amount: number): string {
