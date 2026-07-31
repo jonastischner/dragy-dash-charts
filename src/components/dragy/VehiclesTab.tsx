@@ -142,12 +142,18 @@ function VehicleEditor({ vehicle, onSave, onCancel }: { vehicle: Vehicle; onSave
         paddingBottom: "calc(env(safe-area-inset-bottom) + 0.5rem)",
       }}
     >
-      <div className="max-h-full w-full max-w-lg overflow-y-auto overscroll-contain rounded-t-xl bg-card p-3 sm:rounded-xl">
-        <h3 className="mb-2 text-base font-semibold text-foreground">Fahrzeug bearbeiten</h3>
+      <div className="max-h-full w-full max-w-lg overflow-y-auto overscroll-contain rounded-t-xl bg-card sm:rounded-xl">
+        <div className="sticky top-0 z-10 flex items-center justify-between gap-2 border-b border-border bg-card/95 px-3 py-2 backdrop-blur">
+          <h3 className="text-base font-semibold text-foreground">Fahrzeug bearbeiten</h3>
+          <div className="flex gap-2">
+            <Button variant="ghost" onClick={onCancel}>Abbrechen</Button>
+            <Button onClick={() => onSave(v)}>Speichern</Button>
+          </div>
+        </div>
+        <div className="p-3">
         <Field label="Name"><TextInput value={v.name} onChange={(e) => setV({ ...v, name: e.target.value })} /></Field>
 
-        <div className="mt-2 rounded-md border border-border p-2">
-          <div className="mb-1 text-xs font-semibold text-foreground">Fahrzeugbild</div>
+        <Collapsible title="Fahrzeugbild" persistKey="vehicleEditor.image" subtitle={v.imageDataUrl ? "Bild hinterlegt" : "kein Bild"}>
           <div className="flex items-center gap-3">
             {v.imageDataUrl ? (
               <img src={v.imageDataUrl} alt={v.name} className="h-20 w-20 flex-none rounded object-cover border border-border" />
@@ -165,24 +171,25 @@ function VehicleEditor({ vehicle, onSave, onCancel }: { vehicle: Vehicle; onSave
               <span className="text-[10px] text-muted-foreground">Wird auf max. 800 px verkleinert und lokal + in der Cloud gespeichert.</span>
             </div>
           </div>
-        </div>
+        </Collapsible>
 
-        <Row className="mt-2">
-          <Field label="Masse (kg, inkl. Fahrer)"><NumInput value={v.mass} onChange={(e) => setV({ ...v, mass: +e.target.value })} /></Field>
-          <Field label="Rollwiderstand Crr"><NumInput step="0.001" value={v.crr} onChange={(e) => setV({ ...v, crr: +e.target.value })} /></Field>
-          <Field label="Cd"><NumInput step="0.01" value={v.cd} onChange={(e) => setV({ ...v, cd: +e.target.value })} /></Field>
-          <Field label="Stirnfläche A (m²)"><NumInput step="0.01" value={v.area} onChange={(e) => setV({ ...v, area: +e.target.value })} /></Field>
-          <Field label="Glättungsfenster (Punkte)" hint="1 = keine Glättung"><NumInput value={v.smoothingWindow} onChange={(e) => setV({ ...v, smoothingWindow: Math.max(1, +e.target.value) })} /></Field>
-          <Field label="Cd·A kalibriert?">
-            <label className="flex h-10 items-center gap-2 text-xs text-muted-foreground">
-              <input type="checkbox" checked={v.calibrated} onChange={(e) => setV({ ...v, calibrated: e.target.checked })} />
-              per Coastdown gemessen
-            </label>
-          </Field>
-        </Row>
+        <Collapsible title="Fahrzeugdaten" persistKey="vehicleEditor.basics" defaultOpen subtitle={`${v.mass} kg · Cd ${v.cd} · A ${v.area} m²`}>
+          <Row>
+            <Field label="Masse (kg, inkl. Fahrer)"><NumInput value={v.mass} onChange={(e) => setV({ ...v, mass: +e.target.value })} /></Field>
+            <Field label="Rollwiderstand Crr"><NumInput step="0.001" value={v.crr} onChange={(e) => setV({ ...v, crr: +e.target.value })} /></Field>
+            <Field label="Cd"><NumInput step="0.01" value={v.cd} onChange={(e) => setV({ ...v, cd: +e.target.value })} /></Field>
+            <Field label="Stirnfläche A (m²)"><NumInput step="0.01" value={v.area} onChange={(e) => setV({ ...v, area: +e.target.value })} /></Field>
+            <Field label="Glättungsfenster (Punkte)" hint="1 = keine Glättung"><NumInput value={v.smoothingWindow} onChange={(e) => setV({ ...v, smoothingWindow: Math.max(1, +e.target.value) })} /></Field>
+            <Field label="Cd·A kalibriert?">
+              <label className="flex h-10 items-center gap-2 text-xs text-muted-foreground">
+                <input type="checkbox" checked={v.calibrated} onChange={(e) => setV({ ...v, calibrated: e.target.checked })} />
+                per Coastdown gemessen
+              </label>
+            </Field>
+          </Row>
+        </Collapsible>
 
-        <div className="mt-3 rounded-md border border-border p-2">
-          <div className="mb-1 text-xs font-semibold text-foreground">Drehzahlen</div>
+        <Collapsible title="Drehzahlen" persistKey="vehicleEditor.rpms" subtitle={`Schalt ${v.shiftRpm ?? "–"} · Max ${v.maxRpm ?? "–"} U/min`}>
           <Row>
             <Field label="Schaltdrehzahl (U/min)" hint="Empfohlener Schaltpunkt für Schaltdiagramm">
               <NumInput value={v.shiftRpm ?? ""} placeholder="z.B. 6500" onChange={(e) => setV({ ...v, shiftRpm: e.target.value === "" ? undefined : +e.target.value })} />
@@ -191,10 +198,9 @@ function VehicleEditor({ vehicle, onSave, onCancel }: { vehicle: Vehicle; onSave
               <NumInput value={v.maxRpm ?? ""} placeholder="z.B. 7200" onChange={(e) => setV({ ...v, maxRpm: e.target.value === "" ? undefined : +e.target.value })} />
             </Field>
           </Row>
-        </div>
+        </Collapsible>
 
-        <div className="mt-3 rounded-md border border-border p-2">
-          <div className="mb-1 text-xs font-semibold text-foreground">RPM-Faktor aus Vmax</div>
+        <Collapsible title="RPM-Faktor aus Vmax" persistKey="vehicleEditor.rpmMatch" subtitle={`${v.rpmFactorDefault.toFixed(3)} U/min pro km/h`}>
           <Note>Nur Vorgabe für neu angelegte Läufe. Bestehende Läufe bleiben unverändert.</Note>
           <Row className="mt-2">
             <Field label="Höchste erreichte Drehzahl"><NumInput value={v.rpmMatch.maxRpm} onChange={(e) => setV({ ...v, rpmMatch: { ...v.rpmMatch, maxRpm: +e.target.value } })} /></Field>
@@ -204,7 +210,7 @@ function VehicleEditor({ vehicle, onSave, onCancel }: { vehicle: Vehicle; onSave
             <Button variant="secondary" onClick={applyRpmMatch}>Faktor berechnen</Button>
             <span className="text-xs text-muted-foreground">rpmFactor: <b>{v.rpmFactorDefault.toFixed(3)}</b> U/min pro km/h</span>
           </div>
-        </div>
+        </Collapsible>
 
         <AntriebManager
           gearboxDefs={v.gearboxDefs ?? []}
@@ -224,29 +230,30 @@ function VehicleEditor({ vehicle, onSave, onCancel }: { vehicle: Vehicle; onSave
           onUseAsDefault={(f) => setV({ ...v, rpmFactorDefault: +f.toFixed(3) })}
         />
 
-        <div className="mt-3 rounded-md border border-border p-2">
-          <div className="mb-1 text-xs font-semibold text-foreground">Schleppleistungskurve (Prüfstand)</div>
+        <Collapsible title="Schleppleistungskurve (Prüfstand)" persistKey="vehicleEditor.dragCurve" subtitle={`${v.dragCurve.length} Stützpunkte`}>
           <p className="text-[10px] text-muted-foreground">Stützpunkte RPM → PS. Lineare Interpolation, außerhalb geklemmt.</p>
           <div className="mt-2 space-y-1">
             {v.dragCurve.map((d, i) => (
               <div key={i} className="flex items-center gap-2">
                 <NumInput className="flex-1" value={d.rpm} onChange={(e) => updateDrag(i, { rpm: +e.target.value })} />
                 <NumInput className="flex-1" value={d.ps} onChange={(e) => updateDrag(i, { ps: +e.target.value })} />
-                <Button variant="danger" onClick={() => delDrag(i)}>×</Button>
+                <IconButton label="Stützpunkt löschen" onClick={() => delDrag(i)} />
               </div>
             ))}
           </div>
-          <Button className="mt-2" variant="secondary" onClick={addDrag}>+ Stützpunkt</Button>
-        </div>
+          <AddButton onClick={addDrag}>Stützpunkt</AddButton>
+        </Collapsible>
 
         <div className="mt-3 flex justify-end gap-2">
           <Button variant="ghost" onClick={onCancel}>Abbrechen</Button>
           <Button onClick={() => onSave(v)}>Speichern</Button>
         </div>
+        </div>
       </div>
     </div>
   );
 }
+
 
 function ConfirmDelete({ vehicle, sessionCount, onConfirm, onCancel }: { vehicle: Vehicle; sessionCount: number; onConfirm: () => void; onCancel: () => void }) {
   useLockBodyScroll();
