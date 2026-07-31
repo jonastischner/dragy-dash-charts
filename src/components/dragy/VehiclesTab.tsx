@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { ChevronRight, Trash2, Plus, Pencil } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 
 import { Section, Field, TextInput, NumInput, Button, Note, Row, Collapsible, IconButton, AddButton, Select, usePersistedState } from "./ui";
 import { useAppStore, newVehicle } from "@/lib/dragy/store";
