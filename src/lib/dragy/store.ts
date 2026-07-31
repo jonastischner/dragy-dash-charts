@@ -143,7 +143,15 @@ export function useAppStore() {
       }
       await refresh();
     },
+    duplicateVehicle: async (source: Vehicle) => {
+      const copy = duplicateVehicle(source);
+      await db.putVehicle(copy);
+      await refresh();
+      bg(pushLocal("vehicle", copy));
+      return copy;
+    },
     saveSession: async (s: Session) => {
+
       const stamped = stamp(s);
       await db.putSession(stamped);
       await refresh();
