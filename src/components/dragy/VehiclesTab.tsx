@@ -644,8 +644,6 @@ function ShiftDiagramCompare({ vehicle }: { vehicle: Vehicle }) {
   const resolved = resolveAllGears(vehicle).filter((r) => effective.includes(r.setupId));
   const maxRpm = vehicle.maxRpm && vehicle.maxRpm > 0 ? vehicle.maxRpm : 8000;
   const shiftRpm = vehicle.shiftRpm && vehicle.shiftRpm > 0 ? vehicle.shiftRpm : undefined;
-  // Obergrenze der Gang-Linien: Schaltdrehzahl (falls gepflegt), sonst Maximaldrehzahl.
-  const topRpm = shiftRpm ?? maxRpm;
   const setupIds = Array.from(new Set(resolved.map((r) => r.setupId)));
   const baseColors = ["#38bdf8", "#f472b6", "#a3e635", "#fbbf24", "#c084fc", "#f97316"];
 
