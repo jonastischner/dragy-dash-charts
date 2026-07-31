@@ -536,53 +536,47 @@ function GearboxesCollapsibleList({ gearboxDefs, onAdd, onUpdate, onDelete }: {
   onUpdate: (i: number, patch: Partial<GearboxDef>) => void;
   onDelete: (i: number) => void;
 }) {
-  const [openIds, setOpenIds] = useState<Set<string>>(new Set());
-  const toggle = (id: string) => setOpenIds((prev) => {
-    const next = new Set(prev);
-    if (next.has(id)) next.delete(id); else next.add(id);
-    return next;
-  });
+  const [openIds, setOpenIds] = usePersistedState<string[]>("vehicleEditor.openGearboxes", []);
+  const toggle = (id: string) => setOpenIds((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
   return (
-    <div className="mt-2 rounded-md border border-border bg-card/60 p-2">
-      <div className="mb-1 flex items-center justify-between">
-        <div className="text-[11px] font-semibold text-foreground">Getriebe</div>
-        <Button variant="secondary" onClick={onAdd}>+ Getriebe</Button>
-      </div>
+    <Collapsible title="Getriebe" level="sub" persistKey="vehicleEditor.gearboxes" defaultOpen subtitle={`${gearboxDefs.length} angelegt`}>
       {gearboxDefs.length === 0 && <p className="text-[11px] text-muted-foreground">Noch kein Getriebe.</p>}
       <ul className="space-y-2">
         {gearboxDefs.map((gb, i) => {
-          const open = openIds.has(gb.id);
+          const open = openIds.includes(gb.id);
           return (
             <li key={gb.id} className="rounded-md border border-border bg-background p-2">
               <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={() => toggle(gb.id)}
-                  className="flex h-8 w-8 flex-none items-center justify-center rounded bg-muted text-foreground hover:bg-secondary"
-                  aria-label={open ? "Einklappen" : "Ausklappen"}
+                  aria-expanded={open}
+                  className="flex min-h-[44px] flex-1 items-center gap-2 rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
-                  <span className={`inline-block transition-transform ${open ? "rotate-90" : ""}`}>▶</span>
+                  <ChevronRight className={`h-4 w-4 flex-none text-muted-foreground transition-transform ${open ? "rotate-90" : ""}`} aria-hidden="true" />
+                  <span className="min-w-0 truncate text-sm text-foreground">
+                    {gb.name} <span className="ml-1 text-[11px] text-muted-foreground">{gb.gears.length} Gänge</span>
+                  </span>
                 </button>
-                {open ? (
-                  <TextInput className="flex-1" value={gb.name} onChange={(e) => onUpdate(i, { name: e.target.value })} />
-                ) : (
-                  <button type="button" onClick={() => toggle(gb.id)} className="flex-1 text-left text-sm text-foreground">
-                    {gb.name} <span className="ml-2 text-[11px] text-muted-foreground">{gb.gears.length} Gänge</span>
-                  </button>
-                )}
-                <Button variant="danger" onClick={() => onDelete(i)}>×</Button>
+                <IconButton label="Getriebe löschen" onClick={() => onDelete(i)} />
               </div>
               {open && (
-                <GearListEditor
-                  gears={gb.gears}
-                  onChange={(gears) => onUpdate(i, { gears })}
-                />
+                <>
+                  <div className="mt-2">
+                    <Field label="Name"><TextInput value={gb.name} onChange={(e) => onUpdate(i, { name: e.target.value })} /></Field>
+                  </div>
+                  <GearListEditor
+                    gears={gb.gears}
+                    onChange={(gears) => onUpdate(i, { gears })}
+                  />
+                </>
               )}
             </li>
           );
         })}
       </ul>
-    </div>
+      <AddButton onClick={onAdd}>Getriebe</AddButton>
+    </Collapsible>
   );
 }
 
@@ -607,7 +601,7 @@ function GearListEditor({ gears, onChange }: { gears: GearRatio[]; onChange: (g:
                 <TextInput value={g.name} onChange={(e) => update(i, { name: e.target.value })} />
               </Field>
               <div className="flex items-end">
-                <Button variant="danger" onClick={() => del(i)}>×</Button>
+                <IconButton label="Gang löschen" onClick={() => del(i)} />
               </div>
             </div>
             <div className="mt-2">
@@ -618,10 +612,11 @@ function GearListEditor({ gears, onChange }: { gears: GearRatio[]; onChange: (g:
           </li>
         ))}
       </ul>
-      <Button className="mt-2" variant="secondary" onClick={add}>+ Gang</Button>
+      <AddButton onClick={add}>Gang</AddButton>
     </div>
   );
 }
+
 
 
 async function downscaleImage(file: File, maxSize: number, quality: number): Promise<string> {
