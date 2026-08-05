@@ -120,7 +120,7 @@ function ManualEditor({ vehicleId, tempC, pressureHpa, rh, onSave, onCancel }: {
   };
 
   return (
-    <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/70 p-3 sm:items-center" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
+    <div className="fixed inset-0 z-40 flex items-end justify-center bg-neutral-0/70 p-4 sm:items-center" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
       <div className="max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-t-xl bg-card p-4 sm:rounded-xl">
         <h3 className="mb-2 text-base font-semibold text-foreground">Manuelle Session</h3>
         <Field label="Name"><TextInput value={name} onChange={(e) => setName(e.target.value)} /></Field>

@@ -278,8 +278,8 @@ function VehicleEditor({ vehicle, onSave, onCancel }: { vehicle: Vehicle; onSave
 function ConfirmDelete({ vehicle, sessionCount, onConfirm, onCancel }: { vehicle: Vehicle; sessionCount: number; onConfirm: () => void; onCancel: () => void }) {
   useLockBodyScroll();
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/70 p-4">
-      <div className="w-full max-w-sm overscroll-contain rounded-lg bg-card p-4">
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-neutral-0/70 p-4">
+      <div className="w-full max-w-sm overscroll-contain rounded-lg bg-card p-4 shadow-e3 animate-sheet-in">
         <h3 className="text-body font-semibold text-foreground">Fahrzeug löschen?</h3>
         <p className="mt-2 text-caption text-muted-foreground"><b>{vehicle.name}</b> wird gelöscht. Dabei werden auch {sessionCount} zugehörige Session(s) inklusive aller Läufe entfernt.</p>
         <div className="mt-3 flex justify-end gap-2">
