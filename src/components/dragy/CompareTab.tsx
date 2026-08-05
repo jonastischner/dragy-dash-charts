@@ -85,6 +85,30 @@ export function CompareTab({ onOpenVehicles }: { onOpenVehicles?: () => void } =
         })
     : [];
 
+  // Übersicht: alle aktiven (sichtbaren) Läufe mit Peak-Resultaten.
+  const overviewRows = segments
+    .filter((g) => g.visible !== false)
+    .map((g) => {
+      const session = state.sessions.find((s) => s.id === g.sessionId)!;
+      const samples = computeSegment(session, g, activeVehicle);
+      const rec = session.records.filter((r) => r.t >= g.startT && r.t <= g.endT);
+      let pW = 0, pWRpm = NaN, pE = 0, pERpm = NaN, tW = 0, tWRpm = NaN, tE = 0, tERpm = NaN;
+      for (const s of samples) {
+        const psW = s.pWheelW * W_TO_PS, psE = s.pEngineW * W_TO_PS;
+        if (Number.isFinite(psW) && psW > pW) { pW = psW; pWRpm = s.rpm; }
+        if (Number.isFinite(psE) && psE > pE) { pE = psE; pERpm = s.rpm; }
+        if (Number.isFinite(s.torqueWheelNm) && s.torqueWheelNm > tW) { tW = s.torqueWheelNm; tWRpm = s.rpm; }
+        if (Number.isFinite(s.torqueEngineNm) && s.torqueEngineNm > tE) { tE = s.torqueEngineNm; tERpm = s.rpm; }
+      }
+      const vFrom = rec[0]?.speedKmh ?? NaN;
+      const vMax = rec.length ? Math.max(...rec.map((r) => r.speedKmh)) : NaN;
+      const dur = rec.length ? rec[rec.length - 1].t - rec[0].t : NaN;
+      return { label: `${session.name} · ${g.name}`, color: g.color, pW, pWRpm, pE, pERpm, tW, tWRpm, tE, tERpm, vFrom, vMax, dur };
+    });
+
+  const fmt = (v: number, d = 0) => (Number.isFinite(v) && v !== 0 ? v.toFixed(d) : "—");
+  const fmtRpm = (v: number) => (Number.isFinite(v) ? `${v.toFixed(0)} U/min` : "—");
+
   return (
     <div>
       <Section
@@ -150,6 +174,53 @@ export function CompareTab({ onOpenVehicles }: { onOpenVehicles?: () => void } =
           </>
         )}
       </Section>
+
+      <Section title="Übersicht aktive Läufe" note="Peak-Werte je sichtbarem Lauf – Sichtbarkeit über die Chart-Legende steuern.">
+        {overviewRows.length === 0 ? (
+          <p className="text-xs text-muted-foreground">Keine aktiven Läufe.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs text-foreground">
+              <thead className="text-muted-foreground">
+                <tr>
+                  <th className="py-1 pr-2 text-left font-medium">Lauf</th>
+                  <th className="py-1 pr-2 text-right font-medium">Rad PS</th>
+                  <th className="py-1 pr-2 text-right font-medium">@ Rad</th>
+                  <th className="py-1 pr-2 text-right font-medium">Motor PS</th>
+                  <th className="py-1 pr-2 text-right font-medium">@ Motor</th>
+                  <th className="py-1 pr-2 text-right font-medium">Rad Nm</th>
+                  <th className="py-1 pr-2 text-right font-medium">@ Nm</th>
+                  <th className="py-1 pr-2 text-right font-medium">Motor Nm</th>
+                  <th className="py-1 pr-2 text-right font-medium">@ Nm</th>
+                  <th className="py-1 pr-2 text-right font-medium">km/h</th>
+                  <th className="py-1 pr-2 text-right font-medium">Dauer</th>
+                </tr>
+              </thead>
+              <tbody>
+                {overviewRows.map((r, i) => (
+                  <tr key={i} className="border-t border-border">
+                    <td className="py-1 pr-2 whitespace-nowrap">
+                      <span className="mr-1 inline-block h-2 w-3 rounded-sm align-middle" style={{ backgroundColor: r.color }} />
+                      {r.label}
+                    </td>
+                    <td className="py-1 pr-2 text-right tabular-nums">{fmt(r.pW)}</td>
+                    <td className="py-1 pr-2 text-right tabular-nums text-muted-foreground">{fmtRpm(r.pWRpm)}</td>
+                    <td className="py-1 pr-2 text-right tabular-nums">{fmt(r.pE)}</td>
+                    <td className="py-1 pr-2 text-right tabular-nums text-muted-foreground">{fmtRpm(r.pERpm)}</td>
+                    <td className="py-1 pr-2 text-right tabular-nums">{fmt(r.tW)}</td>
+                    <td className="py-1 pr-2 text-right tabular-nums text-muted-foreground">{fmtRpm(r.tWRpm)}</td>
+                    <td className="py-1 pr-2 text-right tabular-nums">{fmt(r.tE)}</td>
+                    <td className="py-1 pr-2 text-right tabular-nums text-muted-foreground">{fmtRpm(r.tERpm)}</td>
+                    <td className="py-1 pr-2 text-right tabular-nums">{Number.isFinite(r.vFrom) ? `${r.vFrom.toFixed(0)}–${r.vMax.toFixed(0)}` : "—"}</td>
+                    <td className="py-1 pr-2 text-right tabular-nums">{Number.isFinite(r.dur) ? `${r.dur.toFixed(2)} s` : "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Section>
+
 
       <Section title="Grenzen & Annahmen der Berechnung">
         <ul className="list-disc space-y-1 pl-4 text-xs text-muted-foreground">
