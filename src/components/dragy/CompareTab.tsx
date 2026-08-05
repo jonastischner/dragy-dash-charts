@@ -85,6 +85,30 @@ export function CompareTab({ onOpenVehicles }: { onOpenVehicles?: () => void } =
         })
     : [];
 
+  // Übersicht: alle aktiven (sichtbaren) Läufe mit Peak-Resultaten.
+  const overviewRows = segments
+    .filter((g) => g.visible !== false)
+    .map((g) => {
+      const session = state.sessions.find((s) => s.id === g.sessionId)!;
+      const samples = computeSegment(session, g, activeVehicle);
+      const rec = session.records.filter((r) => r.t >= g.startT && r.t <= g.endT);
+      let pW = 0, pWRpm = NaN, pE = 0, pERpm = NaN, tW = 0, tWRpm = NaN, tE = 0, tERpm = NaN;
+      for (const s of samples) {
+        const psW = s.pWheelW * W_TO_PS, psE = s.pEngineW * W_TO_PS;
+        if (Number.isFinite(psW) && psW > pW) { pW = psW; pWRpm = s.rpm; }
+        if (Number.isFinite(psE) && psE > pE) { pE = psE; pERpm = s.rpm; }
+        if (Number.isFinite(s.torqueWheelNm) && s.torqueWheelNm > tW) { tW = s.torqueWheelNm; tWRpm = s.rpm; }
+        if (Number.isFinite(s.torqueEngineNm) && s.torqueEngineNm > tE) { tE = s.torqueEngineNm; tERpm = s.rpm; }
+      }
+      const vFrom = rec[0]?.speedKmh ?? NaN;
+      const vMax = rec.length ? Math.max(...rec.map((r) => r.speedKmh)) : NaN;
+      const dur = rec.length ? rec[rec.length - 1].t - rec[0].t : NaN;
+      return { label: `${session.name} · ${g.name}`, color: g.color, pW, pWRpm, pE, pERpm, tW, tWRpm, tE, tERpm, vFrom, vMax, dur };
+    });
+
+  const fmt = (v: number, d = 0) => (Number.isFinite(v) && v !== 0 ? v.toFixed(d) : "—");
+  const fmtRpm = (v: number) => (Number.isFinite(v) ? `${v.toFixed(0)} U/min` : "—");
+
   return (
     <div>
       <Section
