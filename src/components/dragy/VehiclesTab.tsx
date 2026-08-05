@@ -154,21 +154,23 @@ function VehicleEditor({ vehicle, onSave, onCancel }: { vehicle: Vehicle; onSave
   useLockBodyScroll();
   return (
     <div
-      className="fixed inset-0 z-40 flex items-end justify-center bg-black/70 p-3 sm:items-center"
+      className="fixed inset-0 z-40 flex items-end justify-center bg-neutral-0/70 p-4 sm:items-center"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Fahrzeug bearbeiten"
       style={{
-        paddingTop: "calc(env(safe-area-inset-top) + 0.5rem)",
-        paddingBottom: "calc(env(safe-area-inset-bottom) + 0.5rem)",
+        paddingTop: "calc(env(safe-area-inset-top) + 16px)",
+        paddingBottom: "calc(env(safe-area-inset-bottom) + 16px)",
       }}
     >
-      <div className="max-h-full w-full max-w-lg overflow-y-auto overscroll-contain rounded-t-xl bg-card sm:rounded-xl">
-        <div className="sticky top-0 z-10 flex items-center justify-between gap-2 border-b border-border bg-card/95 px-3 py-3 backdrop-blur">
-          <h3 className="text-base font-semibold text-foreground">Fahrzeug bearbeiten</h3>
-          <div className="flex gap-2">
-            <Button variant="ghost" onClick={onCancel}>Abbrechen</Button>
-            <Button onClick={() => onSave(v)}>Speichern</Button>
-          </div>
+      <div className="animate-sheet-in max-h-full w-full max-w-lg overflow-y-auto overflow-x-hidden overscroll-contain rounded-t-xl bg-card shadow-e3 sm:rounded-xl">
+        <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-border bg-card/95 px-4 py-3 backdrop-blur">
+          <h3 className="min-w-0 flex-1 truncate text-subtitle text-foreground">Fahrzeug bearbeiten</h3>
+          <Button variant="ghost" onClick={onCancel}>Abbrechen</Button>
+          <Button onClick={() => onSave(v)}>Speichern</Button>
         </div>
-        <div className="p-4">
+        <div className="min-w-0 p-4">
+
         <Field label="Name"><TextInput value={v.name} onChange={(e) => setV({ ...v, name: e.target.value })} /></Field>
 
         <Collapsible title="Fahrzeugbild" persistKey="vehicleEditor.image" subtitle={v.imageDataUrl ? "Bild hinterlegt" : "kein Bild"}>
