@@ -174,7 +174,7 @@ function VehicleEditor({ vehicle, onSave, onCancel }: { vehicle: Vehicle; onSave
             <X className="h-5 w-5" strokeWidth={2} aria-hidden="true" />
           </button>
           <h3 className="min-w-0 flex-1 truncate text-subtitle text-foreground">Fahrzeug bearbeiten</h3>
-          <Button onClick={() => onSave(v)}>Änderungen speichern</Button>
+          <Button onClick={() => onSave(v)}>Speichern</Button>
         </div>
         <div className="min-w-0 p-4">
 
@@ -433,7 +433,7 @@ function AntriebManager({ gearboxDefs, finalDrives, tires, setups, defaultSetupI
 
   return (
     <Collapsible
-      title="Antrieb (Getriebe, Endübersetzung, Reifen, Setups)"
+      title="Antrieb"
       persistKey="vehicleEditor.drive"
       defaultOpen
       subtitle={`${gearboxDefs.length} Getriebe · ${finalDrives.length} Endübersetzungen · ${tires.length} Reifen · ${setups.length} Setups`}
