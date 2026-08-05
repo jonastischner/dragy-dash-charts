@@ -119,10 +119,10 @@ export function CompareTab({ onOpenVehicles }: { onOpenVehicles?: () => void } =
             : "Motorleistung/-drehmoment sind Schätzungen (RPM aus Vmax abgeleitet, Schleppkurve als Näherung). Drehmoment ist gegenüber RPM-Faktor-Fehlern empfindlicher als die Leistung."
         }
       >
-        <div className="mb-2 flex flex-wrap gap-1">
+        <div className="mb-2 flex flex-wrap gap-2">
           {(Object.keys(MODE_LABEL) as Mode[]).map((m) => (
             <button key={m} onClick={() => setMode(m)}
-              className={`rounded px-2 py-1 text-caption ${mode === m ? "bg-primary text-white" : "bg-secondary text-foreground"}`}>
+              className={`rounded px-3 py-1 text-caption ${mode === m ? "bg-primary text-white" : "bg-secondary text-foreground"}`}>
               {MODE_LABEL[m]}
             </button>
           ))}

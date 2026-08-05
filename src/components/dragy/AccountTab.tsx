@@ -107,12 +107,12 @@ export function AccountTab() {
           <button
             type="button"
             onClick={() => { setMode("login"); setErr(null); setMsg(null); }}
-            className={`rounded px-3 py-1.5 font-medium ${!isSignup ? "bg-primary text-white" : "text-muted-foreground"}`}
+            className={`rounded px-3 py-2 font-medium ${!isSignup ? "bg-primary text-white" : "text-muted-foreground"}`}
           >Anmelden</button>
           <button
             type="button"
             onClick={() => { setMode("signup"); setErr(null); setMsg(null); }}
-            className={`rounded px-3 py-1.5 font-medium ${isSignup ? "bg-primary text-white" : "text-muted-foreground"}`}
+            className={`rounded px-3 py-2 font-medium ${isSignup ? "bg-primary text-white" : "text-muted-foreground"}`}
           >Konto erstellen</button>
         </div>
         <div className="grid gap-2">

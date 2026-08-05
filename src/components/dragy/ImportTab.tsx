@@ -120,17 +120,17 @@ function ManualEditor({ vehicleId, tempC, pressureHpa, rh, onSave, onCancel }: {
   };
 
   return (
-    <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/70 p-2 sm:items-center" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
-      <div className="max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-t-xl bg-card p-3 sm:rounded-xl">
+    <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/70 p-3 sm:items-center" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
+      <div className="max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-t-xl bg-card p-4 sm:rounded-xl">
         <h3 className="mb-2 text-base font-semibold text-foreground">Manuelle Session</h3>
         <Field label="Name"><TextInput value={name} onChange={(e) => setName(e.target.value)} /></Field>
         <Note>Bei manuellen Sessions ist die Geschwindigkeits-Glättung deaktiviert (zu wenige Stützpunkte).</Note>
-        <div className="mt-2 grid grid-cols-[1fr_1fr_auto] gap-1 text-caption text-muted-foreground">
+        <div className="mt-2 grid grid-cols-[1fr_1fr_auto] gap-2 text-caption text-muted-foreground">
           <div>Geschw. (km/h)</div><div>Zeit (s)</div><div></div>
         </div>
         <div className="mt-1 space-y-1">
           {rows.map((r, i) => (
-            <div key={i} className="grid grid-cols-[1fr_1fr_auto] gap-1">
+            <div key={i} className="grid grid-cols-[1fr_1fr_auto] gap-2">
               <NumInput value={r.speedKmh} onChange={(e) => update(i, { speedKmh: +e.target.value })} />
               <NumInput value={r.t ?? ""} onChange={(e) => update(i, { t: e.target.value === "" ? null : +e.target.value })} />
               <Button variant="danger" onClick={() => delRow(i)}>×</Button>

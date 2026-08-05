@@ -39,7 +39,7 @@ export function VehiclesTab() {
             const sessions = state.sessions.filter((s) => s.vehicleId === v.id).length;
             const isActive = state.activeVehicleId === v.id;
             return (
-              <li key={v.id} className="rounded-md border border-border bg-muted p-2">
+              <li key={v.id} className="rounded-md border border-border bg-muted p-3">
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2 min-w-0">
                     {v.imageDataUrl && (
@@ -52,7 +52,7 @@ export function VehiclesTab() {
                       <div className="text-caption text-muted-foreground">{v.mass} kg · Cd {v.cd} · A {v.area} m² · {sessions} Sessions</div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-2">
                     {!isActive && <Button variant="secondary" onClick={() => setActive(v.id)}>Aktivieren</Button>}
                     <Button variant="ghost" onClick={() => setEditing(v)}>Bearbeiten</Button>
                     <button
@@ -154,21 +154,21 @@ function VehicleEditor({ vehicle, onSave, onCancel }: { vehicle: Vehicle; onSave
   useLockBodyScroll();
   return (
     <div
-      className="fixed inset-0 z-40 flex items-end justify-center bg-black/70 p-2 sm:items-center"
+      className="fixed inset-0 z-40 flex items-end justify-center bg-black/70 p-3 sm:items-center"
       style={{
         paddingTop: "calc(env(safe-area-inset-top) + 0.5rem)",
         paddingBottom: "calc(env(safe-area-inset-bottom) + 0.5rem)",
       }}
     >
       <div className="max-h-full w-full max-w-lg overflow-y-auto overscroll-contain rounded-t-xl bg-card sm:rounded-xl">
-        <div className="sticky top-0 z-10 flex items-center justify-between gap-2 border-b border-border bg-card/95 px-3 py-2 backdrop-blur">
+        <div className="sticky top-0 z-10 flex items-center justify-between gap-2 border-b border-border bg-card/95 px-3 py-3 backdrop-blur">
           <h3 className="text-base font-semibold text-foreground">Fahrzeug bearbeiten</h3>
           <div className="flex gap-2">
             <Button variant="ghost" onClick={onCancel}>Abbrechen</Button>
             <Button onClick={() => onSave(v)}>Speichern</Button>
           </div>
         </div>
-        <div className="p-3">
+        <div className="p-4">
         <Field label="Name"><TextInput value={v.name} onChange={(e) => setV({ ...v, name: e.target.value })} /></Field>
 
         <Collapsible title="Fahrzeugbild" persistKey="vehicleEditor.image" subtitle={v.imageDataUrl ? "Bild hinterlegt" : "kein Bild"}>
@@ -178,8 +178,8 @@ function VehicleEditor({ vehicle, onSave, onCancel }: { vehicle: Vehicle; onSave
             ) : (
               <div className="h-20 w-20 flex-none rounded border border-dashed border-input bg-muted text-center text-caption text-muted-foreground flex items-center justify-center">kein Bild</div>
             )}
-            <div className="flex flex-col gap-1">
-              <label className="cursor-pointer rounded-md bg-secondary px-3 py-1.5 text-caption text-foreground hover:bg-secondary w-fit">
+            <div className="flex flex-col gap-2">
+              <label className="cursor-pointer rounded-md bg-secondary px-3 py-2 text-caption text-foreground hover:bg-secondary w-fit">
                 Bild wählen
                 <input type="file" accept="image/*" className="hidden" onChange={(e) => onPickImage(e.target.files?.[0] ?? null)} />
               </label>
@@ -277,7 +277,7 @@ function ConfirmDelete({ vehicle, sessionCount, onConfirm, onCancel }: { vehicle
   useLockBodyScroll();
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/70 p-4">
-      <div className="w-full max-w-sm overscroll-contain rounded-lg bg-card p-3">
+      <div className="w-full max-w-sm overscroll-contain rounded-lg bg-card p-4">
         <h3 className="text-body font-semibold text-foreground">Fahrzeug löschen?</h3>
         <p className="mt-2 text-caption text-muted-foreground"><b>{vehicle.name}</b> wird gelöscht. Dabei werden auch {sessionCount} zugehörige Session(s) inklusive aller Läufe entfernt.</p>
         <div className="mt-3 flex justify-end gap-2">
@@ -313,7 +313,7 @@ function GearPresetsEditor({ presets, onChange, onUseAsDefault }: {
           const U = tireCircumferenceM(p.tireSpec);
           const valid = U !== null && p.gearRatio > 0 && p.finalDrive > 0;
           return (
-            <li key={p.id} className="rounded-md border border-border bg-card p-2">
+            <li key={p.id} className="rounded-md border border-border bg-card p-3">
               <div className="flex items-center gap-2">
                 <TextInput className="flex-1" value={p.name} onChange={(e) => update(i, { name: e.target.value })} />
                 <IconButton label="Preset löschen" onClick={() => del(i)} />
@@ -444,7 +444,7 @@ function AntriebManager({ gearboxDefs, finalDrives, tires, setups, defaultSetupI
         {finalDrives.length === 0 && <p className="text-caption text-muted-foreground">Noch keine Endübersetzung.</p>}
         <ul className="space-y-2">
           {finalDrives.map((fd, i) => (
-            <li key={fd.id} className="rounded-md border border-border bg-background p-2">
+            <li key={fd.id} className="rounded-md border border-border bg-background p-3">
               <div className="grid grid-cols-[1fr_1fr_auto] gap-2">
                 <Field label="Name"><TextInput value={fd.name} onChange={(e) => updateFinal(i, { name: e.target.value })} /></Field>
                 <Field label="Übersetzung"><NumInput step="0.001" value={fd.ratio} onChange={(e) => updateFinal(i, { ratio: +e.target.value })} /></Field>
@@ -463,7 +463,7 @@ function AntriebManager({ gearboxDefs, finalDrives, tires, setups, defaultSetupI
           {tires.map((t, i) => {
             const U = tireCircumferenceM(t.spec);
             return (
-              <li key={t.id} className="rounded-md border border-border bg-background p-2">
+              <li key={t.id} className="rounded-md border border-border bg-background p-3">
                 <div className="grid grid-cols-[1fr_1fr_auto] gap-2">
                   <Field label="Name"><TextInput value={t.name} onChange={(e) => updateTire(i, { name: e.target.value })} /></Field>
                   <Field label="Spec (z.B. 225/45R17)"><TextInput value={t.spec} onChange={(e) => updateTire(i, { spec: e.target.value })} /></Field>
@@ -488,11 +488,11 @@ function AntriebManager({ gearboxDefs, finalDrives, tires, setups, defaultSetupI
             const tireSpec = tire?.spec ?? gb?.tireSpec ?? "";
             const isDefault = defaultSetupId === s.id;
             return (
-              <li key={s.id} className="rounded-md border border-border bg-background p-2">
+              <li key={s.id} className="rounded-md border border-border bg-background p-3">
                 <div className="flex items-center gap-2">
                   <TextInput className="flex-1" value={s.name} onChange={(e) => updateSetup(i, { name: e.target.value })} />
                   {isDefault ? (
-                    <span className="rounded bg-primary px-2 py-1 text-caption text-primary-foreground">Standard</span>
+                    <span className="rounded bg-primary px-3 py-1 text-caption text-primary-foreground">Standard</span>
                   ) : (
                     <Button variant="ghost" onClick={() => onChange({ defaultSetupId: s.id })}>als Standard</Button>
                   )}
@@ -519,12 +519,12 @@ function AntriebManager({ gearboxDefs, finalDrives, tires, setups, defaultSetupI
                 {gb && fd && gb.gears.length > 0 && tireSpec && (
                   <div className="mt-2 text-caption text-muted-foreground">
                     <div className="text-muted-foreground">rpmFactor pro Gang (Reifen {tireSpec}, End {fd.ratio.toFixed(3)}):</div>
-                    <div className="mt-1 flex flex-wrap gap-1">
+                    <div className="mt-1 flex flex-wrap gap-2">
                       {gb.gears.map((g) => {
                         const f = computeRpmFactor(g.ratio, fd.ratio, tireSpec);
                         if (f == null) return null;
                         return (
-                          <button key={g.id} className="rounded bg-muted px-2 py-0.5 hover:bg-secondary"
+                          <button key={g.id} className="rounded bg-muted px-3 py-1 hover:bg-secondary"
                             onClick={() => onUseAsDefault(f)}
                             title="Als Standard-rpmFactor setzen">
                             {g.name}: {f.toFixed(2)}
@@ -563,7 +563,7 @@ function GearboxesCollapsibleList({ gearboxDefs, onAdd, onUpdate, onDelete }: {
         {gearboxDefs.map((gb, i) => {
           const open = openIds.includes(gb.id);
           return (
-            <li key={gb.id} className="rounded-md border border-border bg-background p-2">
+            <li key={gb.id} className="rounded-md border border-border bg-background p-3">
               <div className="flex items-center gap-2">
                 <button
                   type="button"
@@ -613,7 +613,7 @@ function GearListEditor({ gears, onChange }: { gears: GearRatio[]; onChange: (g:
       {gears.length === 0 && <p className="text-caption text-muted-foreground">Noch keine Gänge.</p>}
       <ul className="space-y-2">
         {gears.map((g, i) => (
-          <li key={g.id} className="rounded-md border border-border bg-muted/40 p-2">
+          <li key={g.id} className="rounded-md border border-border bg-muted/40 p-3">
             <div className="grid grid-cols-[1fr_auto] gap-2">
               <Field label="Name">
                 <TextInput value={g.name} onChange={(e) => update(i, { name: e.target.value })} />
@@ -731,7 +731,7 @@ function ShiftDiagramCompare({ vehicle }: { vehicle: Vehicle }) {
             {setups.map((s) => {
               const on = effective.includes(s.id);
               return (
-                <label key={s.id} className="flex min-h-[36px] items-center gap-1.5 rounded-md bg-muted px-2 py-1">
+                <label key={s.id} className="flex min-h-[44px] items-center gap-2 rounded-md bg-muted px-3 py-1">
                   <input
                     type="checkbox"
                     checked={on}

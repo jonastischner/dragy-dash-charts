@@ -42,12 +42,12 @@ export function Collapsible({
   const titleCls = level === "section" ? "text-body font-semibold text-foreground" : "text-caption font-semibold text-foreground";
   return (
     <div className={`mt-4 rounded-lg border border-border ${level === "sub" ? "mt-3 bg-elevated" : "bg-card"}`}>
-      <div className="flex items-center gap-2 px-2">
+      <div className="flex items-center gap-2 px-3">
         <button
           type="button"
           onClick={() => setOpen(!open)}
           aria-expanded={open}
-          className="flex min-h-[44px] flex-1 items-center gap-2 rounded-md px-2 text-left transition-ui focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="flex min-h-[44px] flex-1 items-center gap-2 rounded-md px-3 text-left transition-ui focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           <ChevronRight className={`h-4 w-4 flex-none text-muted-foreground transition-ui ${open ? "rotate-90" : ""}`} strokeWidth={2} aria-hidden="true" />
           <span className="min-w-0">
@@ -110,7 +110,7 @@ export function Field({ label, children, hint, error }: { label: string; childre
       <span className="mb-1 block text-caption text-muted-foreground">{label}</span>
       {children}
       {error && (
-        <span className="mt-1 flex items-center gap-1 text-caption text-destructive">
+        <span className="mt-1 flex items-center gap-2 text-caption text-destructive">
           <AlertCircle className="h-3.5 w-3.5 flex-none" strokeWidth={2} aria-hidden="true" />
           {error}
         </span>
@@ -182,7 +182,7 @@ export function Button({
 
 export function Note({ children }: { children: ReactNode }) {
   return (
-    <p className="flex items-start gap-2 rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-caption text-foreground">
+    <p className="flex items-start gap-2 rounded-md border border-warning/40 bg-warning/10 px-3 py-3 text-caption text-foreground">
       <AlertCircle className="mt-0.5 h-4 w-4 flex-none text-warning" strokeWidth={2} aria-hidden="true" />
       <span>{children}</span>
     </p>
