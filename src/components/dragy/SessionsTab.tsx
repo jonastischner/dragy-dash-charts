@@ -19,7 +19,9 @@ export function SessionsTab({ onOpenVehicles }: { onOpenVehicles?: () => void } 
 
   return (
     <div>
+      <AllSessionsPeaks sessions={sessions} segments={state.segments} vehicle={activeVehicle} />
       <Section title={`Sessions – ${activeVehicle.name}`}>
+
         {sessions.length === 0 && <p className="text-xs text-muted-foreground">Noch keine Sessions. Reiter „Import" nutzen.</p>}
         <ul className="space-y-2">
           {sessions.map((s) => {
