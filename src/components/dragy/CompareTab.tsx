@@ -175,6 +175,53 @@ export function CompareTab({ onOpenVehicles }: { onOpenVehicles?: () => void } =
         )}
       </Section>
 
+      <Section title="Übersicht aktive Läufe" note="Peak-Werte je sichtbarem Lauf – Sichtbarkeit über die Chart-Legende steuern.">
+        {overviewRows.length === 0 ? (
+          <p className="text-xs text-muted-foreground">Keine aktiven Läufe.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs text-foreground">
+              <thead className="text-muted-foreground">
+                <tr>
+                  <th className="py-1 pr-2 text-left font-medium">Lauf</th>
+                  <th className="py-1 pr-2 text-right font-medium">Rad PS</th>
+                  <th className="py-1 pr-2 text-right font-medium">@ Rad</th>
+                  <th className="py-1 pr-2 text-right font-medium">Motor PS</th>
+                  <th className="py-1 pr-2 text-right font-medium">@ Motor</th>
+                  <th className="py-1 pr-2 text-right font-medium">Rad Nm</th>
+                  <th className="py-1 pr-2 text-right font-medium">@ Nm</th>
+                  <th className="py-1 pr-2 text-right font-medium">Motor Nm</th>
+                  <th className="py-1 pr-2 text-right font-medium">@ Nm</th>
+                  <th className="py-1 pr-2 text-right font-medium">km/h</th>
+                  <th className="py-1 pr-2 text-right font-medium">Dauer</th>
+                </tr>
+              </thead>
+              <tbody>
+                {overviewRows.map((r, i) => (
+                  <tr key={i} className="border-t border-border">
+                    <td className="py-1 pr-2 whitespace-nowrap">
+                      <span className="mr-1 inline-block h-2 w-3 rounded-sm align-middle" style={{ backgroundColor: r.color }} />
+                      {r.label}
+                    </td>
+                    <td className="py-1 pr-2 text-right tabular-nums">{fmt(r.pW)}</td>
+                    <td className="py-1 pr-2 text-right tabular-nums text-muted-foreground">{fmtRpm(r.pWRpm)}</td>
+                    <td className="py-1 pr-2 text-right tabular-nums">{fmt(r.pE)}</td>
+                    <td className="py-1 pr-2 text-right tabular-nums text-muted-foreground">{fmtRpm(r.pERpm)}</td>
+                    <td className="py-1 pr-2 text-right tabular-nums">{fmt(r.tW)}</td>
+                    <td className="py-1 pr-2 text-right tabular-nums text-muted-foreground">{fmtRpm(r.tWRpm)}</td>
+                    <td className="py-1 pr-2 text-right tabular-nums">{fmt(r.tE)}</td>
+                    <td className="py-1 pr-2 text-right tabular-nums text-muted-foreground">{fmtRpm(r.tERpm)}</td>
+                    <td className="py-1 pr-2 text-right tabular-nums">{Number.isFinite(r.vFrom) ? `${r.vFrom.toFixed(0)}–${r.vMax.toFixed(0)}` : "—"}</td>
+                    <td className="py-1 pr-2 text-right tabular-nums">{Number.isFinite(r.dur) ? `${r.dur.toFixed(2)} s` : "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Section>
+
+
       <Section title="Grenzen & Annahmen der Berechnung">
         <ul className="list-disc space-y-1 pl-4 text-xs text-muted-foreground">
           <li>
