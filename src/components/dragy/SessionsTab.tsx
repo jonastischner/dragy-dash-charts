@@ -57,6 +57,111 @@ export function SessionsTab({ onOpenVehicles }: { onOpenVehicles?: () => void } 
     </div>
   );
 }
+function bestOfSegments(session: Session, segs: Segment[], vehicle: any) {
+  let best: { segId: string; segName: string; color: string; ps: number; psRpm: number; nm: number; nmRpm: number } | null = null;
+  for (const g of segs) {
+    const samples = computeSegment(session, g, vehicle);
+    let ps = NaN, psRpm = NaN, nm = NaN, nmRpm = NaN;
+    for (const s of samples) {
+      const p = s.pEngineW * W_TO_PS;
+      if (Number.isFinite(p) && (!Number.isFinite(ps) || p > ps)) { ps = p; psRpm = s.rpm; }
+      const t = s.torqueEngineNm;
+      if (Number.isFinite(t) && (!Number.isFinite(nm) || t > nm)) { nm = t; nmRpm = s.rpm; }
+    }
+    if (!Number.isFinite(ps)) continue;
+    if (!best || ps > best.ps) best = { segId: g.id, segName: g.name, color: g.color, ps, psRpm, nm, nmRpm };
+  }
+  return best;
+}
+
+function AllSessionsPeaks({ sessions, segments, vehicle }: { sessions: Session[]; segments: Segment[]; vehicle: any }) {
+  const [refKey, setRefKey] = usePersistedState<string>(`dragy.peaks.globalRef.${vehicle.id}`, "");
+
+  const rows = useMemo(() => {
+    return sessions.map((s) => {
+      const segs = segments.filter((g) => g.sessionId === s.id);
+      return { session: s, best: bestOfSegments(s, segs, vehicle) };
+    }).filter((r) => r.best);
+  }, [sessions, segments, vehicle]);
+
+  if (rows.length === 0) return null;
+
+  const strongest = rows.reduce((a, b) => (b.best!.ps > a.best!.ps ? b : a));
+  const ref = rows.find((r) => `${r.session.id}:${r.best!.segId}` === refKey);
+
+  const fmtDelta = (val: number, base: number, unit: string) => {
+    if (!Number.isFinite(val) || !Number.isFinite(base) || base === 0) return "—";
+    const abs = val - base;
+    const pct = (abs / base) * 100;
+    const sign = abs > 0 ? "+" : "";
+    const cls = abs > 0.05 ? "text-emerald-400" : abs < -0.05 ? "text-red-400" : "text-muted-foreground";
+    return <span className={cls}>{sign}{abs.toFixed(0)} {unit} ({sign}{pct.toFixed(1)} %)</span>;
+  };
+
+  return (
+    <Section title="Stärkster Lauf je Session">
+      <Note>Pro Session wird der Lauf mit der höchsten geschätzten Motorleistung gezeigt. Ein Lauf kann session-übergreifend als Referenz gesetzt werden.</Note>
+      <div className="mt-2">
+        <Field label="Referenzlauf (session-übergreifend)">
+          <select
+            className="w-full rounded-md border border-input bg-muted px-2 py-2 text-sm text-foreground focus:border-ring focus:outline-none"
+            value={refKey}
+            onChange={(e) => setRefKey(e.target.value)}
+          >
+            <option value="">– keine Referenz –</option>
+            {rows.map((r) => (
+              <option key={r.session.id} value={`${r.session.id}:${r.best!.segId}`}>
+                {r.session.name} – {r.best!.segName}
+              </option>
+            ))}
+          </select>
+        </Field>
+      </div>
+      <div className="mt-2 overflow-x-auto">
+        <table className="w-full text-xs text-foreground">
+          <thead className="text-muted-foreground">
+            <tr>
+              <th className="py-1 pr-2 text-left font-medium">Session</th>
+              <th className="py-1 pr-2 text-left font-medium">Bester Lauf</th>
+              <th className="py-1 pr-2 text-right font-medium">Peak PS</th>
+              <th className="py-1 pr-2 text-right font-medium">@ U/min</th>
+              {ref && <th className="py-1 pr-2 text-right font-medium">Δ PS</th>}
+              <th className="py-1 pr-2 text-right font-medium">Peak Nm</th>
+              <th className="py-1 pr-2 text-right font-medium">@ U/min</th>
+              {ref && <th className="py-1 pr-2 text-right font-medium">Δ Nm</th>}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => {
+              const key = `${r.session.id}:${r.best!.segId}`;
+              const isRef = key === refKey;
+              return (
+                <tr key={r.session.id} className={`border-t border-border ${isRef ? "bg-secondary/40" : ""}`}>
+                  <td className="py-1 pr-2">
+                    {r.session.name}
+                    {r.session.id === strongest.session.id && <span className="ml-1 text-[10px] text-emerald-400">★ stärkste</span>}
+                    {isRef && <span className="ml-1 text-[10px] text-muted-foreground">(Ref)</span>}
+                  </td>
+                  <td className="py-1 pr-2">
+                    <span className="mr-1 inline-block h-2 w-3 rounded-sm align-middle" style={{ backgroundColor: r.best!.color }} />
+                    {r.best!.segName}
+                  </td>
+                  <td className="py-1 pr-2 text-right tabular-nums">{r.best!.ps.toFixed(0)}</td>
+                  <td className="py-1 pr-2 text-right tabular-nums">{Number.isFinite(r.best!.psRpm) ? r.best!.psRpm.toFixed(0) : "—"}</td>
+                  {ref && <td className="py-1 pr-2 text-right tabular-nums">{isRef ? "—" : fmtDelta(r.best!.ps, ref.best!.ps, "PS")}</td>}
+                  <td className="py-1 pr-2 text-right tabular-nums">{Number.isFinite(r.best!.nm) ? r.best!.nm.toFixed(0) : "—"}</td>
+                  <td className="py-1 pr-2 text-right tabular-nums">{Number.isFinite(r.best!.nmRpm) ? r.best!.nmRpm.toFixed(0) : "—"}</td>
+                  {ref && <td className="py-1 pr-2 text-right tabular-nums">{isRef ? "—" : fmtDelta(r.best!.nm, ref.best!.nm, "Nm")}</td>}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </Section>
+  );
+}
+
 
 function SessionDetail({ session, segments, vehicle, onRename, onDelete, onSaveSeg, onDelSeg, onEnvUpdate }: {
   session: Session; segments: Segment[]; vehicle: any;
