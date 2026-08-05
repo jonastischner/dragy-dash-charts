@@ -171,17 +171,40 @@ export function computeSegment(
   const inSeg = session.records.filter((r) => r.t >= segment.startT && r.t <= segment.endT);
   if (inSeg.length < 3) return [];
   const rho = airDensity(session.tempC, session.pressureHpa, session.rh);
-  const window = session.manual ? 1 : vehicle.smoothingWindow;
-  const vsKmh = smoothCentered(inSeg.map((r) => r.speedKmh), window);
-  const times = inSeg.map((r) => r.t);
+  const rawT = inSeg.map((r) => r.t);
+  const rawV = inSeg.map((r) => r.speedKmh);
+
+  // 1) Auf ein gleichmäßiges Zeitraster interpolieren (Lücken/Jitter der
+  //    GPS-Samples werden ausgeglichen, mind. 20 Hz für weiche Kurven).
+  const span = rawT[rawT.length - 1] - rawT[0];
+  const medDt = span / Math.max(1, rawT.length - 1);
+  const dt = Math.min(Math.max(medDt / 2, 0.01), 0.05);
+  const grid = resampleUniform(rawT, rawV, dt);
+  const times = grid.times;
+
+  // 2) Savitzky-Golay: lokale quadratische Regression liefert geglättete
+  //    Geschwindigkeit und die Beschleunigung analytisch aus derselben Fit-
+  //    Kurve (kein Rauschverstärken durch nachträgliches Differenzieren).
+  const userWin = session.manual ? 1 : Math.max(1, vehicle.smoothingWindow);
+  // Fensterbreite in Sekunden aus dem Nutzerwert (bezogen auf Rohabstand),
+  // dann in Rasterpunkte umgerechnet – ungerade und mind. 5 Punkte.
+  const winSec = Math.max(userWin, 3) * medDt;
+  let win = Math.round(winSec / dt);
+  if (win % 2 === 0) win += 1;
+  win = Math.max(5, Math.min(win, Math.max(5, times.length - 1)));
+
+  const vsKmh = savitzkyGolay(grid.values, win, 2, 0);
+  const dvKmhDt = savitzkyGolay(grid.values, win, 2, 1, dt);
   const vsMs = vsKmh.map((v) => v / 3.6);
-  const a = centralDerivative(vsMs, times);
+  // Beschleunigung leicht nachglätten (SG 2. Ordnung, gleiches Fenster).
+  const a = savitzkyGolay(dvKmhDt.map((d) => d / 3.6), win, 2, 0);
+
   const crr = segment.calibration?.crr ?? vehicle.crr;
   const cdA = segment.calibration?.cdA ?? vehicle.cd * vehicle.area;
   const m = session.massOverride && session.massOverride > 0 ? session.massOverride : vehicle.mass;
   const factor = segment.rpmFactor;
   const out: SegmentSample[] = [];
-  for (let i = 0; i < inSeg.length; i++) {
+  for (let i = 0; i < times.length; i++) {
     const v = vsMs[i];
     const pWheel = v * (m * a[i] + m * G * crr + 0.5 * rho * cdA * v * v);
     const rpm = vsKmh[i] * factor;
