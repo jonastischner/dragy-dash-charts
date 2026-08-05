@@ -233,15 +233,23 @@ export function coastdownFit(
   const inR = session.records.filter((r) => r.t >= startT && r.t <= endT);
   if (inR.length < 5) return null;
   const rho = airDensity(session.tempC, session.pressureHpa, session.rh);
-  const vs = smoothCentered(inR.map((r) => r.speedKmh / 3.6), 5);
-  const t = inR.map((r) => r.t);
-  const a = centralDerivative(vs, t);
+  const rawT = inR.map((r) => r.t);
+  const rawV = inR.map((r) => r.speedKmh / 3.6);
+  const medDt = (rawT[rawT.length - 1] - rawT[0]) / Math.max(1, rawT.length - 1);
+  const dt = Math.min(Math.max(medDt / 2, 0.01), 0.05);
+  const grid = resampleUniform(rawT, rawV, dt);
+  let win = Math.round((7 * medDt) / dt);
+  if (win % 2 === 0) win += 1;
+  win = Math.max(5, Math.min(win, Math.max(5, grid.times.length - 1)));
+  const vs = savitzkyGolay(grid.values, win, 2, 0);
+  const a = savitzkyGolay(grid.values, win, 2, 1, dt);
   // a_decel = -a (positive during deceleration)
   const xs: number[] = []; const ys: number[] = [];
-  for (let i = 0; i < inR.length; i++) {
-    if (a[i] < 0) { xs.push(vs[i] * vs[i]); ys.push(-a[i]); }
+  for (let i = 0; i < vs.length; i++) {
+    if (Number.isFinite(a[i]) && a[i] < 0) { xs.push(vs[i] * vs[i]); ys.push(-a[i]); }
   }
   if (xs.length < 5) return null;
+
   // linear regression y = b0 + b1*x
   const n = xs.length;
   const sx = xs.reduce((s, v) => s + v, 0);
