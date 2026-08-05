@@ -165,9 +165,16 @@ function VehicleEditor({ vehicle, onSave, onCancel }: { vehicle: Vehicle; onSave
     >
       <div className="animate-sheet-in max-h-full w-full max-w-lg overflow-y-auto overflow-x-hidden overscroll-contain rounded-t-xl bg-card shadow-e3 sm:rounded-xl">
         <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-border bg-card/95 px-4 py-3 backdrop-blur">
+          <button
+            type="button"
+            aria-label="Bearbeiten abbrechen und schließen"
+            onClick={onCancel}
+            className="inline-flex h-11 w-11 flex-none items-center justify-center rounded-md text-muted-foreground transition-ui hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <X className="h-5 w-5" strokeWidth={2} aria-hidden="true" />
+          </button>
           <h3 className="min-w-0 flex-1 truncate text-subtitle text-foreground">Fahrzeug bearbeiten</h3>
-          <Button variant="ghost" onClick={onCancel}>Abbrechen</Button>
-          <Button onClick={() => onSave(v)}>Speichern</Button>
+          <Button onClick={() => onSave(v)}>Änderungen speichern</Button>
         </div>
         <div className="min-w-0 p-4">
 

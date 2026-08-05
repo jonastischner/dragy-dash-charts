@@ -57,7 +57,7 @@ export function Collapsible({
         </button>
         {actions}
       </div>
-      {open && <div className="animate-enter px-4 pb-4">{children}</div>}
+      {open && <div className="animate-enter px-4 pb-4 pt-2">{children}</div>}
     </div>
   );
 }
