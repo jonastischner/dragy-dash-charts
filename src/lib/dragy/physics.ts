@@ -41,6 +41,100 @@ export function centralDerivative(values: number[], times: number[]): number[] {
   return out;
 }
 
+// ---- Interpolation & Savitzky-Golay ----------------------------------------
+
+// Linear interpolation of y(x) on a sorted x array.
+export function interpLinear(xs: number[], ys: number[], x: number): number {
+  const n = xs.length;
+  if (n === 0) return NaN;
+  if (x <= xs[0]) return ys[0];
+  if (x >= xs[n - 1]) return ys[n - 1];
+  let lo = 0, hi = n - 1;
+  while (hi - lo > 1) {
+    const mid = (lo + hi) >> 1;
+    if (xs[mid] <= x) lo = mid; else hi = mid;
+  }
+  const dx = xs[hi] - xs[lo];
+  if (dx === 0) return ys[lo];
+  const f = (x - xs[lo]) / dx;
+  return ys[lo] + f * (ys[hi] - ys[lo]);
+}
+
+// Resample (t, v) onto a uniform time grid with step dt using linear interpolation.
+export function resampleUniform(
+  times: number[], values: number[], dt: number,
+): { times: number[]; values: number[] } {
+  const t0 = times[0], t1 = times[times.length - 1];
+  const n = Math.max(2, Math.floor((t1 - t0) / dt) + 1);
+  const ot: number[] = new Array(n), ov: number[] = new Array(n);
+  for (let i = 0; i < n; i++) {
+    const t = t0 + i * dt;
+    ot[i] = t;
+    ov[i] = interpLinear(times, values, t);
+  }
+  return { times: ot, values: ov };
+}
+
+// Savitzky-Golay filter on uniformly sampled data: local least-squares fit of a
+// polynomial of `order` over a window of `window` points. deriv=0 => smoothed
+// value, deriv=1 => first derivative (per unit x, i.e. divided by dt).
+// Fits are done per point (also near the edges, where the window is clipped),
+// so no data points are dropped and the ends stay well-behaved.
+export function savitzkyGolay(
+  values: number[], window: number, order = 2, deriv: 0 | 1 = 0, dt = 1,
+): number[] {
+  const n = values.length;
+  const out = new Array<number>(n);
+  const half = Math.max(1, Math.floor(window / 2));
+  const deg = Math.min(order, 3);
+  for (let i = 0; i < n; i++) {
+    const lo = Math.max(0, i - half);
+    const hi = Math.min(n - 1, i + half);
+    const m = hi - lo + 1;
+    if (m < deg + 1) {
+      out[i] = deriv === 0 ? values[i] : NaN;
+      continue;
+    }
+    // Normal equations for a polynomial in u = (j - i)
+    const size = deg + 1;
+    const A: number[][] = Array.from({ length: size }, () => new Array(size).fill(0));
+    const b: number[] = new Array(size).fill(0);
+    for (let j = lo; j <= hi; j++) {
+      const u = j - i;
+      const pows: number[] = [1];
+      for (let k = 1; k <= 2 * deg; k++) pows.push(pows[k - 1] * u);
+      for (let r = 0; r < size; r++) {
+        for (let c = 0; c < size; c++) A[r][c] += pows[r + c];
+        b[r] += pows[r] * values[j];
+      }
+    }
+    // Gauss elimination with partial pivoting
+    for (let c = 0; c < size; c++) {
+      let piv = c;
+      for (let r = c + 1; r < size; r++) if (Math.abs(A[r][c]) > Math.abs(A[piv][c])) piv = r;
+      if (Math.abs(A[piv][c]) < 1e-12) { piv = c; }
+      if (piv !== c) { const tr = A[piv]; A[piv] = A[c]; A[c] = tr; const tb = b[piv]; b[piv] = b[c]; b[c] = tb; }
+      const d = A[c][c] || 1e-12;
+      for (let r = c + 1; r < size; r++) {
+        const f = A[r][c] / d;
+        if (!f) continue;
+        for (let k = c; k < size; k++) A[r][k] -= f * A[c][k];
+        b[r] -= f * b[c];
+      }
+    }
+    const coef = new Array<number>(size).fill(0);
+    for (let r = size - 1; r >= 0; r--) {
+      let s = b[r];
+      for (let k = r + 1; k < size; k++) s -= A[r][k] * coef[k];
+      coef[r] = s / (A[r][r] || 1e-12);
+    }
+    // value at u = 0 => coef[0]; derivative at u = 0 => coef[1] / dt
+    out[i] = deriv === 0 ? coef[0] : coef[1] / dt;
+  }
+  return out;
+}
+
+
 export interface SegmentSample {
   t: number;
   vMs: number;
@@ -77,17 +171,40 @@ export function computeSegment(
   const inSeg = session.records.filter((r) => r.t >= segment.startT && r.t <= segment.endT);
   if (inSeg.length < 3) return [];
   const rho = airDensity(session.tempC, session.pressureHpa, session.rh);
-  const window = session.manual ? 1 : vehicle.smoothingWindow;
-  const vsKmh = smoothCentered(inSeg.map((r) => r.speedKmh), window);
-  const times = inSeg.map((r) => r.t);
+  const rawT = inSeg.map((r) => r.t);
+  const rawV = inSeg.map((r) => r.speedKmh);
+
+  // 1) Auf ein gleichmäßiges Zeitraster interpolieren (Lücken/Jitter der
+  //    GPS-Samples werden ausgeglichen, mind. 20 Hz für weiche Kurven).
+  const span = rawT[rawT.length - 1] - rawT[0];
+  const medDt = span / Math.max(1, rawT.length - 1);
+  const dt = Math.min(Math.max(medDt / 2, 0.01), 0.05);
+  const grid = resampleUniform(rawT, rawV, dt);
+  const times = grid.times;
+
+  // 2) Savitzky-Golay: lokale quadratische Regression liefert geglättete
+  //    Geschwindigkeit und die Beschleunigung analytisch aus derselben Fit-
+  //    Kurve (kein Rauschverstärken durch nachträgliches Differenzieren).
+  const userWin = session.manual ? 1 : Math.max(1, vehicle.smoothingWindow);
+  // Fensterbreite in Sekunden aus dem Nutzerwert (bezogen auf Rohabstand),
+  // dann in Rasterpunkte umgerechnet – ungerade und mind. 5 Punkte.
+  const winSec = Math.max(userWin, 3) * medDt;
+  let win = Math.round(winSec / dt);
+  if (win % 2 === 0) win += 1;
+  win = Math.max(5, Math.min(win, Math.max(5, times.length - 1)));
+
+  const vsKmh = savitzkyGolay(grid.values, win, 2, 0);
+  const dvKmhDt = savitzkyGolay(grid.values, win, 2, 1, dt);
   const vsMs = vsKmh.map((v) => v / 3.6);
-  const a = centralDerivative(vsMs, times);
+  // Beschleunigung leicht nachglätten (SG 2. Ordnung, gleiches Fenster).
+  const a = savitzkyGolay(dvKmhDt.map((d) => d / 3.6), win, 2, 0);
+
   const crr = segment.calibration?.crr ?? vehicle.crr;
   const cdA = segment.calibration?.cdA ?? vehicle.cd * vehicle.area;
   const m = session.massOverride && session.massOverride > 0 ? session.massOverride : vehicle.mass;
   const factor = segment.rpmFactor;
   const out: SegmentSample[] = [];
-  for (let i = 0; i < inSeg.length; i++) {
+  for (let i = 0; i < times.length; i++) {
     const v = vsMs[i];
     const pWheel = v * (m * a[i] + m * G * crr + 0.5 * rho * cdA * v * v);
     const rpm = vsKmh[i] * factor;
@@ -116,15 +233,23 @@ export function coastdownFit(
   const inR = session.records.filter((r) => r.t >= startT && r.t <= endT);
   if (inR.length < 5) return null;
   const rho = airDensity(session.tempC, session.pressureHpa, session.rh);
-  const vs = smoothCentered(inR.map((r) => r.speedKmh / 3.6), 5);
-  const t = inR.map((r) => r.t);
-  const a = centralDerivative(vs, t);
+  const rawT = inR.map((r) => r.t);
+  const rawV = inR.map((r) => r.speedKmh / 3.6);
+  const medDt = (rawT[rawT.length - 1] - rawT[0]) / Math.max(1, rawT.length - 1);
+  const dt = Math.min(Math.max(medDt / 2, 0.01), 0.05);
+  const grid = resampleUniform(rawT, rawV, dt);
+  let win = Math.round((7 * medDt) / dt);
+  if (win % 2 === 0) win += 1;
+  win = Math.max(5, Math.min(win, Math.max(5, grid.times.length - 1)));
+  const vs = savitzkyGolay(grid.values, win, 2, 0);
+  const a = savitzkyGolay(grid.values, win, 2, 1, dt);
   // a_decel = -a (positive during deceleration)
   const xs: number[] = []; const ys: number[] = [];
-  for (let i = 0; i < inR.length; i++) {
-    if (a[i] < 0) { xs.push(vs[i] * vs[i]); ys.push(-a[i]); }
+  for (let i = 0; i < vs.length; i++) {
+    if (Number.isFinite(a[i]) && a[i] < 0) { xs.push(vs[i] * vs[i]); ys.push(-a[i]); }
   }
   if (xs.length < 5) return null;
+
   // linear regression y = b0 + b1*x
   const n = xs.length;
   const sx = xs.reduce((s, v) => s + v, 0);

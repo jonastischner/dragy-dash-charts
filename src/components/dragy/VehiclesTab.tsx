@@ -197,7 +197,7 @@ function VehicleEditor({ vehicle, onSave, onCancel }: { vehicle: Vehicle; onSave
             <Field label="Rollwiderstand Crr"><NumInput step="0.001" value={v.crr} onChange={(e) => setV({ ...v, crr: +e.target.value })} /></Field>
             <Field label="Cd"><NumInput step="0.01" value={v.cd} onChange={(e) => setV({ ...v, cd: +e.target.value })} /></Field>
             <Field label="Stirnfläche A (m²)"><NumInput step="0.01" value={v.area} onChange={(e) => setV({ ...v, area: +e.target.value })} /></Field>
-            <Field label="Glättungsfenster (Punkte)" hint="1 = keine Glättung"><NumInput value={v.smoothingWindow} onChange={(e) => setV({ ...v, smoothingWindow: Math.max(1, +e.target.value) })} /></Field>
+            <Field label="Glättungsfenster (Punkte)" hint="Fensterbreite der Savitzky-Golay-Glättung (Interpolation + lokale Regression). Größer = weicher, kleiner = detailreicher."><NumInput value={v.smoothingWindow} onChange={(e) => setV({ ...v, smoothingWindow: Math.max(1, +e.target.value) })} /></Field>
             <Field label="Cd·A kalibriert?">
               <label className="flex h-10 items-center gap-2 text-xs text-muted-foreground">
                 <input type="checkbox" checked={v.calibrated} onChange={(e) => setV({ ...v, calibrated: e.target.checked })} />
