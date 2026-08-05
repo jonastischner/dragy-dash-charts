@@ -147,6 +147,9 @@ function SessionDetail({ session, segments, vehicle, onRename, onDelete, onSaveS
         <Chart series={speedSeries} bands={bands} xLabel="t (s)" yLabel="km/h" xFormat={(v) => v.toFixed(1)} yFormat={(v) => v.toFixed(0)} />
       </div>
 
+      <PeakOverview session={session} segments={segments} vehicle={vehicle} />
+
+
       <div className="mt-3 rounded-md border border-border p-2">
         <div className="text-xs font-semibold text-foreground">Auto-Erkennung (Vorschlag, danach prüfen)</div>
         <Note>Sucht rückwärts von Zielgeschwindigkeit zum tiefsten Punkt des vorangegangenen Anstiegs.</Note>
