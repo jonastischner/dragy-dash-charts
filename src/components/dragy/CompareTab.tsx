@@ -122,14 +122,14 @@ export function CompareTab({ onOpenVehicles }: { onOpenVehicles?: () => void } =
         <div className="mb-2 flex flex-wrap gap-1">
           {(Object.keys(MODE_LABEL) as Mode[]).map((m) => (
             <button key={m} onClick={() => setMode(m)}
-              className={`rounded px-2 py-1 text-xs ${mode === m ? "bg-primary text-white" : "bg-secondary text-foreground"}`}>
+              className={`rounded px-2 py-1 text-caption ${mode === m ? "bg-primary text-white" : "bg-secondary text-foreground"}`}>
               {MODE_LABEL[m]}
             </button>
           ))}
         </div>
 
         {segments.length === 0 ? (
-          <p className="text-xs text-muted-foreground">Keine Läufe im aktiven Fahrzeug.</p>
+          <p className="text-caption text-muted-foreground">Keine Läufe im aktiven Fahrzeug.</p>
         ) : (
           <>
             <Chart
@@ -143,7 +143,7 @@ export function CompareTab({ onOpenVehicles }: { onOpenVehicles?: () => void } =
             />
             {isAccel && splitRows.length > 0 && (
               <div className="mt-3 overflow-x-auto">
-                <table className="w-full text-xs text-foreground">
+                <table className="w-full text-caption text-foreground">
                   <thead className="text-muted-foreground">
                     <tr>
                       <th className="py-1 pr-2 text-left font-medium">Lauf</th>
@@ -168,7 +168,7 @@ export function CompareTab({ onOpenVehicles }: { onOpenVehicles?: () => void } =
                     ))}
                   </tbody>
                 </table>
-                <p className="mt-1 text-[10px] text-muted-foreground">Split-Zeiten linear zwischen Samples interpoliert; „—" wenn die Zielgeschwindigkeit im Segment nicht erreicht wurde.</p>
+                <p className="mt-1 text-caption text-muted-foreground">Split-Zeiten linear zwischen Samples interpoliert; „—" wenn die Zielgeschwindigkeit im Segment nicht erreicht wurde.</p>
               </div>
             )}
           </>
@@ -177,10 +177,10 @@ export function CompareTab({ onOpenVehicles }: { onOpenVehicles?: () => void } =
 
       <Section title="Übersicht aktive Läufe" note="Peak-Werte je sichtbarem Lauf – Sichtbarkeit über die Chart-Legende steuern.">
         {overviewRows.length === 0 ? (
-          <p className="text-xs text-muted-foreground">Keine aktiven Läufe.</p>
+          <p className="text-caption text-muted-foreground">Keine aktiven Läufe.</p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-xs text-foreground">
+            <table className="w-full text-caption text-foreground">
               <thead className="text-muted-foreground">
                 <tr>
                   <th className="py-1 pr-2 text-left font-medium">Lauf</th>
@@ -223,7 +223,7 @@ export function CompareTab({ onOpenVehicles }: { onOpenVehicles?: () => void } =
 
 
       <Section title="Grenzen & Annahmen der Berechnung">
-        <ul className="list-disc space-y-1 pl-4 text-xs text-muted-foreground">
+        <ul className="list-disc space-y-1 pl-4 text-caption text-muted-foreground">
           <li>
             <b>Rotierende Massen werden nicht berücksichtigt.</b> Im Beschleunigungsterm geht nur die
             translatorische Fahrzeugmasse ein; Räder, Antriebsstrang und Motor-Trägheit sind ausgeklammert.

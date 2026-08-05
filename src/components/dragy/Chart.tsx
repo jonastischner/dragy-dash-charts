@@ -164,12 +164,12 @@ export function Chart({ series, bands = [], xLabel, yLabel, height = 280, onLege
   return (
     <div ref={wrapRef} className="w-full">
       <canvas ref={canvasRef} onPointerMove={onMove} onPointerDown={onMove} onPointerLeave={onLeave} className="touch-none rounded-md" />
-      <div className="mt-1 min-h-[1.25rem] text-xs text-muted-foreground">{hoverText}</div>
+      <div className="mt-1 min-h-[1.25rem] text-caption text-muted-foreground">{hoverText}</div>
       {series.length > 0 && (
         <div className="mt-1 flex flex-wrap gap-2">
           {series.map((s, i) => (
             <button key={i} onClick={() => onLegendToggle?.(i)}
-              className={`flex items-center gap-1 rounded px-2 py-0.5 text-xs ${s.visible === false ? "opacity-40" : ""}`}
+              className={`flex items-center gap-1 rounded px-2 py-0.5 text-caption ${s.visible === false ? "opacity-40" : ""}`}
               style={{ backgroundColor: "#1e293b" }}>
               <span className="inline-block h-2 w-4 rounded-sm" style={{ backgroundColor: s.color }} />
               <span className="text-foreground">{s.label}</span>

@@ -22,7 +22,7 @@ export function SessionsTab({ onOpenVehicles }: { onOpenVehicles?: () => void } 
       <AllSessionsPeaks sessions={sessions} segments={state.segments} vehicle={activeVehicle} />
       <Section title={`Sessions – ${activeVehicle.name}`}>
 
-        {sessions.length === 0 && <p className="text-xs text-muted-foreground">Noch keine Sessions. Reiter „Import" nutzen.</p>}
+        {sessions.length === 0 && <p className="text-caption text-muted-foreground">Noch keine Sessions. Reiter „Import" nutzen.</p>}
         <ul className="space-y-2">
           {sessions.map((s) => {
             const segs = state.segments.filter((g) => g.sessionId === s.id);
@@ -32,8 +32,8 @@ export function SessionsTab({ onOpenVehicles }: { onOpenVehicles?: () => void } 
               <li key={s.id} className="rounded-md border border-border bg-muted">
                 <button className="flex w-full items-center justify-between p-2 text-left" onClick={() => setExpanded(isOpen ? null : s.id)}>
                   <div>
-                    <div className="text-sm font-medium text-foreground">{s.name} {s.manual && <span className="ml-1 rounded bg-amber-700 px-1 text-[10px]">manuell</span>}</div>
-                    <div className="text-[11px] text-muted-foreground">{dur.toFixed(1)} s · {s.records.length} Punkte · {segs.length} Lauf/Läufe</div>
+                    <div className="text-body font-medium text-foreground">{s.name} {s.manual && <span className="ml-1 rounded bg-warning text-warning-foreground px-1 text-caption">manuell</span>}</div>
+                    <div className="text-caption text-muted-foreground">{dur.toFixed(1)} s · {s.records.length} Punkte · {segs.length} Lauf/Läufe</div>
                   </div>
                   <span className="text-muted-foreground">{isOpen ? "▾" : "▸"}</span>
                 </button>
@@ -104,7 +104,7 @@ function AllSessionsPeaks({ sessions, segments, vehicle }: { sessions: Session[]
       <div className="mt-2">
         <Field label="Referenzlauf (session-übergreifend)">
           <select
-            className="w-full rounded-md border border-input bg-muted px-2 py-2 text-sm text-foreground focus:border-ring focus:outline-none"
+            className="w-full rounded-md border border-input bg-muted px-2 py-2 text-body text-foreground focus:border-ring focus:outline-none"
             value={refKey}
             onChange={(e) => setRefKey(e.target.value)}
           >
@@ -118,7 +118,7 @@ function AllSessionsPeaks({ sessions, segments, vehicle }: { sessions: Session[]
         </Field>
       </div>
       <div className="mt-2 overflow-x-auto">
-        <table className="w-full text-xs text-foreground">
+        <table className="w-full text-caption text-foreground">
           <thead className="text-muted-foreground">
             <tr>
               <th className="py-1 pr-2 text-left font-medium">Session</th>
@@ -139,8 +139,8 @@ function AllSessionsPeaks({ sessions, segments, vehicle }: { sessions: Session[]
                 <tr key={r.session.id} className={`border-t border-border ${isRef ? "bg-secondary/40" : ""}`}>
                   <td className="py-1 pr-2">
                     {r.session.name}
-                    {r.session.id === strongest.session.id && <span className="ml-1 text-[10px] text-emerald-400">★ stärkste</span>}
-                    {isRef && <span className="ml-1 text-[10px] text-muted-foreground">(Ref)</span>}
+                    {r.session.id === strongest.session.id && <span className="ml-1 text-caption text-emerald-400">★ stärkste</span>}
+                    {isRef && <span className="ml-1 text-caption text-muted-foreground">(Ref)</span>}
                   </td>
                   <td className="py-1 pr-2">
                     <span className="mr-1 inline-block h-2 w-3 rounded-sm align-middle" style={{ backgroundColor: r.best!.color }} />
@@ -225,7 +225,7 @@ function SessionDetail({ session, segments, vehicle, onRename, onDelete, onSaveS
       </div>
 
       <details className="mt-2 rounded-md border border-border bg-card/50">
-        <summary className="cursor-pointer select-none px-2 py-1.5 text-xs font-semibold text-muted-foreground">
+        <summary className="cursor-pointer select-none px-2 py-1.5 text-caption font-semibold text-muted-foreground">
           Erweitert
         </summary>
         <div className="p-2">
@@ -258,7 +258,7 @@ function SessionDetail({ session, segments, vehicle, onRename, onDelete, onSaveS
 
 
       <div className="mt-3 rounded-md border border-border p-2">
-        <div className="text-xs font-semibold text-foreground">Auto-Erkennung (Vorschlag, danach prüfen)</div>
+        <div className="text-caption font-semibold text-foreground">Auto-Erkennung (Vorschlag, danach prüfen)</div>
         <Note>Sucht rückwärts von Zielgeschwindigkeit zum tiefsten Punkt des vorangegangenen Anstiegs.</Note>
         <Row className="mt-2">
           <Field label="Start ≈ (km/h)"><NumInput value={autoStart} onChange={(e) => setAutoStart(+e.target.value)} /></Field>
@@ -270,7 +270,7 @@ function SessionDetail({ session, segments, vehicle, onRename, onDelete, onSaveS
 
       <div className="mt-3">
         <div className="mb-1 flex items-center justify-between">
-          <h4 className="text-sm font-semibold text-foreground">Läufe</h4>
+          <h4 className="text-body font-semibold text-foreground">Läufe</h4>
           <Button variant="secondary" onClick={addSegment}>+ Lauf</Button>
         </div>
         <ul className="space-y-2">
@@ -317,7 +317,7 @@ function SegmentEditor({ seg, vehicle, maxT, onChange, onDelete }: { seg: Segmen
   return (
     <li className="rounded-md border border-border bg-card p-2">
       <div className="flex items-center gap-2">
-        <label className="flex items-center gap-1 text-xs text-muted-foreground">
+        <label className="flex items-center gap-1 text-caption text-muted-foreground">
           <input type="checkbox" checked={seg.visible} onChange={(e) => onChange({ visible: e.target.checked })} />
           sichtbar
         </label>
@@ -339,7 +339,7 @@ function SegmentEditor({ seg, vehicle, maxT, onChange, onDelete }: { seg: Segmen
         {hasAny && (
           <Field label="Gemessener Gang" hint="Setzt rpmFactor aus Fahrzeug-Getriebe/Preset">
             <select
-              className="w-full rounded-md border border-input bg-muted px-2 py-2 text-sm text-foreground focus:border-ring focus:outline-none"
+              className="w-full rounded-md border border-input bg-muted px-2 py-2 text-body text-foreground focus:border-ring focus:outline-none"
               value={seg.gearPresetId ?? ""}
               onChange={(e) => {
                 const id = e.target.value;
@@ -370,7 +370,7 @@ function SegmentEditor({ seg, vehicle, maxT, onChange, onDelete }: { seg: Segmen
         <Field label="rpmFactor (U/min pro km/h)" hint="Manuell überschreibbar"><NumInput step="0.01" value={seg.rpmFactor} onChange={(e) => onChange({ rpmFactor: +e.target.value, gearPresetId: undefined })} /></Field>
         {seg.calibration && (
           <Field label="Segment-Kalibrierung">
-            <div className="text-[11px] text-muted-foreground">Crr {seg.calibration.crr.toFixed(4)} · CdA {seg.calibration.cdA.toFixed(3)}
+            <div className="text-caption text-muted-foreground">Crr {seg.calibration.crr.toFixed(4)} · CdA {seg.calibration.cdA.toFixed(3)}
               <button className="ml-2 text-red-400 underline" onClick={() => onChange({ calibration: undefined })}>entfernen</button>
             </div>
           </Field>
@@ -423,12 +423,12 @@ function PeakOverview({ session, segments, vehicle }: { session: Session; segmen
 
   return (
     <div className="mt-3 rounded-md border border-border p-2">
-      <div className="text-xs font-semibold text-foreground">Spitzenwerte je Lauf (Motor, geschätzt)</div>
+      <div className="text-caption font-semibold text-foreground">Spitzenwerte je Lauf (Motor, geschätzt)</div>
       <Note>Maximale Motorleistung/-drehmoment mit zugehöriger Drehzahl. Referenzlauf wählen, um Abweichungen zu sehen.</Note>
       <div className="mt-2">
         <Field label="Referenzlauf">
           <select
-            className="w-full rounded-md border border-input bg-muted px-2 py-2 text-sm text-foreground focus:border-ring focus:outline-none"
+            className="w-full rounded-md border border-input bg-muted px-2 py-2 text-body text-foreground focus:border-ring focus:outline-none"
             value={refId}
             onChange={(e) => setRefId(e.target.value)}
           >
@@ -438,7 +438,7 @@ function PeakOverview({ session, segments, vehicle }: { session: Session; segmen
         </Field>
       </div>
       <div className="mt-2 overflow-x-auto">
-        <table className="w-full text-xs text-foreground">
+        <table className="w-full text-caption text-foreground">
           <thead className="text-muted-foreground">
             <tr>
               <th className="py-1 pr-2 text-left font-medium">Lauf</th>
@@ -455,7 +455,7 @@ function PeakOverview({ session, segments, vehicle }: { session: Session; segmen
               <tr key={r.id} className={`border-t border-border ${r.id === refId ? "bg-secondary/40" : ""}`}>
                 <td className="py-1 pr-2">
                   <span className="mr-1 inline-block h-2 w-3 rounded-sm align-middle" style={{ backgroundColor: r.color }} />
-                  {r.name}{r.id === refId && <span className="ml-1 text-[10px] text-muted-foreground">(Ref)</span>}
+                  {r.name}{r.id === refId && <span className="ml-1 text-caption text-muted-foreground">(Ref)</span>}
                 </td>
                 <td className="py-1 pr-2 text-right tabular-nums">{Number.isFinite(r.ps) ? r.ps.toFixed(0) : "—"}</td>
                 <td className="py-1 pr-2 text-right tabular-nums">{Number.isFinite(r.psRpm) ? r.psRpm.toFixed(0) : "—"}</td>
