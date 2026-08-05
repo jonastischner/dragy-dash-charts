@@ -277,3 +277,90 @@ function SegmentEditor({ seg, vehicle, maxT, onChange, onDelete }: { seg: Segmen
     </li>
   );
 }
+
+function PeakOverview({ session, segments, vehicle }: { session: Session; segments: Segment[]; vehicle: any }) {
+  const [refId, setRefId] = usePersistedState<string>(`dragy.peaks.ref.${session.id}`, "");
+
+  const rows = useMemo(() => {
+    return segments.map((g) => {
+      const samples = computeSegment(session, g, vehicle);
+      let best = { ps: NaN, psRpm: NaN, nm: NaN, nmRpm: NaN };
+      for (const s of samples) {
+        const ps = s.pEngineW * W_TO_PS;
+        if (Number.isFinite(ps) && (!Number.isFinite(best.ps) || ps > best.ps)) { best.ps = ps; best.psRpm = s.rpm; }
+        const nm = s.torqueEngineNm;
+        if (Number.isFinite(nm) && (!Number.isFinite(best.nm) || nm > best.nm)) { best.nm = nm; best.nmRpm = s.rpm; }
+      }
+      return { id: g.id, name: g.name, color: g.color, ...best };
+    });
+  }, [session, segments, vehicle]);
+
+  if (rows.length === 0) return null;
+
+  const ref = rows.find((r) => r.id === refId);
+  const delta = (val: number, base: number) => {
+    if (!Number.isFinite(val) || !Number.isFinite(base) || base === 0) return null;
+    const abs = val - base;
+    return { abs, pct: (abs / base) * 100 };
+  };
+  const fmtDelta = (d: { abs: number; pct: number } | null, unit: string, digits = 0) => {
+    if (!d) return "—";
+    const sign = d.abs > 0 ? "+" : "";
+    const cls = d.abs > 0.05 ? "text-emerald-400" : d.abs < -0.05 ? "text-red-400" : "text-muted-foreground";
+    return (
+      <span className={cls}>
+        {sign}{d.abs.toFixed(digits)} {unit} ({sign}{d.pct.toFixed(1)} %)
+      </span>
+    );
+  };
+
+  return (
+    <div className="mt-3 rounded-md border border-border p-2">
+      <div className="text-xs font-semibold text-foreground">Spitzenwerte je Lauf (Motor, geschätzt)</div>
+      <Note>Maximale Motorleistung/-drehmoment mit zugehöriger Drehzahl. Referenzlauf wählen, um Abweichungen zu sehen.</Note>
+      <div className="mt-2">
+        <Field label="Referenzlauf">
+          <select
+            className="w-full rounded-md border border-input bg-muted px-2 py-2 text-sm text-foreground focus:border-ring focus:outline-none"
+            value={refId}
+            onChange={(e) => setRefId(e.target.value)}
+          >
+            <option value="">– keine Referenz –</option>
+            {rows.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+          </select>
+        </Field>
+      </div>
+      <div className="mt-2 overflow-x-auto">
+        <table className="w-full text-xs text-foreground">
+          <thead className="text-muted-foreground">
+            <tr>
+              <th className="py-1 pr-2 text-left font-medium">Lauf</th>
+              <th className="py-1 pr-2 text-right font-medium">Peak PS</th>
+              <th className="py-1 pr-2 text-right font-medium">@ U/min</th>
+              {ref && <th className="py-1 pr-2 text-right font-medium">Δ PS</th>}
+              <th className="py-1 pr-2 text-right font-medium">Peak Nm</th>
+              <th className="py-1 pr-2 text-right font-medium">@ U/min</th>
+              {ref && <th className="py-1 pr-2 text-right font-medium">Δ Nm</th>}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.id} className={`border-t border-border ${r.id === refId ? "bg-secondary/40" : ""}`}>
+                <td className="py-1 pr-2">
+                  <span className="mr-1 inline-block h-2 w-3 rounded-sm align-middle" style={{ backgroundColor: r.color }} />
+                  {r.name}{r.id === refId && <span className="ml-1 text-[10px] text-muted-foreground">(Ref)</span>}
+                </td>
+                <td className="py-1 pr-2 text-right tabular-nums">{Number.isFinite(r.ps) ? r.ps.toFixed(0) : "—"}</td>
+                <td className="py-1 pr-2 text-right tabular-nums">{Number.isFinite(r.psRpm) ? r.psRpm.toFixed(0) : "—"}</td>
+                {ref && <td className="py-1 pr-2 text-right tabular-nums">{r.id === refId ? "—" : fmtDelta(delta(r.ps, ref.ps), "PS")}</td>}
+                <td className="py-1 pr-2 text-right tabular-nums">{Number.isFinite(r.nm) ? r.nm.toFixed(0) : "—"}</td>
+                <td className="py-1 pr-2 text-right tabular-nums">{Number.isFinite(r.nmRpm) ? r.nmRpm.toFixed(0) : "—"}</td>
+                {ref && <td className="py-1 pr-2 text-right tabular-nums">{r.id === refId ? "—" : fmtDelta(delta(r.nm, ref.nm), "Nm")}</td>}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
