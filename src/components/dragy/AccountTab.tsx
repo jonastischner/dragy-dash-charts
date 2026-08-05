@@ -72,19 +72,19 @@ export function AccountTab() {
     return (
       <div>
         <Section title="Konto & Synchronisation" note="Ohne Login bleibt alles lokal. Mit Login werden deine Daten zusätzlich in der Cloud gesichert und mit anderen Geräten geteilt.">
-          <p className="text-sm text-foreground">Angemeldet als <span className="font-mono">{userEmail}</span></p>
-          <p className="mt-1 text-xs text-muted-foreground">
+          <p className="text-body text-foreground">Angemeldet als <span className="font-mono">{userEmail}</span></p>
+          <p className="mt-1 text-caption text-muted-foreground">
             Verbindung: {online ? "online" : "offline"} · Letzte Synchronisation: {formatDate(lastSync)}
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
             <Button onClick={doSync} disabled={busy || !online}>Jetzt synchronisieren</Button>
             <Button variant="secondary" onClick={doLogout} disabled={busy}>Abmelden</Button>
           </div>
-          {msg && <p className="mt-2 text-xs text-emerald-300">{msg}</p>}
-          {err && <p className="mt-2 text-xs text-red-300">{err}</p>}
+          {msg && <p className="mt-2 text-caption text-emerald-300">{msg}</p>}
+          {err && <p className="mt-2 text-caption text-red-300">{err}</p>}
         </Section>
         <Section title="So funktioniert die Synchronisation">
-          <ul className="list-disc space-y-1 pl-4 text-xs text-muted-foreground">
+          <ul className="list-disc space-y-1 pl-4 text-caption text-muted-foreground">
             <li>Alle Änderungen werden weiterhin sofort lokal in IndexedDB gespeichert – die App funktioniert offline wie bisher.</li>
             <li>Solange du angemeldet und online bist, werden neue/geänderte Datensätze automatisch im Hintergrund in die Cloud gespiegelt.</li>
             <li>Bei Login und beim Knopf „Jetzt synchronisieren" wird in beide Richtungen abgeglichen. Bei Konflikten gewinnt der neuere Zeitstempel.</li>
@@ -103,16 +103,16 @@ export function AccountTab() {
         title={isSignup ? "Neuen Account erstellen" : "Anmelden"}
         note="Ohne Login läuft die App wie bisher komplett lokal. Der Account ist nur nötig, wenn du deine Daten in die Cloud sichern oder auf mehreren Geräten nutzen willst."
       >
-        <div className="mb-3 inline-flex rounded-md border border-border bg-muted p-0.5 text-xs">
+        <div className="mb-3 inline-flex rounded-md border border-border bg-muted p-0.5 text-caption">
           <button
             type="button"
             onClick={() => { setMode("login"); setErr(null); setMsg(null); }}
-            className={`rounded px-3 py-1.5 font-medium ${!isSignup ? "bg-primary text-white" : "text-muted-foreground"}`}
+            className={`rounded px-3 py-2 font-medium ${!isSignup ? "bg-primary text-white" : "text-muted-foreground"}`}
           >Anmelden</button>
           <button
             type="button"
             onClick={() => { setMode("signup"); setErr(null); setMsg(null); }}
-            className={`rounded px-3 py-1.5 font-medium ${isSignup ? "bg-primary text-white" : "text-muted-foreground"}`}
+            className={`rounded px-3 py-2 font-medium ${isSignup ? "bg-primary text-white" : "text-muted-foreground"}`}
           >Konto erstellen</button>
         </div>
         <div className="grid gap-2">
@@ -125,19 +125,19 @@ export function AccountTab() {
               <Button onClick={doLogin} disabled={busy || !email || !password}>Anmelden</Button>
             )}
           </div>
-          <p className="text-[11px] text-muted-foreground">
+          <p className="text-caption text-muted-foreground">
             {isSignup ? (
               <>Schon ein Konto? <button type="button" className="text-primary underline" onClick={() => setMode("login")}>Hier anmelden</button>.</>
             ) : (
               <>Noch kein Konto? <button type="button" className="text-primary underline" onClick={() => setMode("signup")}>Jetzt kostenlos erstellen</button>.</>
             )}
           </p>
-          {msg && <p className="text-xs text-emerald-300">{msg}</p>}
-          {err && <p className="text-xs text-red-300">{err}</p>}
+          {msg && <p className="text-caption text-emerald-300">{msg}</p>}
+          {err && <p className="text-caption text-red-300">{err}</p>}
         </div>
       </Section>
       <Section title="Was passiert nach dem Login?">
-        <ul className="list-disc space-y-1 pl-4 text-xs text-muted-foreground">
+        <ul className="list-disc space-y-1 pl-4 text-caption text-muted-foreground">
           <li>Beim ersten Login werden deine bestehenden lokalen Daten in die Cloud gespiegelt.</li>
           <li>Bereits in der Cloud vorhandene Daten (z. B. von einem anderen Gerät) werden lokal ergänzt.</li>
           <li>Danach spiegelt die App jede Änderung automatisch, solange du online bist.</li>

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { ChevronRight, Copy } from "lucide-react";
+import { ChevronRight, Copy, X } from "lucide-react";
 
 import { Section, Field, TextInput, NumInput, Button, Note, Row, Collapsible, IconButton, AddButton, Select, usePersistedState } from "./ui";
 import { useAppStore, newVehicle } from "@/lib/dragy/store";
@@ -33,26 +33,26 @@ export function VehiclesTab() {
   return (
     <div>
       <Section title="Fahrzeuge">
-        {state.vehicles.length === 0 && <p className="text-xs text-muted-foreground">Noch keine Fahrzeuge angelegt.</p>}
+        {state.vehicles.length === 0 && <p className="text-caption text-muted-foreground">Noch keine Fahrzeuge angelegt.</p>}
         <ul className="space-y-2">
           {state.vehicles.map((v) => {
             const sessions = state.sessions.filter((s) => s.vehicleId === v.id).length;
             const isActive = state.activeVehicleId === v.id;
             return (
-              <li key={v.id} className="rounded-md border border-border bg-muted p-2">
+              <li key={v.id} className="rounded-md border border-border bg-muted p-3">
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2 min-w-0">
                     {v.imageDataUrl && (
                       <img src={v.imageDataUrl} alt={v.name} className="h-12 w-12 flex-none rounded object-cover border border-border" />
                     )}
                     <div className="min-w-0">
-                      <div className="text-sm font-medium text-foreground truncate">
-                        {v.name} {isActive && <span className="ml-1 rounded bg-primary px-1 text-[10px]">aktiv</span>}
+                      <div className="text-body font-medium text-foreground truncate">
+                        {v.name} {isActive && <span className="ml-1 rounded bg-primary px-1 text-caption">aktiv</span>}
                       </div>
-                      <div className="text-[11px] text-muted-foreground">{v.mass} kg · Cd {v.cd} · A {v.area} m² · {sessions} Sessions</div>
+                      <div className="text-caption text-muted-foreground">{v.mass} kg · Cd {v.cd} · A {v.area} m² · {sessions} Sessions</div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-2">
                     {!isActive && <Button variant="secondary" onClick={() => setActive(v.id)}>Aktivieren</Button>}
                     <Button variant="ghost" onClick={() => setEditing(v)}>Bearbeiten</Button>
                     <button
@@ -154,21 +154,30 @@ function VehicleEditor({ vehicle, onSave, onCancel }: { vehicle: Vehicle; onSave
   useLockBodyScroll();
   return (
     <div
-      className="fixed inset-0 z-40 flex items-end justify-center bg-black/70 p-2 sm:items-center"
+      className="fixed inset-0 z-40 flex items-end justify-center bg-neutral-0/70 p-4 sm:items-center"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Fahrzeug bearbeiten"
       style={{
-        paddingTop: "calc(env(safe-area-inset-top) + 0.5rem)",
-        paddingBottom: "calc(env(safe-area-inset-bottom) + 0.5rem)",
+        paddingTop: "calc(env(safe-area-inset-top) + 16px)",
+        paddingBottom: "calc(env(safe-area-inset-bottom) + 16px)",
       }}
     >
-      <div className="max-h-full w-full max-w-lg overflow-y-auto overscroll-contain rounded-t-xl bg-card sm:rounded-xl">
-        <div className="sticky top-0 z-10 flex items-center justify-between gap-2 border-b border-border bg-card/95 px-3 py-2 backdrop-blur">
-          <h3 className="text-base font-semibold text-foreground">Fahrzeug bearbeiten</h3>
-          <div className="flex gap-2">
-            <Button variant="ghost" onClick={onCancel}>Abbrechen</Button>
-            <Button onClick={() => onSave(v)}>Speichern</Button>
-          </div>
+      <div className="animate-sheet-in max-h-full w-full max-w-lg overflow-y-auto overflow-x-hidden overscroll-contain rounded-t-xl bg-card shadow-e3 sm:rounded-xl">
+        <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-border bg-card/95 px-4 py-3 backdrop-blur">
+          <button
+            type="button"
+            aria-label="Bearbeiten abbrechen und schließen"
+            onClick={onCancel}
+            className="inline-flex h-11 w-11 flex-none items-center justify-center rounded-md text-muted-foreground transition-ui hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <X className="h-5 w-5" strokeWidth={2} aria-hidden="true" />
+          </button>
+          <h3 className="min-w-0 flex-1 truncate text-subtitle text-foreground">Fahrzeug bearbeiten</h3>
+          <Button onClick={() => onSave(v)}>Speichern</Button>
         </div>
-        <div className="p-3">
+        <div className="min-w-0 p-4">
+
         <Field label="Name"><TextInput value={v.name} onChange={(e) => setV({ ...v, name: e.target.value })} /></Field>
 
         <Collapsible title="Fahrzeugbild" persistKey="vehicleEditor.image" subtitle={v.imageDataUrl ? "Bild hinterlegt" : "kein Bild"}>
@@ -176,17 +185,17 @@ function VehicleEditor({ vehicle, onSave, onCancel }: { vehicle: Vehicle; onSave
             {v.imageDataUrl ? (
               <img src={v.imageDataUrl} alt={v.name} className="h-20 w-20 flex-none rounded object-cover border border-border" />
             ) : (
-              <div className="h-20 w-20 flex-none rounded border border-dashed border-input bg-muted text-center text-[10px] text-muted-foreground flex items-center justify-center">kein Bild</div>
+              <div className="h-20 w-20 flex-none rounded border border-dashed border-input bg-muted text-center text-caption text-muted-foreground flex items-center justify-center">kein Bild</div>
             )}
-            <div className="flex flex-col gap-1">
-              <label className="cursor-pointer rounded-md bg-secondary px-3 py-1.5 text-xs text-foreground hover:bg-secondary w-fit">
+            <div className="flex flex-col gap-2">
+              <label className="cursor-pointer rounded-md bg-secondary px-3 py-2 text-caption text-foreground hover:bg-secondary w-fit">
                 Bild wählen
                 <input type="file" accept="image/*" className="hidden" onChange={(e) => onPickImage(e.target.files?.[0] ?? null)} />
               </label>
               {v.imageDataUrl && (
                 <Button variant="ghost" onClick={() => setV({ ...v, imageDataUrl: undefined })}>Bild entfernen</Button>
               )}
-              <span className="text-[10px] text-muted-foreground">Wird auf max. 800 px verkleinert und lokal + in der Cloud gespeichert.</span>
+              <span className="text-caption text-muted-foreground">Wird auf max. 800 px verkleinert und lokal + in der Cloud gespeichert.</span>
             </div>
           </div>
         </Collapsible>
@@ -199,7 +208,7 @@ function VehicleEditor({ vehicle, onSave, onCancel }: { vehicle: Vehicle; onSave
             <Field label="Stirnfläche A (m²)"><NumInput step="0.01" value={v.area} onChange={(e) => setV({ ...v, area: +e.target.value })} /></Field>
             <Field label="Glättungsfenster (Punkte)" hint="Fensterbreite der Savitzky-Golay-Glättung (Interpolation + lokale Regression). Größer = weicher, kleiner = detailreicher."><NumInput value={v.smoothingWindow} onChange={(e) => setV({ ...v, smoothingWindow: Math.max(1, +e.target.value) })} /></Field>
             <Field label="Cd·A kalibriert?">
-              <label className="flex h-10 items-center gap-2 text-xs text-muted-foreground">
+              <label className="flex h-10 items-center gap-2 text-caption text-muted-foreground">
                 <input type="checkbox" checked={v.calibrated} onChange={(e) => setV({ ...v, calibrated: e.target.checked })} />
                 per Coastdown gemessen
               </label>
@@ -226,7 +235,7 @@ function VehicleEditor({ vehicle, onSave, onCancel }: { vehicle: Vehicle; onSave
           </Row>
           <div className="mt-2 flex items-center gap-2">
             <Button variant="secondary" onClick={applyRpmMatch}>Faktor berechnen</Button>
-            <span className="text-xs text-muted-foreground">rpmFactor: <b>{v.rpmFactorDefault.toFixed(3)}</b> U/min pro km/h</span>
+            <span className="text-caption text-muted-foreground">rpmFactor: <b>{v.rpmFactorDefault.toFixed(3)}</b> U/min pro km/h</span>
           </div>
         </Collapsible>
 
@@ -249,7 +258,7 @@ function VehicleEditor({ vehicle, onSave, onCancel }: { vehicle: Vehicle; onSave
         />
 
         <Collapsible title="Schleppleistungskurve (Prüfstand)" persistKey="vehicleEditor.dragCurve" subtitle={`${v.dragCurve.length} Stützpunkte`}>
-          <p className="text-[10px] text-muted-foreground">Stützpunkte RPM → PS. Lineare Interpolation, außerhalb geklemmt.</p>
+          <p className="text-caption text-muted-foreground">Stützpunkte RPM → PS. Lineare Interpolation, außerhalb geklemmt.</p>
           <div className="mt-2 space-y-1">
             {v.dragCurve.map((d, i) => (
               <div key={i} className="flex items-center gap-2">
@@ -276,10 +285,10 @@ function VehicleEditor({ vehicle, onSave, onCancel }: { vehicle: Vehicle; onSave
 function ConfirmDelete({ vehicle, sessionCount, onConfirm, onCancel }: { vehicle: Vehicle; sessionCount: number; onConfirm: () => void; onCancel: () => void }) {
   useLockBodyScroll();
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/70 p-4">
-      <div className="w-full max-w-sm overscroll-contain rounded-lg bg-card p-3">
-        <h3 className="text-sm font-semibold text-foreground">Fahrzeug löschen?</h3>
-        <p className="mt-2 text-xs text-muted-foreground"><b>{vehicle.name}</b> wird gelöscht. Dabei werden auch {sessionCount} zugehörige Session(s) inklusive aller Läufe entfernt.</p>
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-neutral-0/70 p-4">
+      <div className="w-full max-w-sm overscroll-contain rounded-lg bg-card p-4 shadow-e3 animate-sheet-in">
+        <h3 className="text-body font-semibold text-foreground">Fahrzeug löschen?</h3>
+        <p className="mt-2 text-caption text-muted-foreground"><b>{vehicle.name}</b> wird gelöscht. Dabei werden auch {sessionCount} zugehörige Session(s) inklusive aller Läufe entfernt.</p>
         <div className="mt-3 flex justify-end gap-2">
           <Button variant="ghost" onClick={onCancel}>Abbrechen</Button>
           <Button variant="danger" onClick={onConfirm}>Endgültig löschen</Button>
@@ -307,13 +316,13 @@ function GearPresetsEditor({ presets, onChange, onUseAsDefault }: {
 
   return (
     <Collapsible title="Legacy Getriebe-Presets" persistKey="vehicleEditor.legacyPresets" subtitle={`${presets.length} Alt-Presets`}>
-      <p className="text-[10px] text-muted-foreground">Bestehende Alt-Presets. Neue Konfigurationen bitte oben unter „Antrieb" anlegen.</p>
+      <p className="text-caption text-muted-foreground">Bestehende Alt-Presets. Neue Konfigurationen bitte oben unter „Antrieb" anlegen.</p>
       <ul className="mt-2 space-y-2">
         {presets.map((p, i) => {
           const U = tireCircumferenceM(p.tireSpec);
           const valid = U !== null && p.gearRatio > 0 && p.finalDrive > 0;
           return (
-            <li key={p.id} className="rounded-md border border-border bg-card p-2">
+            <li key={p.id} className="rounded-md border border-border bg-card p-3">
               <div className="flex items-center gap-2">
                 <TextInput className="flex-1" value={p.name} onChange={(e) => update(i, { name: e.target.value })} />
                 <IconButton label="Preset löschen" onClick={() => del(i)} />
@@ -323,7 +332,7 @@ function GearPresetsEditor({ presets, onChange, onUseAsDefault }: {
                 <Field label="Endübersetzung"><NumInput step="0.001" value={p.finalDrive} onChange={(e) => update(i, { finalDrive: +e.target.value })} /></Field>
                 <Field label="Reifen"><TextInput value={p.tireSpec} onChange={(e) => update(i, { tireSpec: e.target.value })} /></Field>
                 <Field label="rpmFactor">
-                  <div className="flex h-10 items-center gap-2 text-xs text-foreground">
+                  <div className="flex h-10 items-center gap-2 text-caption text-foreground">
                     <b>{valid ? p.rpmFactor.toFixed(3) : "–"}</b>
                     {valid && <Button variant="ghost" onClick={() => onUseAsDefault(p.rpmFactor)}>als Standard</Button>}
                   </div>
@@ -424,12 +433,12 @@ function AntriebManager({ gearboxDefs, finalDrives, tires, setups, defaultSetupI
 
   return (
     <Collapsible
-      title="Antrieb (Getriebe, Endübersetzung, Reifen, Setups)"
+      title="Antrieb"
       persistKey="vehicleEditor.drive"
       defaultOpen
       subtitle={`${gearboxDefs.length} Getriebe · ${finalDrives.length} Endübersetzungen · ${tires.length} Reifen · ${setups.length} Setups`}
     >
-      <p className="text-[10px] text-muted-foreground">Getriebe (nur Gänge), Endübersetzungen und Reifen getrennt pflegen und beliebig zu Setups kombinieren.</p>
+      <p className="text-caption text-muted-foreground">Getriebe (nur Gänge), Endübersetzungen und Reifen getrennt pflegen und beliebig zu Setups kombinieren.</p>
 
       {/* Gearboxes */}
       <GearboxesCollapsibleList
@@ -441,10 +450,10 @@ function AntriebManager({ gearboxDefs, finalDrives, tires, setups, defaultSetupI
 
       {/* Final drives */}
       <Collapsible title="Endübersetzungen" level="sub" persistKey="vehicleEditor.finalDrives" subtitle={`${finalDrives.length} angelegt`}>
-        {finalDrives.length === 0 && <p className="text-[11px] text-muted-foreground">Noch keine Endübersetzung.</p>}
+        {finalDrives.length === 0 && <p className="text-caption text-muted-foreground">Noch keine Endübersetzung.</p>}
         <ul className="space-y-2">
           {finalDrives.map((fd, i) => (
-            <li key={fd.id} className="rounded-md border border-border bg-background p-2">
+            <li key={fd.id} className="rounded-md border border-border bg-background p-3">
               <div className="grid grid-cols-[1fr_1fr_auto] gap-2">
                 <Field label="Name"><TextInput value={fd.name} onChange={(e) => updateFinal(i, { name: e.target.value })} /></Field>
                 <Field label="Übersetzung"><NumInput step="0.001" value={fd.ratio} onChange={(e) => updateFinal(i, { ratio: +e.target.value })} /></Field>
@@ -458,18 +467,18 @@ function AntriebManager({ gearboxDefs, finalDrives, tires, setups, defaultSetupI
 
       {/* Tires */}
       <Collapsible title="Reifen" level="sub" persistKey="vehicleEditor.tires" subtitle={`${tires.length} angelegt`}>
-        {tires.length === 0 && <p className="text-[11px] text-muted-foreground">Noch kein Reifen.</p>}
+        {tires.length === 0 && <p className="text-caption text-muted-foreground">Noch kein Reifen.</p>}
         <ul className="space-y-2">
           {tires.map((t, i) => {
             const U = tireCircumferenceM(t.spec);
             return (
-              <li key={t.id} className="rounded-md border border-border bg-background p-2">
+              <li key={t.id} className="rounded-md border border-border bg-background p-3">
                 <div className="grid grid-cols-[1fr_1fr_auto] gap-2">
                   <Field label="Name"><TextInput value={t.name} onChange={(e) => updateTire(i, { name: e.target.value })} /></Field>
                   <Field label="Spec (z.B. 225/45R17)"><TextInput value={t.spec} onChange={(e) => updateTire(i, { spec: e.target.value })} /></Field>
                   <div className="flex items-end"><IconButton label="Reifen löschen" onClick={() => delTire(i)} /></div>
                 </div>
-                <div className="mt-1 text-[10px] text-muted-foreground">Abrollumfang: {U ? (U * 1000).toFixed(0) + " mm (dyn.)" : "– (ungültig)"}</div>
+                <div className="mt-1 text-caption text-muted-foreground">Abrollumfang: {U ? (U * 1000).toFixed(0) + " mm (dyn.)" : "– (ungültig)"}</div>
               </li>
             );
           })}
@@ -479,7 +488,7 @@ function AntriebManager({ gearboxDefs, finalDrives, tires, setups, defaultSetupI
 
       {/* Setups */}
       <Collapsible title="Setups (Getriebe × Endübersetzung × Reifen)" level="sub" persistKey="vehicleEditor.setups" defaultOpen subtitle={`${setups.length} angelegt`}>
-        {setups.length === 0 && <p className="text-[11px] text-muted-foreground">Noch kein Setup.</p>}
+        {setups.length === 0 && <p className="text-caption text-muted-foreground">Noch kein Setup.</p>}
         <ul className="space-y-2">
           {setups.map((s, i) => {
             const gb = gearboxDefs.find((g) => g.id === s.gearboxId);
@@ -488,11 +497,11 @@ function AntriebManager({ gearboxDefs, finalDrives, tires, setups, defaultSetupI
             const tireSpec = tire?.spec ?? gb?.tireSpec ?? "";
             const isDefault = defaultSetupId === s.id;
             return (
-              <li key={s.id} className="rounded-md border border-border bg-background p-2">
+              <li key={s.id} className="rounded-md border border-border bg-background p-3">
                 <div className="flex items-center gap-2">
                   <TextInput className="flex-1" value={s.name} onChange={(e) => updateSetup(i, { name: e.target.value })} />
                   {isDefault ? (
-                    <span className="rounded bg-primary px-2 py-1 text-[10px] text-primary-foreground">Standard</span>
+                    <span className="rounded bg-primary px-3 py-1 text-caption text-primary-foreground">Standard</span>
                   ) : (
                     <Button variant="ghost" onClick={() => onChange({ defaultSetupId: s.id })}>als Standard</Button>
                   )}
@@ -517,14 +526,14 @@ function AntriebManager({ gearboxDefs, finalDrives, tires, setups, defaultSetupI
                   </Field>
                 </Row>
                 {gb && fd && gb.gears.length > 0 && tireSpec && (
-                  <div className="mt-2 text-[11px] text-muted-foreground">
+                  <div className="mt-2 text-caption text-muted-foreground">
                     <div className="text-muted-foreground">rpmFactor pro Gang (Reifen {tireSpec}, End {fd.ratio.toFixed(3)}):</div>
-                    <div className="mt-1 flex flex-wrap gap-1">
+                    <div className="mt-1 flex flex-wrap gap-2">
                       {gb.gears.map((g) => {
                         const f = computeRpmFactor(g.ratio, fd.ratio, tireSpec);
                         if (f == null) return null;
                         return (
-                          <button key={g.id} className="rounded bg-muted px-2 py-0.5 hover:bg-secondary"
+                          <button key={g.id} className="rounded bg-muted px-3 py-1 hover:bg-secondary"
                             onClick={() => onUseAsDefault(f)}
                             title="Als Standard-rpmFactor setzen">
                             {g.name}: {f.toFixed(2)}
@@ -535,7 +544,7 @@ function AntriebManager({ gearboxDefs, finalDrives, tires, setups, defaultSetupI
                   </div>
                 )}
                 {(!tireSpec) && (
-                  <p className="mt-2 text-[11px] text-amber-400">Bitte einen Reifen für dieses Setup wählen.</p>
+                  <p className="mt-2 text-caption text-warning">Bitte einen Reifen für dieses Setup wählen.</p>
                 )}
               </li>
             );
@@ -558,12 +567,12 @@ function GearboxesCollapsibleList({ gearboxDefs, onAdd, onUpdate, onDelete }: {
   const toggle = (id: string) => setOpenIds((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
   return (
     <Collapsible title="Getriebe" level="sub" persistKey="vehicleEditor.gearboxes" defaultOpen subtitle={`${gearboxDefs.length} angelegt`}>
-      {gearboxDefs.length === 0 && <p className="text-[11px] text-muted-foreground">Noch kein Getriebe.</p>}
+      {gearboxDefs.length === 0 && <p className="text-caption text-muted-foreground">Noch kein Getriebe.</p>}
       <ul className="space-y-2">
         {gearboxDefs.map((gb, i) => {
           const open = openIds.includes(gb.id);
           return (
-            <li key={gb.id} className="rounded-md border border-border bg-background p-2">
+            <li key={gb.id} className="rounded-md border border-border bg-background p-3">
               <div className="flex items-center gap-2">
                 <button
                   type="button"
@@ -572,8 +581,8 @@ function GearboxesCollapsibleList({ gearboxDefs, onAdd, onUpdate, onDelete }: {
                   className="flex min-h-[44px] flex-1 items-center gap-2 rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   <ChevronRight className={`h-4 w-4 flex-none text-muted-foreground transition-transform ${open ? "rotate-90" : ""}`} aria-hidden="true" />
-                  <span className="min-w-0 truncate text-sm text-foreground">
-                    {gb.name} <span className="ml-1 text-[11px] text-muted-foreground">{gb.gears.length} Gänge</span>
+                  <span className="min-w-0 truncate text-body text-foreground">
+                    {gb.name} <span className="ml-1 text-caption text-muted-foreground">{gb.gears.length} Gänge</span>
                   </span>
                 </button>
                 <IconButton label="Getriebe löschen" onClick={() => onDelete(i)} />
@@ -610,10 +619,10 @@ function GearListEditor({ gears, onChange }: { gears: GearRatio[]; onChange: (g:
 
   return (
     <div className="mt-2">
-      {gears.length === 0 && <p className="text-[11px] text-muted-foreground">Noch keine Gänge.</p>}
+      {gears.length === 0 && <p className="text-caption text-muted-foreground">Noch keine Gänge.</p>}
       <ul className="space-y-2">
         {gears.map((g, i) => (
-          <li key={g.id} className="rounded-md border border-border bg-muted/40 p-2">
+          <li key={g.id} className="rounded-md border border-border bg-muted/40 p-3">
             <div className="grid grid-cols-[1fr_auto] gap-2">
               <Field label="Name">
                 <TextInput value={g.name} onChange={(e) => update(i, { name: e.target.value })} />
@@ -720,18 +729,18 @@ function ShiftDiagramCompare({ vehicle }: { vehicle: Vehicle }) {
       persistKey="vehicleEditor.shiftDiagram"
       subtitle={`${effective.length} von ${setups.length} Setups aktiv`}
     >
-      <p className="text-[10px] text-muted-foreground">
+      <p className="text-caption text-muted-foreground">
         U/min über km/h je Gang. Senkrechte Linien zeigen den Drehzahlabfall beim Schalten (bei gepflegter Schaltdrehzahl); waagerechte Linien markieren Schalt- (orange) und Maximaldrehzahl (rot).
       </p>
       {setups.length === 0 ? (
-        <p className="mt-2 text-[11px] text-muted-foreground">Erst mindestens ein Setup oben anlegen.</p>
+        <p className="mt-2 text-caption text-muted-foreground">Erst mindestens ein Setup oben anlegen.</p>
       ) : (
         <>
-          <div className="mt-2 flex flex-wrap gap-2 text-xs text-foreground">
+          <div className="mt-2 flex flex-wrap gap-2 text-caption text-foreground">
             {setups.map((s) => {
               const on = effective.includes(s.id);
               return (
-                <label key={s.id} className="flex min-h-[36px] items-center gap-1.5 rounded-md bg-muted px-2 py-1">
+                <label key={s.id} className="flex min-h-[44px] items-center gap-2 rounded-md bg-muted px-3 py-1">
                   <input
                     type="checkbox"
                     checked={on}

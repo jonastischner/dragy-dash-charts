@@ -60,8 +60,15 @@ export function Chart({ series, bands = [], xLabel, yLabel, height = 280, onLege
     const ctx = c.getContext("2d")!;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, W, H);
+    // Design-Tokens aus dem CSS lesen (kein Hardcoding von Farben)
+    const cs = getComputedStyle(document.documentElement);
+    const token = (name: string, fallback: string) => cs.getPropertyValue(name).trim() || fallback;
+    const colCard = token("--card", "#1e1e1e");
+    const colBorder = token("--border", "#2f2f2f");
+    const colMuted = token("--muted-foreground", "#a8a8a8");
+    const colText = token("--foreground", "#ededed");
     // bg
-    ctx.fillStyle = "#0b1220";
+    ctx.fillStyle = colCard;
     ctx.fillRect(0, 0, W, H);
     // bands
     for (const b of bands) {
@@ -70,7 +77,7 @@ export function Chart({ series, bands = [], xLabel, yLabel, height = 280, onLege
       ctx.fillRect(x1, padT, x2 - x1, plotH);
     }
     // grid
-    ctx.strokeStyle = "#1e293b"; ctx.fillStyle = "#94a3b8"; ctx.font = "10px system-ui"; ctx.lineWidth = 1;
+    ctx.strokeStyle = colBorder; ctx.fillStyle = colMuted; ctx.font = "13px Inter, system-ui"; ctx.lineWidth = 1;
     const nx = 5, ny = 5;
     for (let i = 0; i <= nx; i++) {
       const x = padL + (i / nx) * plotW;
@@ -96,7 +103,7 @@ export function Chart({ series, bands = [], xLabel, yLabel, height = 280, onLege
       ctx.stroke();
     }
     // axis labels
-    ctx.fillStyle = "#cbd5e1"; ctx.font = "11px system-ui";
+    ctx.fillStyle = colText; ctx.font = "13px Inter, system-ui";
     if (xLabel) ctx.fillText(xLabel, W - padR - ctx.measureText(xLabel).width, H - 2);
     if (yLabel) { ctx.save(); ctx.translate(12, padT + 4); ctx.rotate(-Math.PI / 2); ctx.fillText(yLabel, -plotH + 4, 0); ctx.restore(); }
 
@@ -116,7 +123,7 @@ export function Chart({ series, bands = [], xLabel, yLabel, height = 280, onLege
     };
     if (hover) {
       const hx = hover.x;
-      ctx.strokeStyle = "#64748b"; ctx.setLineDash([4, 4]);
+      ctx.strokeStyle = colMuted; ctx.setLineDash([4, 4]);
       ctx.beginPath(); ctx.moveTo(hx, padT); ctx.lineTo(hx, padT + plotH); ctx.stroke();
       ctx.setLineDash([]);
       const xVal = xMin + ((hx - padL) / plotW) * (xMax - xMin);
@@ -164,13 +171,14 @@ export function Chart({ series, bands = [], xLabel, yLabel, height = 280, onLege
   return (
     <div ref={wrapRef} className="w-full">
       <canvas ref={canvasRef} onPointerMove={onMove} onPointerDown={onMove} onPointerLeave={onLeave} className="touch-none rounded-md" />
-      <div className="mt-1 min-h-[1.25rem] text-xs text-muted-foreground">{hoverText}</div>
+      <div className="mt-1 min-h-[1.25rem] text-caption text-muted-foreground">{hoverText}</div>
       {series.length > 0 && (
         <div className="mt-1 flex flex-wrap gap-2">
           {series.map((s, i) => (
-            <button key={i} onClick={() => onLegendToggle?.(i)}
-              className={`flex items-center gap-1 rounded px-2 py-0.5 text-xs ${s.visible === false ? "opacity-40" : ""}`}
-              style={{ backgroundColor: "#1e293b" }}>
+            <button key={i} type="button" onClick={() => onLegendToggle?.(i)}
+              aria-pressed={s.visible !== false}
+              aria-label={`${s.label} ${s.visible === false ? "einblenden" : "ausblenden"}`}
+              className={`flex min-h-[44px] items-center gap-2 rounded-md bg-elevated px-3 text-caption transition-ui hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${s.visible === false ? "opacity-40" : ""}`}>
               <span className="inline-block h-2 w-4 rounded-sm" style={{ backgroundColor: s.color }} />
               <span className="text-foreground">{s.label}</span>
             </button>
