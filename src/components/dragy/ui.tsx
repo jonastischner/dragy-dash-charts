@@ -50,7 +50,7 @@ export function Collapsible({
           className="flex min-h-[44px] flex-1 items-center gap-2 rounded-md px-3 text-left transition-ui focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           <ChevronRight className={`h-4 w-4 flex-none text-muted-foreground transition-ui ${open ? "rotate-90" : ""}`} strokeWidth={2} aria-hidden="true" />
-          <span className="min-w-0">
+          <span className="min-w-0 flex-1">
             <span className={`block truncate ${titleCls}`}>{title}</span>
             {subtitle && <span className="block truncate text-caption text-muted-foreground">{subtitle}</span>}
           </span>
