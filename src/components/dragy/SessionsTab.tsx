@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
-import { Section, Field, TextInput, TextArea, NumInput, Button, Note, Row, EmptyState } from "./ui";
+import { Section, Field, TextInput, TextArea, NumInput, Button, Note, Row, EmptyState, usePersistedState } from "./ui";
 import { useAppStore, pickColor } from "@/lib/dragy/store";
-import { autoDetectSegments } from "@/lib/dragy/physics";
+import { autoDetectSegments, computeSegment, W_TO_PS } from "@/lib/dragy/physics";
 import { computeRpmFactor, resolveAllGears } from "@/lib/dragy/gear";
 import { uid } from "@/lib/dragy/db";
 import type { Session, Segment } from "@/lib/dragy/types";
