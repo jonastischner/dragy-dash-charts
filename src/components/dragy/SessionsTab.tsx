@@ -1,11 +1,15 @@
 import { useMemo, useState } from "react";
-import { Section, Field, TextInput, TextArea, NumInput, Button, Note, Row, EmptyState, usePersistedState } from "./ui";
+import { Section, Field, TextInput, TextArea, NumInput, Select, Button, Note, Row, EmptyState, usePersistedState } from "./ui";
 import { useAppStore, pickColor } from "@/lib/dragy/store";
-import { autoDetectSegments, computeSegment, W_TO_PS } from "@/lib/dragy/physics";
+import { autoDetectSegments, computeSegment, splitTime, distanceRun, runDistance, W_TO_PS } from "@/lib/dragy/physics";
 import { computeRpmFactor, resolveAllGears } from "@/lib/dragy/gear";
 import { uid } from "@/lib/dragy/db";
-import type { Session, Segment } from "@/lib/dragy/types";
-import { Chart } from "./Chart";
+import type { Session, Segment, RunCategory } from "@/lib/dragy/types";
+import { RUN_CATEGORY_LABEL, RUN_CATEGORY_SHORT, SESSION_KIND_LABEL, categoriesFor, defaultCategoryFor, hasPowerCurve, runCategory, sessionKind } from "@/lib/dragy/categories";
+import { Chart, type Series } from "./Chart";
+
+const ACCEL_SPLITS: Array<[number, number]> = [[0, 100], [100, 200], [60, 130], [80, 120]];
+
 
 export function SessionsTab({ onOpenVehicles }: { onOpenVehicles?: () => void } = {}) {
   const { state, saveSession, deleteSession, saveSegment, deleteSegment } = useAppStore();
