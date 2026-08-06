@@ -90,7 +90,7 @@ export function CompareTab({ module = "power", onOpenVehicles }: { module?: Modu
     : [];
 
   // Übersicht: alle aktiven (sichtbaren) Läufe mit Peak-Resultaten.
-  const overviewRows = segments
+  const overviewRows = (allowPower ? segments : [])
     .filter((g) => g.visible !== false)
     .map((g) => {
       const session = state.sessions.find((s) => s.id === g.sessionId)!;
