@@ -236,6 +236,7 @@ function SegmentEditor({ module, seg, session, vehicle, maxT, onChange, onDelete
   const flatGearOptions: GearOpt[] = gearboxGroups.flatMap((g) => g.options);
   const hasAny = flatGearOptions.length + legacyPresets.length > 0;
   const isPower = isPowerModule(module);
+  const [pdfOpen, setPdfOpen] = useState(false);
 
   const miniSeries: Series[] = useMemo(() => {
     if (isPower) {
