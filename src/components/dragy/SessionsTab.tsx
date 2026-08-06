@@ -356,8 +356,14 @@ function SegmentEditor({ seg, session, vehicle, maxT, onChange, onDelete }: { se
         <Button variant="danger" onClick={onDelete}>×</Button>
       </div>
       <Row className="mt-2">
+        <Field label="Kategorie" hint="Bestimmt, wie der Lauf ausgewertet wird">
+          <Select value={cat} onChange={(e) => onChange({ category: e.target.value as RunCategory })}>
+            {catOptions.map((c) => <option key={c} value={c}>{RUN_CATEGORY_LABEL[c]}</option>)}
+          </Select>
+        </Field>
         <Field label="Start t (s)"><NumInput step="0.1" value={seg.startT} onChange={(e) => onChange({ startT: Math.max(0, +e.target.value) })} /></Field>
         <Field label="Ende t (s)"><NumInput step="0.1" value={seg.endT} onChange={(e) => onChange({ endT: Math.min(maxT, +e.target.value) })} /></Field>
+
         {hasAny && (
           <Field label="Gemessener Gang" hint="Setzt rpmFactor aus Fahrzeug-Getriebe/Preset">
             <select
