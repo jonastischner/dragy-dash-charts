@@ -73,9 +73,11 @@ export default defineConfig({
   },
   // Für den lokalen Mac-Build (außerhalb der Lovable-Sandbox) erzwingen wir
   // dieselben Ausgabepfade wie in der Sandbox, damit Capacitor webDir: "dist"
-  // findet.
+  // findet. Das node-Preset verzichtet auf Cloudflare-Request-Mutationen,
+  // die in Node 22 zu "Cannot set property ip" führen.
   nitro: isCapacitorBuild
     ? {
+        preset: "node",
         output: {
           dir: "dist",
           publicDir: "dist/client",
