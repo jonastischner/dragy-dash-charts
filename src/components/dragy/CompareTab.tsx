@@ -23,6 +23,7 @@ export function CompareTab({ module = "power", onOpenVehicles }: { module?: Modu
   const allowPower = isPowerModule(module);
   const allowedModes: Mode[] = allowPower ? ["pWheel", "pEngine", "tqWheel", "tqEngine", "accel"] : ["accel"];
   const [mode, setMode] = useState<Mode>(allowPower ? "pWheel" : "accel");
+  const [pdfOpen, setPdfOpen] = useState(false);
 
   const segments = useMemo(() => {
     if (!activeVehicle) return [];
