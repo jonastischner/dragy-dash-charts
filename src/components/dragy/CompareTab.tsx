@@ -113,6 +113,12 @@ export function CompareTab({ module = "power", onOpenVehicles }: { module?: Modu
       return { label: `${session.name} · ${g.name}`, color: g.color, pW, pWRpm, pE, pERpm, tW, tWRpm, tE, tERpm, vFrom, vMax, dur };
     });
 
+  // Sichtbare Läufe als Datenbasis für den Sammel-PDF-Export.
+  const pdfRuns: RunPdfData[] = (allowPower ? segments : [])
+    .filter((g) => g.visible !== false)
+    .map((g) => ({ session: state.sessions.find((s) => s.id === g.sessionId)!, segment: g, vehicle: activeVehicle }))
+    .filter((r) => !!r.session);
+
   const fmt = (v: number, d = 0) => (Number.isFinite(v) && v !== 0 ? v.toFixed(d) : "—");
   const fmtRpm = (v: number) => (Number.isFinite(v) ? `${v.toFixed(0)} U/min` : "—");
 
