@@ -1,46 +1,93 @@
-# Getriebe & Schaltdiagramme
+# Native iOS-App über TestFlight & App Store
 
 ## Ziel
-- Getriebe (nur Gangübersetzungen + Reifen) und Endübersetzung als getrennte, wiederverwendbare Bausteine.
-- Am Fahrzeug beliebige Kombinationen aus einem Getriebe und einer Endübersetzung anlegen ("Setup") und eines als Standard markieren.
-- Pro Fahrzeug Schaltdrehzahl (Empfehlung) und Maximaldrehzahl erfassen.
-- Neues Schaltdiagramm (Geschwindigkeit über Drehzahl je Gang) im Vergleich-Tab, mit Overlay-Vergleich mehrerer Setups.
+Die bestehende Web-App als native iPhone-App verpacken, zunächst via TestFlight testbar machen und später im App Store veröffentlichen.
 
-## Datenmodell (src/lib/dragy/types.ts)
-- Neue Typen:
-  - `GearboxDef { id; name; tireSpec; gears: GearRatio[] }` — nur Gänge + Reifen.
-  - `FinalDriveDef { id; name; ratio }` — reine Endübersetzung.
-  - `DriveSetup { id; name; gearboxId; finalDriveId }` — Kombination am Fahrzeug.
-- `Vehicle` erweitert:
-  - `gearboxDefs: GearboxDef[]`, `finalDrives: FinalDriveDef[]`, `setups: DriveSetup[]`, `defaultSetupId`.
-  - `shiftRpm`, `maxRpm` (beide optional).
-- Migration beim Laden (VehiclesTab): bestehende `gearboxes[]` (mit finalDrive inline) einmalig in ein `GearboxDef` + eigene `FinalDriveDef` + `DriveSetup` je Eintrag aufspalten; alter Zustand bleibt lesbar. Legacy `gearbox`/`gearPresets` weiter unterstützt.
+## Technischer Ansatz
+Die App bleibt eine Web-App und wird mit **Capacitor** in ein natives iOS-Projekt (WKWebView) eingebettet. Das ist der schnellste und wartungsfreundlichste Weg für einen bestehenden React-Stack, weil fast der gesamte Code wiederverwendet werden kann.
 
-## VehiclesTab
-- Neue Editor-Sektion "Antrieb":
-  - Liste Getriebe (Name, Reifen, Gänge n×Ratio).
-  - Liste Endübersetzungen (Name, Ratio).
-  - Liste Setups: Dropdown Getriebe × Dropdown Endübersetzung, Name, "als Standard".
-- Felder Schaltdrehzahl / Max-Drehzahl neben rpmFactorDefault.
+## Wichtige Einschränkung vorab
+**Web Bluetooth funktioniert auf iOS nicht innerhalb der WKWebView.** Der Tab „Live (BLE)" würde im ersten Schritt im nativen iOS-Build keine Geräte finden können. Für echtes BLE-Aufnehmen auf iPhone müsste später ein natives Swift-Plugin geschrieben und über Capacitor an das WebView angebunden werden. Im Plan daher zwei Phasen:
 
-## SessionsTab
-- "Gemessener Gang"-Dropdown: gruppiert nach Setup-Name, Optionen zeigen den effektiven rpmFactor (aus Getriebe-Gang × Endübersetzung × Reifen). Speichert weiterhin nur `rpmFactor` (+ optional `gearPresetId` als Referenz).
-- Manuelle rpmFactor-Eingabe bleibt.
+1. **Phase 1**: App-Grundgerüst mit allen bestehenden Features außer Live-BLE.
+2. **Phase 2 (optional)**: Nativer BLE-Recorder, der Dragy/GPS-Daten direkt aus Swift an die Web-App übergibt.
 
-## Schaltdiagramm (CompareTab)
-- Neuer Modus `shiftDiagram` neben Beschleunigung/Leistung.
-- Auswahl-Panel: Mehrfachauswahl von Setups (aktives Fahrzeug + optional Setups anderer eigener Fahrzeuge).
-- Für jedes gewählte Setup je Gang eine Serie: x = RPM von Leerlauf-nahe bis `maxRpm`, y = km/h aus rpmFactor pro Gang. Vertikale Marker bei `shiftRpm` und `maxRpm`.
-- Farbcode pro Setup, Gangnummer als Label.
-- Vergleich = einfach mehrere Setups gleichzeitig aktiv; Legende toggelt einzelne Setups.
+## Phase 1: Capacitor-Grundgerüst
 
-## Physik / Berechnung
-- Keine Änderung an Leistungsformeln. RPM-Faktor-Auflösung zentral in einer Helper-Funktion `resolveSetupGearFactor(vehicle, setupId, gearId)`; wiederverwendet von SessionsTab und CompareTab.
+### 1.1 Capacitor installieren & konfigurieren
+- `@capacitor/core`, `@capacitor/cli`, `@capacitor/ios` als Dev-Dependencies hinzufügen.
+- `capacitor.config.ts` anlegen mit:
+  - `appId`: z. B. `deinunternehmen.dragyanalyse`
+  - `appName`: `Dragy Leistungsanalyse`
+  - `webDir`: `dist` (das Verzeichnis, das `vite build` ausgibt)
+  - `bundledWebRuntime: false`
+- iOS-Plattform hinzufügen: `npx cap add ios`
 
-## Nicht enthalten
-- Automatische Erkennung des tatsächlich gefahrenen Gangs.
-- Änderung der Sync-Struktur (Vehicle bleibt ein JSON-Blob, neue Felder werden automatisch mitsynchronisiert).
+### 1.2 Build-Pipeline anpassen
+- Neues npm-Script `build:mobile`: `vite build && npx cap sync ios`
+- Sicherstellen, dass alle clientseitigen Pfade nach dem Build relativ bleiben (Capacitor lädt aus `file://`-artigem lokalem Bundle).
+- Prüfen, ob TanStack-Start-Routen statisch gerendert werden können oder ob SSR im nativen Bundle umgangen werden muss.
 
-## Technisch
-- Dateien: `src/lib/dragy/types.ts`, `src/lib/dragy/gear.ts` (Helper), `src/components/dragy/VehiclesTab.tsx`, `src/components/dragy/SessionsTab.tsx`, `src/components/dragy/CompareTab.tsx`.
-- Migration inline beim Laden im VehiclesTab-State, damit keine DB-Migration nötig ist.
+### 1.3 Native App-Identität & Assets
+- App-Icon-Set (iOS-Größen) und Splash-Screen generieren, z. B. mit `@capacitor/assets`.
+- `Info.plist` anpassen:
+  - Orientierung (empfohlen: Portrait + Landscape auf iPad)
+  - `UIViewControllerBasedStatusBarAppearance`
+  - Datenschutz-Hinweise für Kamera/Foto (nur falls später Fahrzeugbild-Kamera genutzt wird)
+
+### 1.4 iOS-spezifische UX-Anpassungen
+- Safe-Area/Padding ist bereits teilweise vorhanden (`env(safe-area-inset-*)`).
+- Konditionalen Hinweis im Tab „Live (BLE)" einbauen: Auf iOS anzeigen, dass diese Funktion im nativen Build noch nicht verfügbar ist.
+- Touch-Target-Größe und Bottom-Tab-Bar bleiben erhalten, da sie bereits mobil-optimiert sind.
+
+### 1.5 Datenspeicherung & Offline
+- IndexedDB funktioniert im WKWebView wie im Safari-Browser.
+- Supabase-Sync funktioniert, solange Internet verfügbar ist.
+- Prüfen, ob `localStorage`-Daten bei App-Updates erhalten bleiben (iOS löscht gelegentlich Web-Caches; Backup-JSON-Export bleibt wichtig).
+
+### 1.6 TestFlight-Vorbereitung
+- App-Icon, Launch-Screen und mindestens ein Screenshot für App Store Connect vorbereiten.
+- In Xcode:
+  - Signing & Capabilities mit Apple Developer Team verknüpfen.
+  - App-Version und Build-Nummer setzen.
+  - Archivieren (`Product > Archive`) und über Organizer zu App Store Connect hochladen.
+- In App Store Connect:
+  - App-Eintrag anlegen.
+  - TestFlight > Interne Testgruppe einrichten.
+  - Compliance-Fragen (Verschlüsselung, Datenschutz) beantworten.
+
+## Phase 2: Nativer BLE-Recorder auf iPhone (optional)
+
+### 2.1 Native iOS-Bluetooth-Schicht
+- Swift-Plugin für Capacitor erstellen:
+  - CoreBluetooth verwenden.
+  - Dragy/GPS-Gerät scannen, verbinden, Daten empfangen.
+  - UBX/NMEA-Parsing kann entweder in Swift oder in JavaScript erfolgen.
+- JavaScript-Bridge:
+  - `startScan()`, `connect(deviceId)`, `startRecording()`, `stopRecording()`
+  - Events: `onData`, `onDisconnect`
+
+### 2.2 Web-App-Integration
+- Im `LiveTab` erkennen, ob die App im Capacitor-iOS-Container läuft.
+- Falls ja: natives Plugin statt Web Bluetooth verwenden.
+- Aufnahme weiterhin in IndexedDB-Session speichern.
+
+## Phase 3: App Store-Freigabe
+
+### 3.1 App Store Connect
+- Screenshots für alle iPhone-Größen bereitstellen.
+- App-Beschreibung, Keywords, Datenschutz-Details.
+- App Review Information (Kontakt, Demo-Account falls nötig).
+
+### 3.2 Review-Richtlinien beachten
+- App muss mehr tun als eine einfache Website anzeigen.
+- Aktuelle App bietet bereits native-adjente Features: Offline-Datenbank, Datei-Import, Diagramme, BLE-Aufnahme.
+- Keine versteckten Zahlungswege; falls später In-App-Käufe kommen, müssen diese über StoreKit laufen.
+
+## Kosten & Voraussetzungen
+- Apple Developer Program: ca. 99 USD/Jahr.
+- Ein Mac ist für Xcode-Build und Upload erforderlich.
+- Für TestFlight reicht der Developer-Account; öffentlicher App Store erfordert Review.
+
+## Nächster konkreter Schritt
+Capacitor in das Projekt integrieren, iOS-Plattform hinzufügen und ein erstes TestFlight-fähiges Archiv erzeugen – ohne native BLE in Phase 1.
