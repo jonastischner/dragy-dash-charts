@@ -79,7 +79,7 @@ export function ImportTab({ module = "power", onOpenVehicles }: { module?: Modul
 
       {manualOpen && (
         <ManualEditor
-          tempC={tempC} pressureHpa={pressureHpa} rh={rh}
+          module={module} tempC={tempC} pressureHpa={pressureHpa} rh={rh}
           onCancel={() => setManualOpen(false)}
           onSave={async (session) => { await saveSession(session); setManualOpen(false); }}
           vehicleId={activeVehicle.id}
