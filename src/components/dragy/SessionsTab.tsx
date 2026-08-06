@@ -307,7 +307,7 @@ function SessionDetail({ session, segments, vehicle, onRename, onDelete, onSaveS
   );
 }
 
-function SegmentEditor({ seg, vehicle, maxT, onChange, onDelete }: { seg: Segment; vehicle: any; maxT: number; onChange: (patch: Partial<Segment>) => Promise<void>; onDelete: () => void }) {
+function SegmentEditor({ seg, session, vehicle, maxT, onChange, onDelete }: { seg: Segment; session: Session; vehicle: any; maxT: number; onChange: (patch: Partial<Segment>) => Promise<void>; onDelete: () => void }) {
   const legacyPresets: Array<{ id: string; name: string; rpmFactor: number }> = vehicle?.gearPresets ?? [];
 
   type GearOpt = { id: string; label: string; rpmFactor: number };
