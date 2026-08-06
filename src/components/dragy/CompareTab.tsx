@@ -181,17 +181,15 @@ export function CompareTab({ module = "power", onOpenVehicles }: { module?: Modu
       </Section>
 
       {allowPower && (
-        <Section
-          title="Übersicht aktive Läufe"
-          note="Peak-Werte je sichtbarem Lauf – Sichtbarkeit über die Chart-Legende steuern."
-          actions={
-            pdfRuns.length > 0 ? (
+        <Section title="Übersicht aktive Läufe" note="Peak-Werte je sichtbarem Lauf – Sichtbarkeit über die Chart-Legende steuern.">
+          {pdfRuns.length > 0 && (
+            <div className="mb-2 flex justify-end">
               <Button variant="secondary" onClick={() => setPdfOpen(true)}>
                 PDF-Protokoll ({pdfRuns.length})
               </Button>
-            ) : undefined
-          }
-        >
+            </div>
+          )}
+          {pdfOpen && <PdfExportDialog runs={pdfRuns} onClose={() => setPdfOpen(false)} />}
           {overviewRows.length === 0 ? (
             <p className="text-caption text-muted-foreground">Keine aktiven Läufe.</p>
           ) : (
