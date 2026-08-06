@@ -334,3 +334,81 @@ export function autoDetectSegments(
   }
   return out;
 }
+
+// ---------------------------------------------------------------------------
+// Beschleunigungs-Auswertung (Kategorie "accel"): Split-Zeiten und 1/4 Meile.
+// Arbeitet direkt auf den GPS-Records, unabhängig von Drehzahl/Leistung.
+// ---------------------------------------------------------------------------
+
+const QUARTER_MILE_M = 402.336;
+
+/** Zeit (s) zwischen zwei Geschwindigkeiten innerhalb eines Laufs, linear interpoliert. */
+export function splitTime(
+  records: Record[],
+  startT: number,
+  endT: number,
+  fromKmh: number,
+  toKmh: number,
+): number | null {
+  const rec = records.filter((r) => r.t >= startT && r.t <= endT);
+  if (rec.length < 2) return null;
+  const cross = (target: number, fromIdx: number): { t: number; idx: number } | null => {
+    for (let i = Math.max(1, fromIdx); i < rec.length; i++) {
+      const a = rec[i - 1], b = rec[i];
+      if (a.speedKmh <= target && b.speedKmh >= target) {
+        const dv = b.speedKmh - a.speedKmh;
+        const t = dv === 0 ? b.t : a.t + ((target - a.speedKmh) / dv) * (b.t - a.t);
+        return { t, idx: i };
+      }
+    }
+    return null;
+  };
+  const a = cross(fromKmh, 1);
+  if (!a) return null;
+  const b = cross(toKmh, a.idx);
+  if (!b) return null;
+  const dt = b.t - a.t;
+  return dt > 0 ? dt : null;
+}
+
+/** Distanz (m) und Endgeschwindigkeit (km/h) für eine Zieldistanz, ab Startpunkt des Laufs. */
+export function distanceRun(
+  records: Record[],
+  startT: number,
+  endT: number,
+  targetM: number = QUARTER_MILE_M,
+): { seconds: number; trapKmh: number } | null {
+  const rec = records.filter((r) => r.t >= startT && r.t <= endT);
+  if (rec.length < 2) return null;
+  let dist = 0;
+  for (let i = 1; i < rec.length; i++) {
+    const a = rec[i - 1], b = rec[i];
+    const dt = b.t - a.t;
+    if (!(dt > 0)) continue;
+    const va = a.speedKmh / 3.6, vb = b.speedKmh / 3.6;
+    const seg = ((va + vb) / 2) * dt;
+    if (dist + seg >= targetM) {
+      const need = targetM - dist;
+      const frac = seg > 0 ? need / seg : 0;
+      return {
+        seconds: a.t - rec[0].t + frac * dt,
+        trapKmh: a.speedKmh + frac * (b.speedKmh - a.speedKmh),
+      };
+    }
+    dist += seg;
+  }
+  return null;
+}
+
+/** Gesamt zurückgelegte Distanz (m) eines Laufs. */
+export function runDistance(records: Record[], startT: number, endT: number): number {
+  const rec = records.filter((r) => r.t >= startT && r.t <= endT);
+  let dist = 0;
+  for (let i = 1; i < rec.length; i++) {
+    const a = rec[i - 1], b = rec[i];
+    const dt = b.t - a.t;
+    if (!(dt > 0)) continue;
+    dist += ((a.speedKmh / 3.6 + b.speedKmh / 3.6) / 2) * dt;
+  }
+  return dist;
+}
