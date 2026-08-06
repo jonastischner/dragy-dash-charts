@@ -63,7 +63,7 @@ export function SessionsTab({ onOpenVehicles }: { onOpenVehicles?: () => void } 
 }
 function bestOfSegments(session: Session, segs: Segment[], vehicle: any) {
   let best: { segId: string; segName: string; color: string; ps: number; psRpm: number; nm: number; nmRpm: number } | null = null;
-  for (const g of segs) {
+  for (const g of segs.filter(hasPowerCurve)) {
     const samples = computeSegment(session, g, vehicle);
     let ps = NaN, psRpm = NaN, nm = NaN, nmRpm = NaN;
     for (const s of samples) {
