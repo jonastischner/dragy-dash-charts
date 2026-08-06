@@ -283,9 +283,10 @@ function SessionDetail({ session, segments, vehicle, onRename, onDelete, onSaveS
         </div>
         <ul className="space-y-2">
           {segments.map((g) => (
-            <SegmentEditor key={g.id} seg={g} vehicle={vehicle} maxT={session.records[session.records.length - 1]?.t ?? 0}
+            <SegmentEditor key={g.id} seg={g} session={session} vehicle={vehicle} maxT={session.records[session.records.length - 1]?.t ?? 0}
               onChange={async (patch) => { await onSaveSeg({ ...g, ...patch }); }}
               onDelete={async () => { if (confirm(`Lauf "${g.name}" löschen?`)) await onDelSeg(g.id); }} />
+
           ))}
         </ul>
       </div>
