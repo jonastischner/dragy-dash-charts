@@ -8,6 +8,7 @@
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "build:mobile": "node scripts/build-mobile.js",
+    "assets:mobile": "npx capacitor-assets generate --ios",
     "preview": "vite preview",
     "lint": "eslint .",
     "format": "prettier --write ."
