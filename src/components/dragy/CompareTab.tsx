@@ -3,6 +3,8 @@ import { Section, Note, EmptyState } from "./ui";
 import { useAppStore } from "@/lib/dragy/store";
 import { computeSegment, W_TO_PS } from "@/lib/dragy/physics";
 import { Chart, type Series } from "./Chart";
+import type { ModuleId } from "@/lib/dragy/types";
+import { isPowerModule, sessionModule } from "@/lib/dragy/modules";
 
 type Mode = "pWheel" | "pEngine" | "tqWheel" | "tqEngine" | "accel";
 const MODE_LABEL: Record<Mode, string> = {
@@ -15,21 +17,23 @@ const MODE_LABEL: Record<Mode, string> = {
 
 const SPLIT_TARGETS = [60, 100, 150, 200];
 
-export function CompareTab({ onOpenVehicles }: { onOpenVehicles?: () => void } = {}) {
+export function CompareTab({ module = "power", onOpenVehicles }: { module?: ModuleId; onOpenVehicles?: () => void } = {}) {
   const { state, saveSegment } = useAppStore();
   const activeVehicle = state.vehicles.find((v) => v.id === state.activeVehicleId);
-  const [mode, setMode] = useState<Mode>("pWheel");
+  const allowPower = isPowerModule(module);
+  const allowedModes: Mode[] = allowPower ? ["pWheel", "pEngine", "tqWheel", "tqEngine", "accel"] : ["accel"];
+  const [mode, setMode] = useState<Mode>(allowPower ? "pWheel" : "accel");
 
   const segments = useMemo(() => {
     if (!activeVehicle) return [];
-    const own = state.sessions.filter((s) => s.vehicleId === activeVehicle.id);
+    const own = state.sessions.filter((s) => s.vehicleId === activeVehicle.id && sessionModule(s) === module);
     return state.segments.filter((g) => own.some((s) => s.id === g.sessionId));
-  }, [state, activeVehicle]);
+  }, [state, activeVehicle, module]);
 
-  if (!activeVehicle) return <Section title="Leistungsvergleich"><EmptyState title="Kein aktives Fahrzeug" description="Wähle ein Fahrzeug, um Läufe zu vergleichen." actionLabel="Zu Fahrzeuge" onAction={onOpenVehicles} /></Section>;
+  if (!activeVehicle) return <Section title="Vergleich"><EmptyState title="Kein aktives Fahrzeug" description="Wähle ein Fahrzeug, um Läufe zu vergleichen." actionLabel="Zur Garage" onAction={onOpenVehicles} /></Section>;
 
+  const isAccel = !allowedModes.includes(mode) || mode === "accel";
 
-  const isAccel = mode === "accel";
 
   const series: Series[] = segments.map((g) => {
     const session = state.sessions.find((s) => s.id === g.sessionId)!;
