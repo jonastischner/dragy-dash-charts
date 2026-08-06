@@ -78,11 +78,21 @@ export function useAppStore() {
 
   useEffect(() => {
     (async () => {
-      const s = await db.loadAll();
-      setState(s as AppState);
+      const s = (await db.loadAll()) as AppState;
+      // Migration: Sessions ohne Modul aus Altdaten (kind/category) ableiten.
+      const missing = s.sessions.filter((x) => !x.module);
+      if (missing.length > 0) {
+        for (const sess of missing) {
+          const segs = s.segments.filter((g) => g.sessionId === sess.id);
+          sess.module = migrateSessionModule(sess, segs);
+          await db.putSession(sess);
+        }
+      }
+      setState(s);
       setReady(true);
     })();
   }, []);
+
 
   useEffect(() => {
     let mounted = true;
