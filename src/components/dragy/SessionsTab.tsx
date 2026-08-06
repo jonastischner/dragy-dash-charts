@@ -262,7 +262,12 @@ function SessionDetail({ session, segments, vehicle, onRename, onDelete, onSaveS
         <Chart series={speedSeries} bands={bands} xLabel="t (s)" yLabel="km/h" xFormat={(v) => v.toFixed(1)} yFormat={(v) => v.toFixed(0)} />
       </div>
 
+      <SessionCurves session={session} segments={segments} vehicle={vehicle} />
+
       <PeakOverview session={session} segments={segments} vehicle={vehicle} />
+
+      <AccelOverview session={session} segments={segments} />
+
 
 
       <div className="mt-3 rounded-md border border-border p-3">
