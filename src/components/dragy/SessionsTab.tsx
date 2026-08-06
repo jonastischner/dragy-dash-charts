@@ -534,3 +534,126 @@ function PeakOverview({ session, segments, vehicle }: { session: Session; segmen
     </div>
   );
 }
+
+type CurveMode = "pEngine" | "tqEngine" | "pWheel" | "accel";
+const CURVE_LABEL: Record<CurveMode, string> = {
+  pEngine: "Motorleistung (PS)",
+  tqEngine: "Motor-Drehmoment (Nm)",
+  pWheel: "Radleistung (PS)",
+  accel: "Beschleunigung (km/h über s)",
+};
+
+/** Leistungs-/Drehmomentkurven aller Läufe einer Session, direkt in der Session-Übersicht. */
+function SessionCurves({ session, segments, vehicle }: { session: Session; segments: Segment[]; vehicle: any }) {
+  const [mode, setMode] = usePersistedState<CurveMode>("dragy.session.curveMode", "pEngine");
+  const [hidden, setHidden] = useState<Record<string, boolean>>({});
+
+  const isAccel = mode === "accel";
+  const relevant = useMemo(
+    () => segments.filter((g) => (isAccel ? true : hasPowerCurve(g))),
+    [segments, isAccel],
+  );
+
+  const series: Series[] = useMemo(() => relevant.map((g) => {
+    if (isAccel) {
+      const points = session.records
+        .filter((r) => r.t >= g.startT && r.t <= g.endT)
+        .map((r) => ({ x: r.t - g.startT, y: r.speedKmh }));
+      return { label: `${g.name} · ${RUN_CATEGORY_SHORT[runCategory(g)]}`, color: g.color, points, visible: !hidden[g.id] };
+    }
+    const samples = computeSegment(session, g, vehicle);
+    const points = samples
+      .map((s) => {
+        const y = mode === "pEngine" ? s.pEngineW * W_TO_PS
+          : mode === "pWheel" ? s.pWheelW * W_TO_PS
+          : s.torqueEngineNm;
+        return { x: s.rpm, y };
+      })
+      .filter((p) => Number.isFinite(p.x) && Number.isFinite(p.y));
+    return { label: g.name, color: g.color, points, visible: !hidden[g.id] };
+  }), [relevant, session, vehicle, mode, isAccel, hidden]);
+
+  if (relevant.length === 0) return null;
+
+  return (
+    <div className="mt-3 rounded-md border border-border p-3">
+      <div className="text-caption font-semibold text-foreground">Auswertung der Läufe</div>
+      <Note>Alle Läufe dieser Session überlagert. Legende zum Ein-/Ausblenden antippen.</Note>
+      <div className="mt-2">
+        <Field label="Diagramm">
+          <Select value={mode} onChange={(e) => setMode(e.target.value as CurveMode)}>
+            {(Object.keys(CURVE_LABEL) as CurveMode[]).map((m) => (
+              <option key={m} value={m}>{CURVE_LABEL[m]}</option>
+            ))}
+          </Select>
+        </Field>
+      </div>
+      <div className="mt-2">
+        <Chart
+          series={series}
+          height={260}
+          xLabel={isAccel ? "t (s)" : "U/min"}
+          yLabel={isAccel ? "km/h" : mode === "tqEngine" ? "Nm" : "PS"}
+          xFormat={(v) => v.toFixed(isAccel ? 1 : 0)}
+          yFormat={(v) => v.toFixed(0)}
+          onLegendToggle={(i) => {
+            const g = relevant[i]; if (!g) return;
+            setHidden((h) => ({ ...h, [g.id]: !h[g.id] }));
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+
+/** Ergebnisse für Beschleunigungsläufe: Split-Zeiten, 1/4 Meile, Distanz. */
+function AccelOverview({ session, segments }: { session: Session; segments: Segment[] }) {
+  const rows = useMemo(() => segments.filter((g) => runCategory(g) === "accel").map((g) => ({
+    id: g.id,
+    name: g.name,
+    color: g.color,
+    splits: ACCEL_SPLITS.map(([a, b]) => splitTime(session.records, g.startT, g.endT, a, b)),
+    quarter: distanceRun(session.records, g.startT, g.endT),
+    dist: runDistance(session.records, g.startT, g.endT),
+  })), [session, segments]);
+
+  if (rows.length === 0) return null;
+
+  return (
+    <div className="mt-3 rounded-md border border-border p-3">
+      <div className="text-caption font-semibold text-foreground">Beschleunigungs-Ergebnisse</div>
+      <Note>Split-Zeiten linear interpoliert, 1/4 Meile über die aufintegrierte GPS-Geschwindigkeit.</Note>
+      <div className="mt-2 overflow-x-auto">
+        <table className="w-full text-caption text-foreground">
+          <thead className="text-muted-foreground">
+            <tr>
+              <th className="py-1 pr-2 text-left font-medium">Lauf</th>
+              {ACCEL_SPLITS.map(([a, b]) => (
+                <th key={`${a}-${b}`} className="py-1 pr-2 text-right font-medium">{a}–{b}</th>
+              ))}
+              <th className="py-1 pr-2 text-right font-medium">1/4 Meile</th>
+              <th className="py-1 pr-2 text-right font-medium">Trap</th>
+              <th className="py-1 pr-2 text-right font-medium">Distanz</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.id} className="border-t border-border">
+                <td className="py-1 pr-2">
+                  <span className="mr-1 inline-block h-2 w-3 rounded-sm align-middle" style={{ backgroundColor: r.color }} />
+                  {r.name}
+                </td>
+                {r.splits.map((s, i) => (
+                  <td key={i} className="py-1 pr-2 text-right tabular-nums">{s != null ? `${s.toFixed(2)} s` : "—"}</td>
+                ))}
+                <td className="py-1 pr-2 text-right tabular-nums">{r.quarter ? `${r.quarter.seconds.toFixed(2)} s` : "—"}</td>
+                <td className="py-1 pr-2 text-right tabular-nums">{r.quarter ? `${r.quarter.trapKmh.toFixed(0)} km/h` : "—"}</td>
+                <td className="py-1 pr-2 text-right tabular-nums">{r.dist.toFixed(0)} m</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
