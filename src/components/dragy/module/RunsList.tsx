@@ -10,6 +10,7 @@ import { uid } from "@/lib/dragy/db";
 import type { ModuleId, Session, Segment, Vehicle } from "@/lib/dragy/types";
 import { MODULE_IDS, MODULE_LABEL, isPowerModule, isTrackModule, sessionModule } from "@/lib/dragy/modules";
 import { Chart, type Series } from "../Chart";
+import { PdfExportDialog } from "../PdfExportDialog";
 
 const ACCEL_SPLITS: Array<[number, number]> = [[0, 100], [100, 200], [60, 130], [80, 120]];
 
@@ -236,6 +237,7 @@ function SegmentEditor({ module, seg, session, vehicle, maxT, onChange, onDelete
   const flatGearOptions: GearOpt[] = gearboxGroups.flatMap((g) => g.options);
   const hasAny = flatGearOptions.length + legacyPresets.length > 0;
   const isPower = isPowerModule(module);
+  const [pdfOpen, setPdfOpen] = useState(false);
 
   const miniSeries: Series[] = useMemo(() => {
     if (isPower) {
@@ -308,6 +310,15 @@ function SegmentEditor({ module, seg, session, vehicle, maxT, onChange, onDelete
       </div>
 
       {isPower && <CoastdownPanel session={session} seg={seg} vehicle={vehicle} onChange={onChange} />}
+
+      {isPower && (
+        <div className="mt-2 flex justify-end">
+          <Button variant="secondary" onClick={() => setPdfOpen(true)}>PDF-Protokoll</Button>
+        </div>
+      )}
+      {pdfOpen && (
+        <PdfExportDialog runs={[{ session, segment: seg, vehicle }]} onClose={() => setPdfOpen(false)} />
+      )}
 
       <div className="mt-2">
         <div className="mb-1 text-caption font-semibold text-muted-foreground">

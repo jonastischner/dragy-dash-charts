@@ -1,5 +1,7 @@
 import { useMemo, useState } from "react";
-import { Section, Note, EmptyState } from "./ui";
+import { Section, Note, EmptyState, Button } from "./ui";
+import { PdfExportDialog } from "./PdfExportDialog";
+import type { RunPdfData } from "@/lib/dragy/mahaPdf";
 import { useAppStore } from "@/lib/dragy/store";
 import { computeSegment, W_TO_PS } from "@/lib/dragy/physics";
 import { Chart, type Series } from "./Chart";
@@ -23,6 +25,7 @@ export function CompareTab({ module = "power", onOpenVehicles }: { module?: Modu
   const allowPower = isPowerModule(module);
   const allowedModes: Mode[] = allowPower ? ["pWheel", "pEngine", "tqWheel", "tqEngine", "accel"] : ["accel"];
   const [mode, setMode] = useState<Mode>(allowPower ? "pWheel" : "accel");
+  const [pdfOpen, setPdfOpen] = useState(false);
 
   const segments = useMemo(() => {
     if (!activeVehicle) return [];
@@ -110,6 +113,12 @@ export function CompareTab({ module = "power", onOpenVehicles }: { module?: Modu
       return { label: `${session.name} · ${g.name}`, color: g.color, pW, pWRpm, pE, pERpm, tW, tWRpm, tE, tERpm, vFrom, vMax, dur };
     });
 
+  // Sichtbare Läufe als Datenbasis für den Sammel-PDF-Export.
+  const pdfRuns: RunPdfData[] = (allowPower ? segments : [])
+    .filter((g) => g.visible !== false)
+    .map((g) => ({ session: state.sessions.find((s) => s.id === g.sessionId)!, segment: g, vehicle: activeVehicle }))
+    .filter((r) => !!r.session);
+
   const fmt = (v: number, d = 0) => (Number.isFinite(v) && v !== 0 ? v.toFixed(d) : "—");
   const fmtRpm = (v: number) => (Number.isFinite(v) ? `${v.toFixed(0)} U/min` : "—");
 
@@ -182,6 +191,14 @@ export function CompareTab({ module = "power", onOpenVehicles }: { module?: Modu
 
       {allowPower && (
         <Section title="Übersicht aktive Läufe" note="Peak-Werte je sichtbarem Lauf – Sichtbarkeit über die Chart-Legende steuern.">
+          {pdfRuns.length > 0 && (
+            <div className="mb-2 flex justify-end">
+              <Button variant="secondary" onClick={() => setPdfOpen(true)}>
+                PDF-Protokoll ({pdfRuns.length})
+              </Button>
+            </div>
+          )}
+          {pdfOpen && <PdfExportDialog runs={pdfRuns} onClose={() => setPdfOpen(false)} />}
           {overviewRows.length === 0 ? (
             <p className="text-caption text-muted-foreground">Keine aktiven Läufe.</p>
           ) : (
