@@ -3,6 +3,7 @@ import { db, uid } from "./db";
 import type { AppState, Vehicle, Session, Segment, GearboxDef, FinalDriveDef, TireDef, DriveSetup } from "./types";
 import { supabase } from "@/integrations/supabase/client";
 import { pushLocal, pushDelete, pushActiveVehicle } from "./sync";
+import { migrateSessionModule } from "./modules";
 
 
 const DEFAULT_VEHICLE: Omit<Vehicle, "id" | "name"> = {
