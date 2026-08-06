@@ -1,0 +1,110 @@
+import { useMemo } from "react";
+import { Gauge, Timer, Mountain, Flag, ChevronRight } from "lucide-react";
+import { Section, EmptyState, Note } from "./ui";
+import { useAppStore } from "@/lib/dragy/store";
+import { computeSegment, splitTime, runDistance, W_TO_PS } from "@/lib/dragy/physics";
+import type { ModuleId } from "@/lib/dragy/types";
+import { MODULE_DESC, MODULE_IDS, MODULE_LABEL, MODULE_METRIC, sessionModule } from "@/lib/dragy/modules";
+
+const MODULE_ICON: Record<ModuleId, typeof Gauge> = {
+  power: Gauge,
+  accel: Timer,
+  rally: Mountain,
+  circuit: Flag,
+};
+
+export function HomeTab({ onOpenModule, onOpenGarage }: {
+  onOpenModule: (m: ModuleId) => void;
+  onOpenGarage: () => void;
+}) {
+  const { state } = useAppStore();
+  const vehicle = state.vehicles.find((v) => v.id === state.activeVehicleId);
+
+  const stats = useMemo(() => {
+    const out = {} as Record<ModuleId, { sessions: number; runs: number; best: string }>;
+    for (const m of MODULE_IDS) out[m] = { sessions: 0, runs: 0, best: "—" };
+    if (!vehicle) return out;
+
+    for (const m of MODULE_IDS) {
+      const sessions = state.sessions.filter((s) => s.vehicleId === vehicle.id && sessionModule(s) === m);
+      const segs = sessions.flatMap((s) => state.segments.filter((g) => g.sessionId === s.id).map((g) => ({ s, g })));
+      let best = "—";
+      if (m === "power") {
+        let ps = NaN;
+        for (const { s, g } of segs) {
+          for (const smp of computeSegment(s, g, vehicle)) {
+            const p = smp.pEngineW * W_TO_PS;
+            if (Number.isFinite(p) && (!Number.isFinite(ps) || p > ps)) ps = p;
+          }
+        }
+        if (Number.isFinite(ps)) best = `${ps.toFixed(0)} PS`;
+      } else if (m === "accel") {
+        let t: number | null = null;
+        for (const { s, g } of segs) {
+          const v = splitTime(s.records, g.startT, g.endT, 0, 100);
+          if (v != null && (t == null || v < t)) t = v;
+        }
+        if (t != null) best = `${t.toFixed(2)} s`;
+      } else {
+        let t: number | null = null;
+        for (const { s, g } of segs) {
+          const rec = s.records.filter((r) => r.t >= g.startT && r.t <= g.endT);
+          if (rec.length < 2) continue;
+          const d = rec[rec.length - 1].t - rec[0].t;
+          if (runDistance(s.records, g.startT, g.endT) > 0 && (t == null || d < t)) t = d;
+        }
+        if (t != null) best = `${t.toFixed(2)} s`;
+      }
+      out[m] = { sessions: sessions.length, runs: segs.length, best };
+    }
+    return out;
+  }, [state, vehicle]);
+
+  if (!vehicle) {
+    return (
+      <Section title="Start">
+        <EmptyState
+          title="Kein Fahrzeug ausgewählt"
+          description="Fahrzeuge gelten über alle Module hinweg. Lege zuerst ein Fahrzeug an und wähle es oben aus."
+          actionLabel="Zur Garage"
+          onAction={onOpenGarage}
+        />
+      </Section>
+    );
+  }
+
+  return (
+    <Section title={`Module – ${vehicle.name}`}>
+      <Note>Jedes Modul hat eigene Sessions, Läufe und Auswertungen. Das Fahrzeug bleibt über alle Module hinweg aktiv.</Note>
+      <ul className="mt-2 grid gap-2 sm:grid-cols-2">
+        {MODULE_IDS.map((m) => {
+          const Icon = MODULE_ICON[m];
+          const st = stats[m];
+          return (
+            <li key={m}>
+              <button
+                onClick={() => onOpenModule(m)}
+                className="flex w-full items-start gap-3 rounded-md border border-border bg-card p-4 text-left transition-colors hover:border-ring"
+              >
+                <span className="flex h-11 w-11 flex-none items-center justify-center rounded-md bg-secondary text-foreground">
+                  <Icon className="h-5 w-5" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-center justify-between gap-2">
+                    <span className="text-body font-semibold text-foreground">{MODULE_LABEL[m]}</span>
+                    <ChevronRight className="h-4 w-4 flex-none text-muted-foreground" />
+                  </span>
+                  <span className="mt-1 block text-caption text-muted-foreground">{MODULE_DESC[m]}</span>
+                  <span className="mt-2 block text-caption text-foreground">
+                    <b className="tabular-nums">{st.best}</b>
+                    <span className="text-muted-foreground"> {MODULE_METRIC[m]} · {st.sessions} Sessions · {st.runs} Läufe</span>
+                  </span>
+                </span>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    </Section>
+  );
+}

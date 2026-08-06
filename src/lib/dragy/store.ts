@@ -3,6 +3,7 @@ import { db, uid } from "./db";
 import type { AppState, Vehicle, Session, Segment, GearboxDef, FinalDriveDef, TireDef, DriveSetup } from "./types";
 import { supabase } from "@/integrations/supabase/client";
 import { pushLocal, pushDelete, pushActiveVehicle } from "./sync";
+import { migrateSessionModule } from "./modules";
 
 
 const DEFAULT_VEHICLE: Omit<Vehicle, "id" | "name"> = {
@@ -66,23 +67,46 @@ export function duplicateVehicle(source: Vehicle): Vehicle {
 
 const initial: AppState = { vehicles: [], sessions: [], segments: [], activeVehicleId: null };
 
+// Modulweiter Zustand: alle useAppStore()-Instanzen teilen sich Daten,
+// damit z.B. die globale Fahrzeugauswahl im Header sofort mitbekommt,
+// wenn in der Garage ein Fahrzeug gespeichert wird.
+let sharedState: AppState = initial;
+let sharedReady = false;
+const listeners = new Set<() => void>();
+function publish(s: AppState) {
+  sharedState = s;
+  sharedReady = true;
+  listeners.forEach((l) => l());
+}
 
 // Simple background push helper (fire-and-forget)
 function bg<T>(p: Promise<T>) { p.catch((e) => console.warn("[sync] push failed", e)); }
 
 export function useAppStore() {
-  const [state, setState] = useState<AppState>(initial);
-  const [ready, setReady] = useState(false);
+  const [state, setState] = useState<AppState>(sharedState);
+  const [ready, setReady] = useState(sharedReady);
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const emailRef = useRef<string | null>(null);
 
   useEffect(() => {
+    const sync = () => { setState(sharedState); setReady(sharedReady); };
+    listeners.add(sync);
     (async () => {
-      const s = await db.loadAll();
-      setState(s as AppState);
-      setReady(true);
+      const s = (await db.loadAll()) as AppState;
+      // Migration: Sessions ohne Modul aus Altdaten (kind/category) ableiten.
+      const missing = s.sessions.filter((x) => !x.module);
+      for (const sess of missing) {
+        const segs = s.segments.filter((g) => g.sessionId === sess.id);
+        sess.module = migrateSessionModule(sess, segs);
+        await db.putSession(sess);
+      }
+      publish(s);
     })();
+    return () => { listeners.delete(sync); };
   }, []);
+
+
+
 
   useEffect(() => {
     let mounted = true;
@@ -99,8 +123,9 @@ export function useAppStore() {
 
   const refresh = useCallback(async () => {
     const s = await db.loadAll();
-    setState(s as AppState);
+    publish(s as AppState);
   }, []);
+
 
   const stamp = <T extends object>(v: T): T & { updatedAt: number } => ({ ...v, updatedAt: Date.now() });
 
