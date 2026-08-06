@@ -123,8 +123,9 @@ export function useAppStore() {
 
   const refresh = useCallback(async () => {
     const s = await db.loadAll();
-    setState(s as AppState);
+    publish(s as AppState);
   }, []);
+
 
   const stamp = <T extends object>(v: T): T & { updatedAt: number } => ({ ...v, updatedAt: Date.now() });
 
