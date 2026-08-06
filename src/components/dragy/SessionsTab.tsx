@@ -403,6 +403,20 @@ function SegmentEditor({ seg, session, vehicle, maxT, onChange, onDelete }: { se
           <TextArea rows={2} value={seg.notes ?? ""} onChange={(e) => onChange({ notes: e.target.value })} placeholder="Notizen…" />
         </Field>
       </div>
+      <div className="mt-2">
+        <div className="mb-1 text-caption font-semibold text-muted-foreground">
+          {isPower ? "Leistung (PS) über Drehzahl" : "Geschwindigkeit (km/h) über Zeit"}
+        </div>
+        <Chart
+          series={miniSeries}
+          height={160}
+          xLabel={isPower ? "U/min" : "t (s)"}
+          yLabel={isPower ? "PS" : "km/h"}
+          xFormat={(v) => v.toFixed(isPower ? 0 : 1)}
+          yFormat={(v) => v.toFixed(0)}
+        />
+      </div>
+
     </li>
   );
 }
