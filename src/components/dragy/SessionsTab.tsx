@@ -452,7 +452,7 @@ function PeakOverview({ session, segments, vehicle }: { session: Session; segmen
   const [refId, setRefId] = usePersistedState<string>(`dragy.peaks.ref.${session.id}`, "");
 
   const rows = useMemo(() => {
-    return segments.map((g) => {
+    return segments.filter(hasPowerCurve).map((g) => {
       const samples = computeSegment(session, g, vehicle);
       let best = { ps: NaN, psRpm: NaN, nm: NaN, nmRpm: NaN };
       for (const s of samples) {
