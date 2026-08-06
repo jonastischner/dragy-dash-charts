@@ -9,6 +9,10 @@ import { CompareTab } from "@/components/dragy/CompareTab";
 import { BackupTab } from "@/components/dragy/BackupTab";
 import { AccountTab } from "@/components/dragy/AccountTab";
 import { LiveTab } from "@/components/dragy/LiveTab";
+import { usePersistedState } from "@/components/dragy/ui";
+import { SESSION_KIND_LABEL } from "@/lib/dragy/categories";
+import type { SessionKind } from "@/lib/dragy/types";
+
 
 export const Route = createFileRoute("/")({
   head: () => ({
