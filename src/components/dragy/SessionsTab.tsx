@@ -4,7 +4,7 @@ import { useAppStore, pickColor } from "@/lib/dragy/store";
 import { autoDetectSegments, computeSegment, splitTime, distanceRun, runDistance, W_TO_PS } from "@/lib/dragy/physics";
 import { computeRpmFactor, resolveAllGears } from "@/lib/dragy/gear";
 import { uid } from "@/lib/dragy/db";
-import type { Session, Segment, RunCategory } from "@/lib/dragy/types";
+import type { Session, Segment, RunCategory, SessionKind } from "@/lib/dragy/types";
 import { RUN_CATEGORY_LABEL, RUN_CATEGORY_SHORT, SESSION_KIND_LABEL, categoriesFor, defaultCategoryFor, hasPowerCurve, runCategory, sessionKind } from "@/lib/dragy/categories";
 import { Chart, type Series } from "./Chart";
 
