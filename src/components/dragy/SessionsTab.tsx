@@ -15,18 +15,26 @@ export function SessionsTab({ onOpenVehicles }: { onOpenVehicles?: () => void } 
   const { state, saveSession, deleteSession, saveSegment, deleteSegment } = useAppStore();
   const activeVehicle = state.vehicles.find((v) => v.id === state.activeVehicleId);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [module] = usePersistedState<SessionKind>("dragy.activeModule", "performance");
 
   if (!activeVehicle) return <Section title="Sessions & Läufe"><EmptyState title="Kein aktives Fahrzeug" description="Lege zuerst ein Fahrzeug an und aktiviere es." actionLabel="Zu Fahrzeuge" onAction={onOpenVehicles} /></Section>;
 
 
-  const sessions = state.sessions.filter((s) => s.vehicleId === activeVehicle.id).sort((a, b) => b.createdAt - a.createdAt);
+  const sessions = state.sessions
+    .filter((s) => s.vehicleId === activeVehicle.id && sessionKind(s) === module)
+    .sort((a, b) => b.createdAt - a.createdAt);
 
   return (
     <div>
       <AllSessionsPeaks sessions={sessions} segments={state.segments} vehicle={activeVehicle} />
-      <Section title={`Sessions – ${activeVehicle.name}`}>
+      <Section title={`Sessions – ${activeVehicle.name}`} note={`Modul: ${SESSION_KIND_LABEL[module]}`}>
 
-        {sessions.length === 0 && <p className="text-caption text-muted-foreground">Noch keine Sessions. Reiter „Import" nutzen.</p>}
+        {sessions.length === 0 && (
+          <p className="text-caption text-muted-foreground">
+            Keine Sessions in diesem Modul. Über „Import" anlegen – der Session-Typ lässt sich in der Session umstellen.
+          </p>
+        )}
+
         <ul className="space-y-2">
           {sessions.map((s) => {
             const segs = state.segments.filter((g) => g.sessionId === s.id);
