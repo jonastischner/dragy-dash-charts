@@ -120,13 +120,14 @@ export function CompareTab({ onOpenVehicles }: { onOpenVehicles?: () => void } =
         }
       >
         <div className="mb-2 flex flex-wrap gap-2">
-          {(Object.keys(MODE_LABEL) as Mode[]).map((m) => (
+          {allowedModes.map((m) => (
             <button key={m} onClick={() => setMode(m)}
-              className={`rounded px-3 py-1 text-caption ${mode === m ? "bg-primary text-white" : "bg-secondary text-foreground"}`}>
+              className={`min-h-11 rounded px-3 text-caption ${mode === m ? "bg-primary text-primary-foreground" : "bg-secondary text-foreground"}`}>
               {MODE_LABEL[m]}
             </button>
           ))}
         </div>
+
 
         {segments.length === 0 ? (
           <p className="text-caption text-muted-foreground">Keine Läufe im aktiven Fahrzeug.</p>
