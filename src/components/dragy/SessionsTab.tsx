@@ -185,13 +185,16 @@ function SessionDetail({ session, segments, vehicle, onRename, onDelete, onSaveS
 
   const bands = segments.map((g) => ({ xStart: g.startT, xEnd: g.endT, color: g.color, label: g.name }));
 
+  const kind = sessionKind(session);
+  const defCat = defaultCategoryFor(kind);
+
   const addSegment = async () => {
     const i = segments.length;
     const dur = session.records[session.records.length - 1]?.t ?? 0;
     const seg: Segment = {
       id: uid(), sessionId: session.id, name: `Lauf ${i + 1}`,
       startT: 0, endT: dur, rpmFactor: vehicle.rpmFactorDefault,
-      color: pickColor(i), visible: true,
+      color: pickColor(i), visible: true, category: defCat,
     };
     await onSaveSeg(seg);
   };
@@ -205,11 +208,12 @@ function SessionDetail({ session, segments, vehicle, onRename, onDelete, onSaveS
         id: uid(), sessionId: session.id, name: `Auto ${segments.length + i + 1}`,
         startT: found[i].startT, endT: found[i].endT,
         rpmFactor: vehicle.rpmFactorDefault,
-        color: pickColor(segments.length + i), visible: true,
+        color: pickColor(segments.length + i), visible: true, category: defCat,
       };
       await onSaveSeg(seg);
     }
   };
+
 
   return (
     <div className="border-t border-border p-3">
