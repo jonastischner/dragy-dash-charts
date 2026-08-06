@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Car, Upload, ListChecks, Ruler, BarChart3, Database, UserCircle2, MoreHorizontal, X } from "lucide-react";
+import { Car, Upload, ListChecks, Ruler, BarChart3, Database, UserCircle2, MoreHorizontal, X, Bluetooth } from "lucide-react";
 import { VehiclesTab } from "@/components/dragy/VehiclesTab";
 import { ImportTab } from "@/components/dragy/ImportTab";
 import { SessionsTab } from "@/components/dragy/SessionsTab";
@@ -8,6 +8,7 @@ import { CalibrationTab } from "@/components/dragy/CalibrationTab";
 import { CompareTab } from "@/components/dragy/CompareTab";
 import { BackupTab } from "@/components/dragy/BackupTab";
 import { AccountTab } from "@/components/dragy/AccountTab";
+import { LiveTab } from "@/components/dragy/LiveTab";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -22,7 +23,7 @@ export const Route = createFileRoute("/")({
   component: Index,
 });
 
-type Tab = "vehicles" | "import" | "sessions" | "calibration" | "compare" | "backup" | "account";
+type Tab = "vehicles" | "live" | "import" | "sessions" | "calibration" | "compare" | "backup" | "account";
 type TabDef = { id: Tab; label: string; icon: typeof Car };
 
 const PRIMARY_TABS: TabDef[] = [
@@ -32,6 +33,7 @@ const PRIMARY_TABS: TabDef[] = [
   { id: "import", label: "Import", icon: Upload },
 ];
 const MORE_TABS: TabDef[] = [
+  { id: "live", label: "Live (BLE)", icon: Bluetooth },
   { id: "calibration", label: "Kalibrierung", icon: Ruler },
   { id: "backup", label: "Backup", icon: Database },
   { id: "account", label: "Konto", icon: UserCircle2 },
@@ -97,6 +99,7 @@ function Index() {
         {tab === "sessions" && <SessionsTab onOpenVehicles={goVehicles} />}
         {tab === "calibration" && <CalibrationTab onOpenVehicles={goVehicles} />}
         {tab === "compare" && <CompareTab onOpenVehicles={goVehicles} />}
+        {tab === "live" && <LiveTab onOpenVehicles={goVehicles} />}
         {tab === "backup" && <BackupTab />}
         {tab === "account" && <AccountTab />}
       </main>
