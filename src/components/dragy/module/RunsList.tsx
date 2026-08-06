@@ -309,6 +309,15 @@ function SegmentEditor({ module, seg, session, vehicle, maxT, onChange, onDelete
 
       {isPower && <CoastdownPanel session={session} seg={seg} vehicle={vehicle} onChange={onChange} />}
 
+      {isPower && (
+        <div className="mt-2 flex justify-end">
+          <Button variant="secondary" onClick={() => setPdfOpen(true)}>PDF-Protokoll</Button>
+        </div>
+      )}
+      {pdfOpen && (
+        <PdfExportDialog runs={[{ session, segment: seg, vehicle }]} onClose={() => setPdfOpen(false)} />
+      )}
+
       <div className="mt-2">
         <div className="mb-1 text-caption font-semibold text-muted-foreground">
           {isPower ? "Leistung (PS) über Drehzahl" : "Geschwindigkeit (km/h) über Zeit"}
