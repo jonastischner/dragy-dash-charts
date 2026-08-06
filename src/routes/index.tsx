@@ -94,7 +94,29 @@ function Index() {
             })}
           </nav>
         </div>
+        {/* Modul-Umschalter: dieselben Bereiche, unterschiedliche Auswertung */}
+        <div className="mx-auto max-w-[1200px] px-4 pb-3 md:px-6">
+          <div role="tablist" aria-label="Module" className="flex gap-1 overflow-x-auto rounded-md bg-muted p-1">
+            {MODULES.map((m) => {
+              const isActive = module === m;
+              return (
+                <button
+                  key={m}
+                  role="tab"
+                  aria-selected={isActive}
+                  onClick={() => setModule(m)}
+                  className={`min-h-[36px] flex-1 whitespace-nowrap rounded-md px-3 text-caption font-medium transition-ui focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                    isActive ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {SESSION_KIND_LABEL[m]}
+                </button>
+              );
+            })}
+          </div>
+        </div>
       </header>
+
 
       <main className="mx-auto max-w-[1200px] px-4 py-6 pb-[calc(80px+env(safe-area-inset-bottom))] md:px-6 md:pb-6">
         <h2 className="sr-only">{active.label}</h2>
