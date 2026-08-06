@@ -81,6 +81,13 @@ export interface Record { t: number; speedKmh: number; heightM: number }
 
 export interface ManualRow { speedKmh: number; t: number | null }
 
+/** Kategorie eines Laufs – steuert Auswertung und Anzeige. */
+export type RunCategory = "power" | "accel" | "coastdown" | "stage" | "lap";
+
+/** Modul/Typ einer Session. */
+export type SessionKind = "performance" | "rally" | "circuit";
+
+
 export interface Session {
   id: string;
   vehicleId: string;
