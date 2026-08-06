@@ -44,9 +44,13 @@ const MORE_TABS: TabDef[] = [
 ];
 const ALL_TABS = [...PRIMARY_TABS, ...MORE_TABS];
 
+const MODULES: SessionKind[] = ["performance", "rally", "circuit"];
+
 function Index() {
   const [tab, setTab] = useState<Tab>("vehicles");
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [module, setModule] = usePersistedState<SessionKind>("dragy.activeModule", "performance");
+
   const goVehicles = () => setTab("vehicles");
   const active = ALL_TABS.find((t) => t.id === tab)!;
   const moreActive = MORE_TABS.some((t) => t.id === tab);
