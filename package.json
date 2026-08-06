@@ -7,7 +7,7 @@
     "dev": "vite dev",
     "build": "vite build",
     "build:dev": "vite build --mode development",
-    "build:mobile": "CAPACITOR_BUILD=true vite build && npx cap sync ios",
+    "build:mobile": "node scripts/build-mobile.js",
     "preview": "vite preview",
     "lint": "eslint .",
     "format": "prettier --write ."
