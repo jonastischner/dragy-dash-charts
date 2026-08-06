@@ -222,10 +222,18 @@ function SessionDetail({ session, segments, vehicle, onRename, onDelete, onSaveS
         <div className="flex items-end justify-end"><Button variant="danger" onClick={onDelete}>Session löschen</Button></div>
       </Row>
       <Row className="mt-2">
+        <Field label="Modul / Session-Typ" hint="Bestimmt die Standard-Kategorie neuer Läufe">
+          <Select value={kind} onChange={(e) => onEnvUpdate({ kind: e.target.value as any })}>
+            {(["performance", "rally", "circuit"] as const).map((k) => (
+              <option key={k} value={k}>{SESSION_KIND_LABEL[k]}</option>
+            ))}
+          </Select>
+        </Field>
         <Field label="Temperatur (°C)"><NumInput value={session.tempC} onChange={(e) => onEnvUpdate({ tempC: +e.target.value })} /></Field>
         <Field label="Druck (hPa)"><NumInput value={session.pressureHpa} onChange={(e) => onEnvUpdate({ pressureHpa: +e.target.value })} /></Field>
         <Field label="Luftfeuchte (%)"><NumInput value={session.rh} onChange={(e) => onEnvUpdate({ rh: +e.target.value })} /></Field>
       </Row>
+
       <div className="mt-2">
         <Field label="Notizen zur Session" hint="z.B. Strecke, Wetter, Setup">
           <TextArea rows={3} value={session.notes ?? ""} onChange={(e) => onEnvUpdate({ notes: e.target.value })} placeholder="Notizen…" />
