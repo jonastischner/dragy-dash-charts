@@ -8,10 +8,11 @@ import {
   NORDIC_UART, bleSupported, connectBle, createParser, pointsToRecords, toAscii, toHex,
   type BleConnection, type StreamFormat, type StreamPoint,
 } from "@/lib/dragy/ble";
-import type { Session } from "@/lib/dragy/types";
+import type { Session, SessionKind } from "@/lib/dragy/types";
 
 export function LiveTab({ onOpenVehicles }: { onOpenVehicles?: () => void } = {}) {
   const { state, saveSession } = useAppStore();
+  const [module] = usePersistedState<SessionKind>("dragy.activeModule", "performance");
   const activeVehicle = state.vehicles.find((v) => v.id === state.activeVehicleId);
   const platform = useCapacitorPlatform();
 
@@ -98,7 +99,7 @@ export function LiveTab({ onOpenVehicles }: { onOpenVehicles?: () => void } = {}
     const s: Session = {
       id: uid(), vehicleId: activeVehicle.id,
       name: `Live ${new Date().toLocaleString("de-DE")}`,
-      records, tempC, pressureHpa, rh, manual: false, createdAt: Date.now(),
+      records, tempC, pressureHpa, rh, manual: false, createdAt: Date.now(), kind: module,
     };
     await saveSession(s);
     setSaveMsg(`Session gespeichert: ${records.length} Punkte (${records[records.length - 1].t.toFixed(1)} s).`);

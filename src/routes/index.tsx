@@ -9,6 +9,10 @@ import { CompareTab } from "@/components/dragy/CompareTab";
 import { BackupTab } from "@/components/dragy/BackupTab";
 import { AccountTab } from "@/components/dragy/AccountTab";
 import { LiveTab } from "@/components/dragy/LiveTab";
+import { usePersistedState } from "@/components/dragy/ui";
+import { SESSION_KIND_LABEL } from "@/lib/dragy/categories";
+import type { SessionKind } from "@/lib/dragy/types";
+
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -40,9 +44,13 @@ const MORE_TABS: TabDef[] = [
 ];
 const ALL_TABS = [...PRIMARY_TABS, ...MORE_TABS];
 
+const MODULES: SessionKind[] = ["performance", "rally", "circuit"];
+
 function Index() {
   const [tab, setTab] = useState<Tab>("vehicles");
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [module, setModule] = usePersistedState<SessionKind>("dragy.activeModule", "performance");
+
   const goVehicles = () => setTab("vehicles");
   const active = ALL_TABS.find((t) => t.id === tab)!;
   const moreActive = MORE_TABS.some((t) => t.id === tab);
@@ -90,10 +98,40 @@ function Index() {
             })}
           </nav>
         </div>
+        {/* Modul-Umschalter: dieselben Bereiche, unterschiedliche Auswertung */}
+        <div className="mx-auto max-w-[1200px] px-4 pb-3 md:px-6">
+          <div role="tablist" aria-label="Module" className="flex gap-1 overflow-x-auto rounded-md bg-muted p-1">
+            {MODULES.map((m) => {
+              const isActive = module === m;
+              return (
+                <button
+                  key={m}
+                  role="tab"
+                  aria-selected={isActive}
+                  onClick={() => setModule(m)}
+                  className={`min-h-[36px] flex-1 whitespace-nowrap rounded-md px-3 text-caption font-medium transition-ui focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                    isActive ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {SESSION_KIND_LABEL[m]}
+                </button>
+              );
+            })}
+          </div>
+        </div>
       </header>
+
 
       <main className="mx-auto max-w-[1200px] px-4 py-6 pb-[calc(80px+env(safe-area-inset-bottom))] md:px-6 md:pb-6">
         <h2 className="sr-only">{active.label}</h2>
+        {module !== "performance" && (
+          <div className="mb-4 rounded-md border border-border bg-card p-3 text-caption text-muted-foreground">
+            <span className="font-semibold text-foreground">{SESSION_KIND_LABEL[module]}</span> – in Vorbereitung.
+            Sessions können diesem Modul bereits zugeordnet werden (Session-Typ in der Session); die spezifische
+            Auswertung (Stage-Zeit, Rundenzeit, Speed-Trace über Distanz) folgt.
+          </div>
+        )}
+
         {tab === "vehicles" && <VehiclesTab />}
         {tab === "import" && <ImportTab onOpenVehicles={goVehicles} />}
         {tab === "sessions" && <SessionsTab onOpenVehicles={goVehicles} />}

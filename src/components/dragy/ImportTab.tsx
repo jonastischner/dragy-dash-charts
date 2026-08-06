@@ -1,14 +1,15 @@
 import { useRef, useState } from "react";
-import { Section, Field, TextInput, NumInput, Button, Note, Row, EmptyState } from "./ui";
+import { Section, Field, TextInput, NumInput, Button, Note, Row, EmptyState, usePersistedState } from "./ui";
 import { useAppStore } from "@/lib/dragy/store";
 import { parseUbx } from "@/lib/dragy/ubx";
 import { parseTableFile } from "@/lib/dragy/tabular";
 import { uid } from "@/lib/dragy/db";
-import type { Session, ManualRow, Record as R } from "@/lib/dragy/types";
+import type { Session, ManualRow, Record as R, SessionKind } from "@/lib/dragy/types";
 
 
 export function ImportTab({ onOpenVehicles }: { onOpenVehicles?: () => void } = {}) {
   const { state, saveSession } = useAppStore();
+  const [module] = usePersistedState<SessionKind>("dragy.activeModule", "performance");
   const activeVehicle = state.vehicles.find((v) => v.id === state.activeVehicleId);
   const inputRef = useRef<HTMLInputElement>(null);
   const [tempC, setTempC] = useState(20);
@@ -39,7 +40,7 @@ export function ImportTab({ onOpenVehicles }: { onOpenVehicles?: () => void } = 
         }
         const s: Session = {
           id: uid(), vehicleId: activeVehicle.id, name: f.name.replace(/\.(data|ubx|csv|txt|tsv|xlsx|xlsm|xls)$/i, ""),
-          records, tempC, pressureHpa, rh, manual: false, createdAt: Date.now(),
+          records, tempC, pressureHpa, rh, manual: false, createdAt: Date.now(), kind: module,
         };
         await saveSession(s);
         msgs.push(`${f.name}: ${records.length} Punkte importiert (${records[records.length - 1].t.toFixed(1)} s)${extra}`);
@@ -100,6 +101,7 @@ function ManualEditor({ vehicleId, tempC, pressureHpa, rh, onSave, onCancel }: {
   onSave: (s: Session) => void; onCancel: () => void;
 }) {
   const [name, setName] = useState("Manuelle Session");
+  const [module] = usePersistedState<SessionKind>("dragy.activeModule", "performance");
   const [rows, setRows] = useState<ManualRow[]>(defaultRows());
 
   const update = (i: number, patch: Partial<ManualRow>) => {
@@ -115,7 +117,7 @@ function ManualEditor({ vehicleId, tempC, pressureHpa, rh, onSave, onCancel }: {
     const records: R[] = valid.map((r) => ({ t: r.t as number, speedKmh: r.speedKmh, heightM: 0 }));
     onSave({
       id: uid(), vehicleId, name, records, tempC, pressureHpa, rh,
-      manual: true, manualRows: rows, createdAt: Date.now(),
+      manual: true, manualRows: rows, createdAt: Date.now(), kind: module,
     });
   };
 

@@ -1,28 +1,40 @@
 import { useMemo, useState } from "react";
-import { Section, Field, TextInput, TextArea, NumInput, Button, Note, Row, EmptyState, usePersistedState } from "./ui";
+import { Section, Field, TextInput, TextArea, NumInput, Select, Button, Note, Row, EmptyState, usePersistedState } from "./ui";
 import { useAppStore, pickColor } from "@/lib/dragy/store";
-import { autoDetectSegments, computeSegment, W_TO_PS } from "@/lib/dragy/physics";
+import { autoDetectSegments, computeSegment, splitTime, distanceRun, runDistance, W_TO_PS } from "@/lib/dragy/physics";
 import { computeRpmFactor, resolveAllGears } from "@/lib/dragy/gear";
 import { uid } from "@/lib/dragy/db";
-import type { Session, Segment } from "@/lib/dragy/types";
-import { Chart } from "./Chart";
+import type { Session, Segment, RunCategory, SessionKind } from "@/lib/dragy/types";
+import { RUN_CATEGORY_LABEL, RUN_CATEGORY_SHORT, SESSION_KIND_LABEL, categoriesFor, defaultCategoryFor, hasPowerCurve, runCategory, sessionKind } from "@/lib/dragy/categories";
+import { Chart, type Series } from "./Chart";
+
+const ACCEL_SPLITS: Array<[number, number]> = [[0, 100], [100, 200], [60, 130], [80, 120]];
+
 
 export function SessionsTab({ onOpenVehicles }: { onOpenVehicles?: () => void } = {}) {
   const { state, saveSession, deleteSession, saveSegment, deleteSegment } = useAppStore();
   const activeVehicle = state.vehicles.find((v) => v.id === state.activeVehicleId);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [module] = usePersistedState<SessionKind>("dragy.activeModule", "performance");
 
   if (!activeVehicle) return <Section title="Sessions & Läufe"><EmptyState title="Kein aktives Fahrzeug" description="Lege zuerst ein Fahrzeug an und aktiviere es." actionLabel="Zu Fahrzeuge" onAction={onOpenVehicles} /></Section>;
 
 
-  const sessions = state.sessions.filter((s) => s.vehicleId === activeVehicle.id).sort((a, b) => b.createdAt - a.createdAt);
+  const sessions = state.sessions
+    .filter((s) => s.vehicleId === activeVehicle.id && sessionKind(s) === module)
+    .sort((a, b) => b.createdAt - a.createdAt);
 
   return (
     <div>
       <AllSessionsPeaks sessions={sessions} segments={state.segments} vehicle={activeVehicle} />
-      <Section title={`Sessions – ${activeVehicle.name}`}>
+      <Section title={`Sessions – ${activeVehicle.name}`} note={`Modul: ${SESSION_KIND_LABEL[module]}`}>
 
-        {sessions.length === 0 && <p className="text-caption text-muted-foreground">Noch keine Sessions. Reiter „Import" nutzen.</p>}
+        {sessions.length === 0 && (
+          <p className="text-caption text-muted-foreground">
+            Keine Sessions in diesem Modul. Über „Import" anlegen – der Session-Typ lässt sich in der Session umstellen.
+          </p>
+        )}
+
         <ul className="space-y-2">
           {sessions.map((s) => {
             const segs = state.segments.filter((g) => g.sessionId === s.id);
@@ -59,7 +71,7 @@ export function SessionsTab({ onOpenVehicles }: { onOpenVehicles?: () => void } 
 }
 function bestOfSegments(session: Session, segs: Segment[], vehicle: any) {
   let best: { segId: string; segName: string; color: string; ps: number; psRpm: number; nm: number; nmRpm: number } | null = null;
-  for (const g of segs) {
+  for (const g of segs.filter(hasPowerCurve)) {
     const samples = computeSegment(session, g, vehicle);
     let ps = NaN, psRpm = NaN, nm = NaN, nmRpm = NaN;
     for (const s of samples) {
@@ -181,13 +193,16 @@ function SessionDetail({ session, segments, vehicle, onRename, onDelete, onSaveS
 
   const bands = segments.map((g) => ({ xStart: g.startT, xEnd: g.endT, color: g.color, label: g.name }));
 
+  const kind = sessionKind(session);
+  const defCat = defaultCategoryFor(kind);
+
   const addSegment = async () => {
     const i = segments.length;
     const dur = session.records[session.records.length - 1]?.t ?? 0;
     const seg: Segment = {
       id: uid(), sessionId: session.id, name: `Lauf ${i + 1}`,
       startT: 0, endT: dur, rpmFactor: vehicle.rpmFactorDefault,
-      color: pickColor(i), visible: true,
+      color: pickColor(i), visible: true, category: defCat,
     };
     await onSaveSeg(seg);
   };
@@ -201,11 +216,12 @@ function SessionDetail({ session, segments, vehicle, onRename, onDelete, onSaveS
         id: uid(), sessionId: session.id, name: `Auto ${segments.length + i + 1}`,
         startT: found[i].startT, endT: found[i].endT,
         rpmFactor: vehicle.rpmFactorDefault,
-        color: pickColor(segments.length + i), visible: true,
+        color: pickColor(segments.length + i), visible: true, category: defCat,
       };
       await onSaveSeg(seg);
     }
   };
+
 
   return (
     <div className="border-t border-border p-3">
@@ -214,10 +230,18 @@ function SessionDetail({ session, segments, vehicle, onRename, onDelete, onSaveS
         <div className="flex items-end justify-end"><Button variant="danger" onClick={onDelete}>Session löschen</Button></div>
       </Row>
       <Row className="mt-2">
+        <Field label="Modul / Session-Typ" hint="Bestimmt die Standard-Kategorie neuer Läufe">
+          <Select value={kind} onChange={(e) => onEnvUpdate({ kind: e.target.value as any })}>
+            {(["performance", "rally", "circuit"] as const).map((k) => (
+              <option key={k} value={k}>{SESSION_KIND_LABEL[k]}</option>
+            ))}
+          </Select>
+        </Field>
         <Field label="Temperatur (°C)"><NumInput value={session.tempC} onChange={(e) => onEnvUpdate({ tempC: +e.target.value })} /></Field>
         <Field label="Druck (hPa)"><NumInput value={session.pressureHpa} onChange={(e) => onEnvUpdate({ pressureHpa: +e.target.value })} /></Field>
         <Field label="Luftfeuchte (%)"><NumInput value={session.rh} onChange={(e) => onEnvUpdate({ rh: +e.target.value })} /></Field>
       </Row>
+
       <div className="mt-2">
         <Field label="Notizen zur Session" hint="z.B. Strecke, Wetter, Setup">
           <TextArea rows={3} value={session.notes ?? ""} onChange={(e) => onEnvUpdate({ notes: e.target.value })} placeholder="Notizen…" />
@@ -254,7 +278,12 @@ function SessionDetail({ session, segments, vehicle, onRename, onDelete, onSaveS
         <Chart series={speedSeries} bands={bands} xLabel="t (s)" yLabel="km/h" xFormat={(v) => v.toFixed(1)} yFormat={(v) => v.toFixed(0)} />
       </div>
 
+      <SessionCurves session={session} segments={segments} vehicle={vehicle} />
+
       <PeakOverview session={session} segments={segments} vehicle={vehicle} />
+
+      <AccelOverview session={session} segments={segments} />
+
 
 
       <div className="mt-3 rounded-md border border-border p-3">
@@ -275,9 +304,10 @@ function SessionDetail({ session, segments, vehicle, onRename, onDelete, onSaveS
         </div>
         <ul className="space-y-2">
           {segments.map((g) => (
-            <SegmentEditor key={g.id} seg={g} vehicle={vehicle} maxT={session.records[session.records.length - 1]?.t ?? 0}
+            <SegmentEditor key={g.id} seg={g} session={session} vehicle={vehicle} maxT={session.records[session.records.length - 1]?.t ?? 0}
               onChange={async (patch) => { await onSaveSeg({ ...g, ...patch }); }}
               onDelete={async () => { if (confirm(`Lauf "${g.name}" löschen?`)) await onDelSeg(g.id); }} />
+
           ))}
         </ul>
       </div>
@@ -285,7 +315,7 @@ function SessionDetail({ session, segments, vehicle, onRename, onDelete, onSaveS
   );
 }
 
-function SegmentEditor({ seg, vehicle, maxT, onChange, onDelete }: { seg: Segment; vehicle: any; maxT: number; onChange: (patch: Partial<Segment>) => Promise<void>; onDelete: () => void }) {
+function SegmentEditor({ seg, session, vehicle, maxT, onChange, onDelete }: { seg: Segment; session: Session; vehicle: any; maxT: number; onChange: (patch: Partial<Segment>) => Promise<void>; onDelete: () => void }) {
   const legacyPresets: Array<{ id: string; name: string; rpmFactor: number }> = vehicle?.gearPresets ?? [];
 
   type GearOpt = { id: string; label: string; rpmFactor: number };
@@ -314,6 +344,27 @@ function SegmentEditor({ seg, vehicle, maxT, onChange, onDelete }: { seg: Segmen
   const flatGearOptions: GearOpt[] = gearboxGroups.flatMap((g) => g.options);
   const hasAny = flatGearOptions.length + legacyPresets.length > 0;
 
+  const cat = runCategory(seg);
+  const isPower = hasPowerCurve(seg);
+  const kindOptions = categoriesFor(sessionKind(session));
+  const catOptions: RunCategory[] = kindOptions.includes(cat) ? kindOptions : [cat, ...kindOptions];
+
+  const miniSeries: Series[] = useMemo(() => {
+    if (isPower) {
+      const samples = computeSegment(session, seg, vehicle);
+      const points = samples
+        .map((s) => ({ x: s.rpm, y: s.pEngineW * W_TO_PS }))
+        .filter((p) => Number.isFinite(p.x) && Number.isFinite(p.y));
+      return [{ label: seg.name, color: seg.color, points }];
+    }
+    const points = session.records
+      .filter((r) => r.t >= seg.startT && r.t <= seg.endT)
+      .map((r) => ({ x: r.t - seg.startT, y: r.speedKmh }));
+    return [{ label: seg.name, color: seg.color, points }];
+  }, [session, seg, vehicle, isPower]);
+
+
+
   return (
     <li className="rounded-md border border-border bg-card p-3">
       <div className="flex items-center gap-2">
@@ -334,8 +385,14 @@ function SegmentEditor({ seg, vehicle, maxT, onChange, onDelete }: { seg: Segmen
         <Button variant="danger" onClick={onDelete}>×</Button>
       </div>
       <Row className="mt-2">
+        <Field label="Kategorie" hint="Bestimmt, wie der Lauf ausgewertet wird">
+          <Select value={cat} onChange={(e) => onChange({ category: e.target.value as RunCategory })}>
+            {catOptions.map((c) => <option key={c} value={c}>{RUN_CATEGORY_LABEL[c]}</option>)}
+          </Select>
+        </Field>
         <Field label="Start t (s)"><NumInput step="0.1" value={seg.startT} onChange={(e) => onChange({ startT: Math.max(0, +e.target.value) })} /></Field>
         <Field label="Ende t (s)"><NumInput step="0.1" value={seg.endT} onChange={(e) => onChange({ endT: Math.min(maxT, +e.target.value) })} /></Field>
+
         {hasAny && (
           <Field label="Gemessener Gang" hint="Setzt rpmFactor aus Fahrzeug-Getriebe/Preset">
             <select
@@ -381,6 +438,20 @@ function SegmentEditor({ seg, vehicle, maxT, onChange, onDelete }: { seg: Segmen
           <TextArea rows={2} value={seg.notes ?? ""} onChange={(e) => onChange({ notes: e.target.value })} placeholder="Notizen…" />
         </Field>
       </div>
+      <div className="mt-2">
+        <div className="mb-1 text-caption font-semibold text-muted-foreground">
+          {isPower ? "Leistung (PS) über Drehzahl" : "Geschwindigkeit (km/h) über Zeit"}
+        </div>
+        <Chart
+          series={miniSeries}
+          height={160}
+          xLabel={isPower ? "U/min" : "t (s)"}
+          yLabel={isPower ? "PS" : "km/h"}
+          xFormat={(v) => v.toFixed(isPower ? 0 : 1)}
+          yFormat={(v) => v.toFixed(0)}
+        />
+      </div>
+
     </li>
   );
 }
@@ -389,7 +460,7 @@ function PeakOverview({ session, segments, vehicle }: { session: Session; segmen
   const [refId, setRefId] = usePersistedState<string>(`dragy.peaks.ref.${session.id}`, "");
 
   const rows = useMemo(() => {
-    return segments.map((g) => {
+    return segments.filter(hasPowerCurve).map((g) => {
       const samples = computeSegment(session, g, vehicle);
       let best = { ps: NaN, psRpm: NaN, nm: NaN, nmRpm: NaN };
       for (const s of samples) {
@@ -463,6 +534,129 @@ function PeakOverview({ session, segments, vehicle }: { session: Session; segmen
                 <td className="py-1 pr-2 text-right tabular-nums">{Number.isFinite(r.nm) ? r.nm.toFixed(0) : "—"}</td>
                 <td className="py-1 pr-2 text-right tabular-nums">{Number.isFinite(r.nmRpm) ? r.nmRpm.toFixed(0) : "—"}</td>
                 {ref && <td className="py-1 pr-2 text-right tabular-nums">{r.id === refId ? "—" : fmtDelta(delta(r.nm, ref.nm), "Nm")}</td>}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+type CurveMode = "pEngine" | "tqEngine" | "pWheel" | "accel";
+const CURVE_LABEL: Record<CurveMode, string> = {
+  pEngine: "Motorleistung (PS)",
+  tqEngine: "Motor-Drehmoment (Nm)",
+  pWheel: "Radleistung (PS)",
+  accel: "Beschleunigung (km/h über s)",
+};
+
+/** Leistungs-/Drehmomentkurven aller Läufe einer Session, direkt in der Session-Übersicht. */
+function SessionCurves({ session, segments, vehicle }: { session: Session; segments: Segment[]; vehicle: any }) {
+  const [mode, setMode] = usePersistedState<CurveMode>("dragy.session.curveMode", "pEngine");
+  const [hidden, setHidden] = useState<Record<string, boolean>>({});
+
+  const isAccel = mode === "accel";
+  const relevant = useMemo(
+    () => segments.filter((g) => (isAccel ? true : hasPowerCurve(g))),
+    [segments, isAccel],
+  );
+
+  const series: Series[] = useMemo(() => relevant.map((g) => {
+    if (isAccel) {
+      const points = session.records
+        .filter((r) => r.t >= g.startT && r.t <= g.endT)
+        .map((r) => ({ x: r.t - g.startT, y: r.speedKmh }));
+      return { label: `${g.name} · ${RUN_CATEGORY_SHORT[runCategory(g)]}`, color: g.color, points, visible: !hidden[g.id] };
+    }
+    const samples = computeSegment(session, g, vehicle);
+    const points = samples
+      .map((s) => {
+        const y = mode === "pEngine" ? s.pEngineW * W_TO_PS
+          : mode === "pWheel" ? s.pWheelW * W_TO_PS
+          : s.torqueEngineNm;
+        return { x: s.rpm, y };
+      })
+      .filter((p) => Number.isFinite(p.x) && Number.isFinite(p.y));
+    return { label: g.name, color: g.color, points, visible: !hidden[g.id] };
+  }), [relevant, session, vehicle, mode, isAccel, hidden]);
+
+  if (relevant.length === 0) return null;
+
+  return (
+    <div className="mt-3 rounded-md border border-border p-3">
+      <div className="text-caption font-semibold text-foreground">Auswertung der Läufe</div>
+      <Note>Alle Läufe dieser Session überlagert. Legende zum Ein-/Ausblenden antippen.</Note>
+      <div className="mt-2">
+        <Field label="Diagramm">
+          <Select value={mode} onChange={(e) => setMode(e.target.value as CurveMode)}>
+            {(Object.keys(CURVE_LABEL) as CurveMode[]).map((m) => (
+              <option key={m} value={m}>{CURVE_LABEL[m]}</option>
+            ))}
+          </Select>
+        </Field>
+      </div>
+      <div className="mt-2">
+        <Chart
+          series={series}
+          height={260}
+          xLabel={isAccel ? "t (s)" : "U/min"}
+          yLabel={isAccel ? "km/h" : mode === "tqEngine" ? "Nm" : "PS"}
+          xFormat={(v) => v.toFixed(isAccel ? 1 : 0)}
+          yFormat={(v) => v.toFixed(0)}
+          onLegendToggle={(i) => {
+            const g = relevant[i]; if (!g) return;
+            setHidden((h) => ({ ...h, [g.id]: !h[g.id] }));
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+
+/** Ergebnisse für Beschleunigungsläufe: Split-Zeiten, 1/4 Meile, Distanz. */
+function AccelOverview({ session, segments }: { session: Session; segments: Segment[] }) {
+  const rows = useMemo(() => segments.filter((g) => runCategory(g) === "accel").map((g) => ({
+    id: g.id,
+    name: g.name,
+    color: g.color,
+    splits: ACCEL_SPLITS.map(([a, b]) => splitTime(session.records, g.startT, g.endT, a, b)),
+    quarter: distanceRun(session.records, g.startT, g.endT),
+    dist: runDistance(session.records, g.startT, g.endT),
+  })), [session, segments]);
+
+  if (rows.length === 0) return null;
+
+  return (
+    <div className="mt-3 rounded-md border border-border p-3">
+      <div className="text-caption font-semibold text-foreground">Beschleunigungs-Ergebnisse</div>
+      <Note>Split-Zeiten linear interpoliert, 1/4 Meile über die aufintegrierte GPS-Geschwindigkeit.</Note>
+      <div className="mt-2 overflow-x-auto">
+        <table className="w-full text-caption text-foreground">
+          <thead className="text-muted-foreground">
+            <tr>
+              <th className="py-1 pr-2 text-left font-medium">Lauf</th>
+              {ACCEL_SPLITS.map(([a, b]) => (
+                <th key={`${a}-${b}`} className="py-1 pr-2 text-right font-medium">{a}–{b}</th>
+              ))}
+              <th className="py-1 pr-2 text-right font-medium">1/4 Meile</th>
+              <th className="py-1 pr-2 text-right font-medium">Trap</th>
+              <th className="py-1 pr-2 text-right font-medium">Distanz</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.id} className="border-t border-border">
+                <td className="py-1 pr-2">
+                  <span className="mr-1 inline-block h-2 w-3 rounded-sm align-middle" style={{ backgroundColor: r.color }} />
+                  {r.name}
+                </td>
+                {r.splits.map((s, i) => (
+                  <td key={i} className="py-1 pr-2 text-right tabular-nums">{s != null ? `${s.toFixed(2)} s` : "—"}</td>
+                ))}
+                <td className="py-1 pr-2 text-right tabular-nums">{r.quarter ? `${r.quarter.seconds.toFixed(2)} s` : "—"}</td>
+                <td className="py-1 pr-2 text-right tabular-nums">{r.quarter ? `${r.quarter.trapKmh.toFixed(0)} km/h` : "—"}</td>
+                <td className="py-1 pr-2 text-right tabular-nums">{r.dist.toFixed(0)} m</td>
               </tr>
             ))}
           </tbody>
