@@ -336,6 +336,27 @@ function SegmentEditor({ seg, session, vehicle, maxT, onChange, onDelete }: { se
   const flatGearOptions: GearOpt[] = gearboxGroups.flatMap((g) => g.options);
   const hasAny = flatGearOptions.length + legacyPresets.length > 0;
 
+  const cat = runCategory(seg);
+  const isPower = hasPowerCurve(seg);
+  const kindOptions = categoriesFor(sessionKind(session));
+  const catOptions: RunCategory[] = kindOptions.includes(cat) ? kindOptions : [cat, ...kindOptions];
+
+  const miniSeries: Series[] = useMemo(() => {
+    if (isPower) {
+      const samples = computeSegment(session, seg, vehicle);
+      const points = samples
+        .map((s) => ({ x: s.rpm, y: s.pEngineW * W_TO_PS }))
+        .filter((p) => Number.isFinite(p.x) && Number.isFinite(p.y));
+      return [{ label: seg.name, color: seg.color, points }];
+    }
+    const points = session.records
+      .filter((r) => r.t >= seg.startT && r.t <= seg.endT)
+      .map((r) => ({ x: r.t - seg.startT, y: r.speedKmh }));
+    return [{ label: seg.name, color: seg.color, points }];
+  }, [session, seg, vehicle, isPower]);
+
+
+
   return (
     <li className="rounded-md border border-border bg-card p-3">
       <div className="flex items-center gap-2">
