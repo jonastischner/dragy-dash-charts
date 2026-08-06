@@ -98,7 +98,7 @@ export function LiveTab({ onOpenVehicles }: { onOpenVehicles?: () => void } = {}
     const s: Session = {
       id: uid(), vehicleId: activeVehicle.id,
       name: `Live ${new Date().toLocaleString("de-DE")}`,
-      records, tempC, pressureHpa, rh, manual: false, createdAt: Date.now(),
+      records, tempC, pressureHpa, rh, manual: false, createdAt: Date.now(), kind: module,
     };
     await saveSession(s);
     setSaveMsg(`Session gespeichert: ${records.length} Punkte (${records[records.length - 1].t.toFixed(1)} s).`);

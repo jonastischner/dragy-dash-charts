@@ -39,7 +39,7 @@ export function ImportTab({ onOpenVehicles }: { onOpenVehicles?: () => void } = 
         }
         const s: Session = {
           id: uid(), vehicleId: activeVehicle.id, name: f.name.replace(/\.(data|ubx|csv|txt|tsv|xlsx|xlsm|xls)$/i, ""),
-          records, tempC, pressureHpa, rh, manual: false, createdAt: Date.now(),
+          records, tempC, pressureHpa, rh, manual: false, createdAt: Date.now(), kind: module,
         };
         await saveSession(s);
         msgs.push(`${f.name}: ${records.length} Punkte importiert (${records[records.length - 1].t.toFixed(1)} s)${extra}`);
@@ -115,7 +115,7 @@ function ManualEditor({ vehicleId, tempC, pressureHpa, rh, onSave, onCancel }: {
     const records: R[] = valid.map((r) => ({ t: r.t as number, speedKmh: r.speedKmh, heightM: 0 }));
     onSave({
       id: uid(), vehicleId, name, records, tempC, pressureHpa, rh,
-      manual: true, manualRows: rows, createdAt: Date.now(),
+      manual: true, manualRows: rows, createdAt: Date.now(), kind: module,
     });
   };
 
