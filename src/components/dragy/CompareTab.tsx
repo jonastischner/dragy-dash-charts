@@ -1,5 +1,7 @@
 import { useMemo, useState } from "react";
-import { Section, Note, EmptyState } from "./ui";
+import { Section, Note, EmptyState, Button } from "./ui";
+import { PdfExportDialog } from "./PdfExportDialog";
+import type { RunPdfData } from "@/lib/dragy/mahaPdf";
 import { useAppStore } from "@/lib/dragy/store";
 import { computeSegment, W_TO_PS } from "@/lib/dragy/physics";
 import { Chart, type Series } from "./Chart";
