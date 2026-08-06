@@ -6,10 +6,13 @@ Neu: Das Modul ist die oberste Ordnungsebene. Eine Aufnahme gehört zu genau ein
 
 ## Neue Struktur
 
+Das Fahrzeug steht über allen Modulen: Es wird einmal global gewählt (persistente Fahrzeug-Auswahl in der Kopfzeile, in jedem Tab sichtbar und umschaltbar) und gilt dann für alle Module gleichzeitig. Ein Modulwechsel ändert das Fahrzeug nie, ein Fahrzeugwechsel behält das aktive Modul.
+
 ```text
-Fahrzeug (Garage)
-  └── Modul: Leistung | Beschleunigung | Rallye-Stage | Rundstrecke
-        └── Aufnahme (Datei-Import oder Live-Fahrt)
+Fahrzeug (global gewählt, gilt über alle Module)
+  ├── Stammdaten: Antriebsstrang, Getriebe, Reifen, Setups, Widerstands-Standardwerte
+  └── Module: Leistung | Beschleunigung | Rallye-Stage | Rundstrecke
+        └── Aufnahme (Datei-Import oder Live-Fahrt, gehört zu genau einem Modul)
               └── Läufe (Zuschnitt, erben das Modul der Aufnahme)
 ```
 
@@ -17,16 +20,18 @@ Coastdown ist kein Modul und kein Tab mehr: Das Fahrzeug hat Standardwerte für 
 
 ## Navigation
 
-Vier Tabs statt acht:
+Vier Tabs statt acht, plus eine globale Fahrzeug-Auswahl in der Kopfzeile:
 
 | Tab | Inhalt |
 | --- | --- |
-| Start | Fahrzeug-Auswahl + Modul-Kacheln mit Bestwerten; Einstieg in ein Modul |
+| Start | Modul-Kacheln mit den Bestwerten des gewählten Fahrzeugs; Einstieg in ein Modul |
 | Aufnehmen | Import (UBX/Excel/manuell) und Live-BLE zusammengelegt, mit Modul-Auswahl |
-| Garage | Fahrzeuge, Antriebsstrang, Getriebe, Endübersetzungen, Reifen, Setups, Schaltdiagramme, Widerstands-Standardwerte |
+| Garage | Fahrzeuge verwalten, Antriebsstrang, Getriebe, Endübersetzungen, Reifen, Setups, Schaltdiagramme, Widerstands-Standardwerte |
 | Mehr | Backup, Konto/Sync, Grenzen & Annahmen |
 
-Start zeigt pro Modul eine Kachel mit dem jeweiligen Rekord des Fahrzeugs (z.B. „312 PS bei 5.900 /min" bzw. „0–100 in 4,8 s"). Ein Tap öffnet den Modul-Arbeitsbereich mit drei Bereichen: Aufnahmen & Läufe, Auswertung, Vergleich – alles ausschließlich innerhalb dieses Moduls.
+Start zeigt pro Modul eine Kachel mit dem jeweiligen Rekord des Fahrzeugs (z.B. „312 PS bei 5.900 /min" bzw. „0–100 in 4,8 s"). Ein Tap öffnet den Modul-Arbeitsbereich mit drei Bereichen: Aufnahmen & Läufe, Auswertung, Vergleich – alles ausschließlich innerhalb dieses Moduls, aber immer für das global gewählte Fahrzeug.
+
+
 
 ## Auswertung je Modul
 
