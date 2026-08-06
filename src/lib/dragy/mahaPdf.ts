@@ -165,20 +165,25 @@ function drawPage(doc: jsPDF, d: RunPdfData, info: PdfHeaderInfo) {
 
   // Kurven
   doc.setLineWidth(0.7);
-  const draw = (color: [number, number, number], val: (c: Curve) => number, scale: (v: number) => number) => {
+  const draw = (
+    color: [number, number, number],
+    val: (c: Curve) => number,
+    scale: (v: number) => number,
+    max: number,
+  ) => {
     doc.setDrawColor(...color);
     let run: Array<[number, number]> = [];
     for (const c of curves) {
       const v = val(c);
       if (!Number.isFinite(v)) { if (run.length > 1) drawPolyline(doc, run); run = []; continue; }
-      run.push([px(c.rpm), scale(Math.max(0, Math.min(v, val === ((x: Curve) => x.nm) ? nmMax : psMax)))]);
+      run.push([px(c.rpm), scale(Math.max(0, Math.min(v, max)))]);
     }
     if (run.length > 1) drawPolyline(doc, run);
   };
-  draw(COL.torque, (c) => c.nm, pyNm);
-  draw(COL.engine, (c) => c.pEngine, pyPs);
-  draw(COL.wheel, (c) => c.pWheel, pyPs);
-  draw(COL.drag, (c) => c.pDrag, pyPs);
+  draw(COL.torque, (c) => c.nm, pyNm, nmMax);
+  draw(COL.engine, (c) => c.pEngine, pyPs, psMax);
+  draw(COL.wheel, (c) => c.pWheel, pyPs, psMax);
+  draw(COL.drag, (c) => c.pDrag, pyPs, psMax);
 
   // Legende
   const legend: Array<[string, [number, number, number]]> = [
