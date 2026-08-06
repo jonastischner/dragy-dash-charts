@@ -81,11 +81,14 @@ export interface Record { t: number; speedKmh: number; heightM: number }
 
 export interface ManualRow { speedKmh: number; t: number | null }
 
-/** Kategorie eines Laufs – steuert Auswertung und Anzeige. */
+/** Kategorie eines Laufs – Altdaten-Feld, wird für Migration nach ModuleId genutzt. */
 export type RunCategory = "power" | "accel" | "coastdown" | "stage" | "lap";
 
-/** Modul/Typ einer Session. */
+/** Alter Session-Typ – Altdaten-Feld. */
 export type SessionKind = "performance" | "rally" | "circuit";
+
+/** Modul: primäre Struktur der App. Eine Session gehört genau zu einem Modul. */
+export type ModuleId = "power" | "accel" | "rally" | "circuit";
 
 
 export interface Session {
@@ -101,7 +104,8 @@ export interface Session {
   createdAt: number;
   notes?: string;
   massOverride?: number; // kg, optional per-session Abweichung vom Fahrzeug-Standardgewicht
-  kind?: SessionKind;    // Modul: performance (Standard) | rally | circuit
+  module?: ModuleId;     // Modul der Session (Altdaten werden migriert)
+  kind?: SessionKind;    // veraltet, nur noch für Migration
   updatedAt?: number;
 }
 
