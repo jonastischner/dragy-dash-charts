@@ -8,10 +8,11 @@ import {
   NORDIC_UART, bleSupported, connectBle, createParser, pointsToRecords, toAscii, toHex,
   type BleConnection, type StreamFormat, type StreamPoint,
 } from "@/lib/dragy/ble";
-import type { Session } from "@/lib/dragy/types";
+import type { Session, SessionKind } from "@/lib/dragy/types";
 
 export function LiveTab({ onOpenVehicles }: { onOpenVehicles?: () => void } = {}) {
   const { state, saveSession } = useAppStore();
+  const [module] = usePersistedState<SessionKind>("dragy.activeModule", "performance");
   const activeVehicle = state.vehicles.find((v) => v.id === state.activeVehicleId);
   const platform = useCapacitorPlatform();
 

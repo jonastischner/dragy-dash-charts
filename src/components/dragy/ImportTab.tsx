@@ -4,11 +4,12 @@ import { useAppStore } from "@/lib/dragy/store";
 import { parseUbx } from "@/lib/dragy/ubx";
 import { parseTableFile } from "@/lib/dragy/tabular";
 import { uid } from "@/lib/dragy/db";
-import type { Session, ManualRow, Record as R } from "@/lib/dragy/types";
+import type { Session, ManualRow, Record as R, SessionKind } from "@/lib/dragy/types";
 
 
 export function ImportTab({ onOpenVehicles }: { onOpenVehicles?: () => void } = {}) {
   const { state, saveSession } = useAppStore();
+  const [module] = usePersistedState<SessionKind>("dragy.activeModule", "performance");
   const activeVehicle = state.vehicles.find((v) => v.id === state.activeVehicleId);
   const inputRef = useRef<HTMLInputElement>(null);
   const [tempC, setTempC] = useState(20);
@@ -100,6 +101,7 @@ function ManualEditor({ vehicleId, tempC, pressureHpa, rh, onSave, onCancel }: {
   onSave: (s: Session) => void; onCancel: () => void;
 }) {
   const [name, setName] = useState("Manuelle Session");
+  const [module] = usePersistedState<SessionKind>("dragy.activeModule", "performance");
   const [rows, setRows] = useState<ManualRow[]>(defaultRows());
 
   const update = (i: number, patch: Partial<ManualRow>) => {
