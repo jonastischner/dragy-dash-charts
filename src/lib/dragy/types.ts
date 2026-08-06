@@ -101,6 +101,7 @@ export interface Session {
   createdAt: number;
   notes?: string;
   massOverride?: number; // kg, optional per-session Abweichung vom Fahrzeug-Standardgewicht
+  kind?: SessionKind;    // Modul: performance (Standard) | rally | circuit
   updatedAt?: number;
 }
 
@@ -114,8 +115,10 @@ export interface Segment {
   gearPresetId?: string; // optionaler Verweis auf ein Fahrzeug-Preset (rpmFactor bleibt der resolvierte Wert)
   color: string;
   visible: boolean;
+  category?: RunCategory; // Standard: "power"
   calibration?: { crr: number; cdA: number };
   notes?: string;
+
   updatedAt?: number;
 }
 
