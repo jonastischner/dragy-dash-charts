@@ -3,6 +3,7 @@ import { Bluetooth, Circle, Square } from "lucide-react";
 import { Section, Field, Row, Button, Note, TextInput, NumInput, Select, EmptyState, usePersistedState } from "./ui";
 import { useAppStore } from "@/lib/dragy/store";
 import { uid } from "@/lib/dragy/db";
+import { useCapacitorPlatform } from "@/lib/capacitor";
 import {
   NORDIC_UART, bleSupported, connectBle, createParser, pointsToRecords, toAscii, toHex,
   type BleConnection, type StreamFormat, type StreamPoint,
@@ -12,6 +13,7 @@ import type { Session } from "@/lib/dragy/types";
 export function LiveTab({ onOpenVehicles }: { onOpenVehicles?: () => void } = {}) {
   const { state, saveSession } = useAppStore();
   const activeVehicle = state.vehicles.find((v) => v.id === state.activeVehicleId);
+  const platform = useCapacitorPlatform();
 
   const [serviceUuid, setServiceUuid] = usePersistedState("live.serviceUuid", NORDIC_UART.service);
   const [notifyUuid, setNotifyUuid] = usePersistedState("live.notifyUuid", NORDIC_UART.notify);
@@ -37,6 +39,17 @@ export function LiveTab({ onOpenVehicles }: { onOpenVehicles?: () => void } = {}
 
   useEffect(() => { parserRef.current = createParser(format); }, [format]);
   useEffect(() => () => { connRef.current?.disconnect(); }, []);
+
+  if (platform === "ios") {
+    return (
+      <Section title="Live-Aufnahme (Bluetooth)">
+        <EmptyState
+          title="BLE-Aufnahme in der iOS-App noch nicht verfügbar"
+          description="Die native Bluetooth-Verbindung für Dragy/GPS-Logger wird in einem späteren Update über ein Swift-Plugin ergänzt. Bis dahin kannst du .ubx-, .csv- oder Excel-Dateien im Import-Tab laden."
+        />
+      </Section>
+    );
+  }
 
   const onChunk = useCallback((chunk: Uint8Array) => {
     setBytes((b) => b + chunk.length);
