@@ -124,6 +124,14 @@ function Index() {
 
       <main className="mx-auto max-w-[1200px] px-4 py-6 pb-[calc(80px+env(safe-area-inset-bottom))] md:px-6 md:pb-6">
         <h2 className="sr-only">{active.label}</h2>
+        {module !== "performance" && (
+          <div className="mb-4 rounded-md border border-border bg-card p-3 text-caption text-muted-foreground">
+            <span className="font-semibold text-foreground">{SESSION_KIND_LABEL[module]}</span> – in Vorbereitung.
+            Sessions können diesem Modul bereits zugeordnet werden (Session-Typ in der Session); die spezifische
+            Auswertung (Stage-Zeit, Rundenzeit, Speed-Trace über Distanz) folgt.
+          </div>
+        )}
+
         {tab === "vehicles" && <VehiclesTab />}
         {tab === "import" && <ImportTab onOpenVehicles={goVehicles} />}
         {tab === "sessions" && <SessionsTab onOpenVehicles={goVehicles} />}
