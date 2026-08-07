@@ -88,7 +88,7 @@ function ColorsSection() {
           </Button>
         )}
       </div>
-      {msg && <Note className="mt-2">{msg}</Note>}
+      {msg && <div className="mt-2"><Note>{msg}</Note></div>}
     </Section>
   );
 }
