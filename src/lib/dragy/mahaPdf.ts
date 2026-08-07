@@ -41,18 +41,51 @@ export interface RunPdfData {
 }
 
 function buildCurves(d: RunPdfData): Curve[] {
-  const samples = computeSegment(d.session, d.segment, d.vehicle);
-  return samples
-    .map((s) => ({
+  const samples = computeSegment(d.session, d.segment, d.vehicle)
+    .filter((s) => Number.isFinite(s.rpm) && s.rpm > 0 && Number.isFinite(s.pEngineW));
+  if (samples.length === 0) return [];
+
+  // 1) Ende abschneiden: sobald nicht mehr beschleunigt wird (Gaswegnahme/Begrenzer),
+  //    liegen viele Punkte bei nahezu gleicher Drehzahl mit stark schwankender Leistung
+  //    -> das erzeugt sonst eine senkrechte "Fläche" am rechten Diagrammrand.
+  let end = samples.length;
+  for (let i = samples.length - 1; i > 0; i--) {
+    if (samples[i].a > 0.15) { end = i + 1; break; }
+  }
+  const acc = samples.slice(0, end);
+
+  // 2) Nur monoton steigende Drehzahl behalten (kein Zurückspringen)
+  const mono: typeof acc = [];
+  let maxRpm = -Infinity;
+  for (const s of acc) {
+    if (s.rpm > maxRpm) { maxRpm = s.rpm; mono.push(s); }
+  }
+
+  // 3) Pro Drehzahl-Bucket mitteln -> eine eindeutige, glatte Kurve
+  const BIN = 25;
+  const buckets = new Map<number, { n: number; c: Curve }>();
+  for (const s of mono) {
+    const key = Math.round(s.rpm / BIN);
+    const cur = buckets.get(key);
+    const add: Curve = {
       rpm: s.rpm,
       pWheel: s.pWheelW * W_TO_PS,
       pDrag: s.pDragW * W_TO_PS,
       pEngine: s.pEngineW * W_TO_PS,
       nm: s.torqueEngineNm,
-    }))
-    .filter((c) => Number.isFinite(c.rpm) && c.rpm > 0 && Number.isFinite(c.pEngine))
+    };
+    if (!cur) buckets.set(key, { n: 1, c: add });
+    else {
+      cur.n++;
+      cur.c.rpm += add.rpm; cur.c.pWheel += add.pWheel; cur.c.pDrag += add.pDrag;
+      cur.c.pEngine += add.pEngine; cur.c.nm += add.nm;
+    }
+  }
+  return [...buckets.values()]
+    .map(({ n, c }) => ({ rpm: c.rpm / n, pWheel: c.pWheel / n, pDrag: c.pDrag / n, pEngine: c.pEngine / n, nm: c.nm / n }))
     .sort((a, b) => a.rpm - b.rpm);
 }
+
 
 function peaks(curves: Curve[], d: RunPdfData) {
   let pW = -Infinity, pE = -Infinity, pD = -Infinity, nm = -Infinity;
