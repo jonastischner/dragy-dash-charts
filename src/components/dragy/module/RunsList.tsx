@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Section, Field, TextInput, TextArea, NumInput, Select, Button, Note, Row, EmptyState, usePersistedState } from "../ui";
-import { useAppStore, pickColor } from "@/lib/dragy/store";
+import { useAppStore, pickColor, nextUnusedColor } from "@/lib/dragy/store";
 import {
   autoDetectSegments, computeSegment, splitTime, distanceRun, runDistance,
   coastdownFit, autoDetectCoastdown, W_TO_PS,
@@ -26,6 +26,9 @@ export function RunsList({ module, onOpenGarage }: { module: ModuleId; onOpenGar
       </Section>
     );
   }
+
+  const vehicleSessionIds = new Set(state.sessions.filter((s) => s.vehicleId === activeVehicle.id).map((s) => s.id));
+  const usedColors = state.segments.filter((g) => vehicleSessionIds.has(g.sessionId)).map((g) => g.color);
 
   const sessions = state.sessions
     .filter((s) => s.vehicleId === activeVehicle.id && sessionModule(s) === module)
@@ -60,6 +63,7 @@ export function RunsList({ module, onOpenGarage }: { module: ModuleId; onOpenGar
                   module={module}
                   session={s}
                   segments={segs}
+                  usedColors={usedColors}
                   vehicle={activeVehicle}
                   onRename={async (name) => { await saveSession({ ...s, name }); }}
                   onDelete={async () => { if (confirm(`Session "${s.name}" löschen (${segs.length} Läufe)?`)) { await deleteSession(s.id); setExpanded(null); } }}
@@ -76,9 +80,9 @@ export function RunsList({ module, onOpenGarage }: { module: ModuleId; onOpenGar
   );
 }
 
-function SessionDetail({ module, session, segments, vehicle, onRename, onDelete, onSaveSeg, onDelSeg, onEnvUpdate }: {
+function SessionDetail({ module, session, segments, usedColors, vehicle, onRename, onDelete, onSaveSeg, onDelSeg, onEnvUpdate }: {
   module: ModuleId;
-  session: Session; segments: Segment[]; vehicle: Vehicle;
+  session: Session; segments: Segment[]; usedColors: string[]; vehicle: Vehicle;
   onRename: (n: string) => void; onDelete: () => void;
   onSaveSeg: (s: Segment) => Promise<void>; onDelSeg: (id: string) => Promise<void>;
   onEnvUpdate: (patch: Partial<Session>) => Promise<void>;
@@ -101,7 +105,7 @@ function SessionDetail({ module, session, segments, vehicle, onRename, onDelete,
     const seg: Segment = {
       id: uid(), sessionId: session.id, name: `Lauf ${i + 1}`,
       startT: 0, endT: dur, rpmFactor: vehicle.rpmFactorDefault,
-      color: pickColor(i), visible: true,
+      color: nextUnusedColor(usedColors), visible: true,
     };
     await onSaveSeg(seg);
   };
@@ -110,13 +114,15 @@ function SessionDetail({ module, session, segments, vehicle, onRename, onDelete,
     const found = autoDetectSegments(session.records, autoStart, autoTarget, autoMin);
     if (found.length === 0) return alert("Keine Läufe erkannt. Parameter anpassen.");
     if (!confirm(`${found.length} Lauf/Läufe erkannt. Als Vorschlag anlegen (bestehende bleiben)?`)) return;
+    const assigned: string[] = [];
     for (let i = 0; i < found.length; i++) {
       const seg: Segment = {
         id: uid(), sessionId: session.id, name: `Auto ${segments.length + i + 1}`,
         startT: found[i].startT, endT: found[i].endT,
         rpmFactor: vehicle.rpmFactorDefault,
-        color: pickColor(segments.length + i), visible: true,
+        color: nextUnusedColor([...usedColors, ...assigned]), visible: true,
       };
+      assigned.push(seg.color);
       await onSaveSeg(seg);
     }
   };
