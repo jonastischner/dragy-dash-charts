@@ -208,6 +208,50 @@ export function useAppStore() {
       await refresh();
     },
     clearAll: async () => { await db.clearAll(); await refresh(); },
+    // Zentrale Farbvergabe: allen Läufen (optional nur eines Fahrzeugs)
+    // möglichst unterschiedliche Farben aus der Palette zuweisen.
+    recolorSegments: async (opts?: { vehicleId?: string | null; onlyUnassigned?: boolean }) => {
+      const sessionsById = new Map(sharedState.sessions.map((s) => [s.id, s]));
+      const scoped = sharedState.segments.filter((g) => {
+        const s = sessionsById.get(g.sessionId);
+        if (!s) return false;
+        return !opts?.vehicleId || s.vehicleId === opts.vehicleId;
+      });
+      const ordered = [...scoped].sort((a, b) => {
+        const sa = sessionsById.get(a.sessionId)!, sb = sessionsById.get(b.sessionId)!;
+        return (sa.createdAt - sb.createdAt) || (a.startT - b.startT) || a.id.localeCompare(b.id);
+      });
+
+      let changed = 0;
+      if (opts?.onlyUnassigned) {
+        const used = new Set<string>();
+        const dupes: Segment[] = [];
+        for (const g of ordered) {
+          const c = normalizeHex(g.color);
+          if (c && !used.has(c)) used.add(c);
+          else dupes.push(g);
+        }
+        for (const g of dupes) {
+          const color = nextUnusedColor([...used]);
+          used.add(color);
+          const stamped = stamp({ ...g, color });
+          await db.putSegment(stamped);
+          bg(pushLocal("segment", stamped));
+          changed++;
+        }
+      } else {
+        for (let i = 0; i < ordered.length; i++) {
+          const color = pickColor(i);
+          if (normalizeHex(ordered[i].color) === color) continue;
+          const stamped = stamp({ ...ordered[i], color });
+          await db.putSegment(stamped);
+          bg(pushLocal("segment", stamped));
+          changed++;
+        }
+      }
+      await refresh();
+      return { total: ordered.length, changed };
+    },
     importBatch: async (data: { vehicles?: Vehicle[]; sessions?: Session[]; segments?: Segment[] }) => {
       // Stamp updatedAt so imports propagate to cloud on next sync
       const now = Date.now();
@@ -222,8 +266,31 @@ export function useAppStore() {
   };
 }
 
+// Möglichst gut unterscheidbare Palette (Farbton weit gestreut, wechselnde Helligkeit).
 export const SEGMENT_COLORS = [
   "#ef4444", "#3b82f6", "#22c55e", "#f59e0b", "#a855f7",
   "#06b6d4", "#ec4899", "#84cc16", "#f97316", "#8b5cf6",
+  "#14b8a6", "#e11d48", "#0ea5e9", "#eab308", "#7c3aed",
+  "#10b981", "#fb7185", "#2563eb", "#d97706", "#c026d3",
+  "#65a30d", "#0891b2", "#f472b6", "#4ade80", "#fca5a5",
 ];
-export function pickColor(i: number) { return SEGMENT_COLORS[i % SEGMENT_COLORS.length]; }
+export function pickColor(i: number) { return SEGMENT_COLORS[((i % SEGMENT_COLORS.length) + SEGMENT_COLORS.length) % SEGMENT_COLORS.length]; }
+
+function normalizeHex(c?: string) { return (c ?? "").trim().toLowerCase(); }
+
+/** Erste Palettenfarbe, die noch nicht verwendet wird – sonst die am seltensten genutzte. */
+export function nextUnusedColor(usedColors: Array<string | undefined>) {
+  const counts = new Map<string, number>();
+  for (const c of usedColors) {
+    const k = normalizeHex(c);
+    if (k) counts.set(k, (counts.get(k) ?? 0) + 1);
+  }
+  let best = SEGMENT_COLORS[0], bestCount = Infinity;
+  for (const c of SEGMENT_COLORS) {
+    const n = counts.get(c) ?? 0;
+    if (n === 0) return c;
+    if (n < bestCount) { best = c; bestCount = n; }
+  }
+  return best;
+}
+
