@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Section, Field, TextInput, TextArea, NumInput, Select, Button, Note, Row, EmptyState, usePersistedState } from "../ui";
-import { useAppStore, pickColor, nextUnusedColor } from "@/lib/dragy/store";
+import { useAppStore, nextUnusedColor } from "@/lib/dragy/store";
 import {
   autoDetectSegments, computeSegment, splitTime, distanceRun, runDistance,
   coastdownFit, autoDetectCoastdown, W_TO_PS,

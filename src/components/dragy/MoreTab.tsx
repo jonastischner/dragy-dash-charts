@@ -1,4 +1,6 @@
-import { Section } from "./ui";
+import { useState } from "react";
+import { Section, Button, Note } from "./ui";
+import { useAppStore } from "@/lib/dragy/store";
 import { BackupTab } from "./BackupTab";
 import { AccountTab } from "./AccountTab";
 
@@ -6,6 +8,7 @@ export function MoreTab() {
   return (
     <div>
       <AccountTab />
+      <ColorsSection />
       <BackupTab />
 
       <Section title="Grenzen & Annahmen der Berechnung">
@@ -47,5 +50,45 @@ export function MoreTab() {
         </ul>
       </Section>
     </div>
+  );
+}
+
+function ColorsSection() {
+  const { state, recolorSegments } = useAppStore();
+  const [msg, setMsg] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const activeVehicle = state.vehicles.find((v) => v.id === state.activeVehicleId);
+  const total = state.segments.length;
+
+  const run = async (opts: { vehicleId?: string | null; onlyUnassigned?: boolean }) => {
+    setBusy(true);
+    try {
+      const res = await recolorSegments(opts);
+      setMsg(`${res.changed} von ${res.total} Läufen neu eingefärbt.`);
+    } finally { setBusy(false); }
+  };
+
+  return (
+    <Section title="Farben der Läufe" note={`${total} Läufe insgesamt`}>
+      <p className="text-caption text-muted-foreground">
+        Weist Läufen möglichst unterschiedliche Farben aus der Palette zu. Neue Läufe erhalten
+        automatisch eine noch freie Farbe.
+      </p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <Button onClick={() => run({ onlyUnassigned: true })} disabled={busy || total === 0}>
+          Nur Doppelungen auffrischen
+        </Button>
+        <Button variant="secondary" onClick={() => { if (confirm("Allen Läufen neue Farben zuweisen? Eigene Farbwahl wird überschrieben.")) run({}); }} disabled={busy || total === 0}>
+          Alle Läufe neu einfärben
+        </Button>
+        {activeVehicle && (
+          <Button variant="secondary" onClick={() => { if (confirm(`Läufe von "${activeVehicle.name}" neu einfärben?`)) run({ vehicleId: activeVehicle.id }); }} disabled={busy}>
+            Nur „{activeVehicle.name}“
+          </Button>
+        )}
+      </div>
+      {msg && <Note className="mt-2">{msg}</Note>}
+    </Section>
   );
 }
