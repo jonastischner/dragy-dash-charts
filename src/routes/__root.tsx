@@ -12,6 +12,8 @@ import { useEffect, type ReactNode } from "react";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { registerShareTargetWorker } from "../lib/pwa/share-target";
+import { registerNativeFileOpen } from "../lib/native/file-open";
+
 
 function NotFoundComponent() {
   return (
