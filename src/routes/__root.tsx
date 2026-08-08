@@ -11,6 +11,7 @@ import { useEffect, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
+import { registerShareTargetWorker } from "../lib/pwa/share-target";
 
 function NotFoundComponent() {
   return (
@@ -101,7 +102,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         rel: "stylesheet",
         href: appCss,
       },
-      { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
+      { rel: "icon", href: "/favicon.png", type: "image/png" },
+      { rel: "manifest", href: "/manifest.json" },
+      { rel: "apple-touch-icon", href: "/app-icon-192.png" },
+
     ],
   }),
   shellComponent: RootShell,
@@ -128,6 +132,11 @@ function RootShell({ children }: { children: ReactNode }) {
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
+  // Share Target – später durch native Intent ersetzbar.
+  useEffect(() => {
+    void registerShareTargetWorker();
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
@@ -135,3 +144,4 @@ function RootComponent() {
     </QueryClientProvider>
   );
 }
+
