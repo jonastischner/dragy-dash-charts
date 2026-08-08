@@ -12,6 +12,8 @@ import { useEffect, type ReactNode } from "react";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { registerShareTargetWorker } from "../lib/pwa/share-target";
+import { registerNativeFileOpen } from "../lib/native/file-open";
+
 
 function NotFoundComponent() {
   return (
@@ -131,11 +133,18 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  const router = useRouter();
 
-  // Share Target – später durch native Intent ersetzbar.
+  // Share Target (Web) + natives "Öffnen in" (iOS/Android).
   useEffect(() => {
     void registerShareTargetWorker();
-  }, []);
+    let cleanup: (() => void) | undefined;
+    void registerNativeFileOpen(() => {
+      void router.navigate({ to: "/import" });
+    }).then((fn) => { cleanup = fn; });
+    return () => { cleanup?.(); };
+  }, [router]);
+
 
   return (
     <QueryClientProvider client={queryClient}>
