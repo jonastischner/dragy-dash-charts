@@ -131,6 +131,11 @@ function RootShell({ children }: { children: ReactNode }) {
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
+  // Share Target – später durch native Intent ersetzbar.
+  useEffect(() => {
+    void registerShareTargetWorker();
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
@@ -138,3 +143,4 @@ function RootComponent() {
     </QueryClientProvider>
   );
 }
+
