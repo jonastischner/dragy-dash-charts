@@ -131,11 +131,18 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  const router = useRouter();
 
-  // Share Target – später durch native Intent ersetzbar.
+  // Share Target (Web) + natives "Öffnen in" (iOS/Android).
   useEffect(() => {
     void registerShareTargetWorker();
-  }, []);
+    let cleanup: (() => void) | undefined;
+    void registerNativeFileOpen(() => {
+      void router.navigate({ to: "/import" });
+    }).then((fn) => { cleanup = fn; });
+    return () => { cleanup?.(); };
+  }, [router]);
+
 
   return (
     <QueryClientProvider client={queryClient}>
