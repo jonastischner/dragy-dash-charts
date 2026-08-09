@@ -88,6 +88,8 @@
   --color-ring: var(--ring);
   --color-ring-offset-background: var(--background);
 
+  --color-rally: var(--rally);
+
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
   --color-chart-3: var(--chart-3);
@@ -150,6 +152,8 @@
   --input: #cfcfcf;
   --ring: #1f5fd0;
 
+  --rally: #ff4d00;
+
   --chart-1: #2563eb;
   --chart-2: #1e8e5a;
   --chart-3: #b36b00;
@@ -198,6 +202,8 @@
   --destructive-foreground: #2a0f0c;
   --info: #6ea8fe;
   --info-foreground: #12203a;
+
+  --rally: #ff5c1a;
 
   --border: #2f2f2f;
   --input: #3d3d3d;
