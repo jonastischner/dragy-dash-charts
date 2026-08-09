@@ -1,10 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { BarChart3, Car, Home, Radio, MoreHorizontal } from "lucide-react";
+import { BarChart3, Car, Home, Radio, MoreHorizontal, Mountain } from "lucide-react";
 import { VehiclesTab } from "@/components/dragy/VehiclesTab";
 import { HomeTab } from "@/components/dragy/HomeTab";
 import { CaptureTab } from "@/components/dragy/CaptureTab";
 import { MoreTab } from "@/components/dragy/MoreTab";
+import { TripMasterPage } from "@/components/TripMasterPage";
 import { ModuleWorkspace } from "@/components/dragy/module/ModuleWorkspace";
 import { usePersistedState } from "@/components/dragy/ui";
 import { useAppStore } from "@/lib/dragy/store";
@@ -25,10 +26,11 @@ export const Route = createFileRoute("/")({
   component: Index,
 });
 
-type Tab = "start" | "capture" | "garage" | "more";
+type Tab = "start" | "capture" | "trip" | "garage" | "more";
 const TABS: Array<{ id: Tab; label: string; icon: typeof Home }> = [
   { id: "start", label: "Start", icon: Home },
   { id: "capture", label: "Aufnehmen", icon: Radio },
+  { id: "trip", label: "Trip-Master", icon: Mountain },
   { id: "garage", label: "Garage", icon: Car },
   { id: "more", label: "Mehr", icon: MoreHorizontal },
 ];
@@ -97,6 +99,7 @@ function Index() {
             : <HomeTab onOpenModule={(m) => { setModule(m); setOpenModule(m); }} onOpenGarage={goGarage} />
         )}
         {tab === "capture" && <CaptureTab module={module} onModuleChange={setModule} onOpenGarage={goGarage} />}
+        {tab === "trip" && <TripMasterPage />}
         {tab === "garage" && <VehiclesTab />}
         {tab === "more" && <MoreTab />}
       </main>
