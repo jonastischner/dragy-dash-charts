@@ -1,0 +1,205 @@
+// Datenzugriff für Veranstaltungen – direkt gegen Supabase, kein lokaler
+// Store/Sync wie bei Fahrzeugen/Sessions. Erfordert einen eingeloggten
+// Nutzer (RLS: auth.uid() = user_id); ohne Login schlagen alle Aufrufe fehl.
+
+import { supabase } from "@/integrations/supabase/client";
+import type { Database } from "@/integrations/supabase/types";
+import type {
+  EventScheduleEntry,
+  EventSourceType,
+  EventStage,
+  EventStatus,
+  RallyeEvent,
+} from "@/types/events";
+
+type EventRow = Database["public"]["Tables"]["events"]["Row"];
+type ScheduleRow = Database["public"]["Tables"]["event_schedule"]["Row"];
+type StageRow = Database["public"]["Tables"]["event_stages"]["Row"];
+
+async function requireUserId(): Promise<string> {
+  const { data, error } = await supabase.auth.getUser();
+  if (error || !data.user) throw new Error("Bitte einloggen, um Veranstaltungen zu verwalten.");
+  return data.user.id;
+}
+
+function mapEvent(row: EventRow): RallyeEvent {
+  return {
+    id: row.id,
+    name: row.name,
+    ort: row.ort,
+    datumStart: row.datum_start,
+    datumEnde: row.datum_ende,
+    quelleTyp: row.quelle_typ as EventSourceType | null,
+    quelleReferenz: row.quelle_referenz,
+    status: row.status as EventStatus,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function mapSchedule(row: ScheduleRow): EventScheduleEntry {
+  return {
+    id: row.id,
+    eventId: row.event_id,
+    uhrzeit: row.uhrzeit,
+    programmpunkt: row.programmpunkt,
+  };
+}
+
+function mapStage(row: StageRow): EventStage {
+  return {
+    id: row.id,
+    eventId: row.event_id,
+    wpNummer: row.wp_nummer,
+    name: row.name,
+    laengeKm: row.laenge_km,
+    startUhrzeit: row.start_uhrzeit,
+  };
+}
+
+export async function listEvents(): Promise<RallyeEvent[]> {
+  const { data, error } = await supabase
+    .from("events")
+    .select("*")
+    .order("datum_start", { ascending: true, nullsFirst: false })
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []).map(mapEvent);
+}
+
+export async function createEvent(input: {
+  name: string;
+  ort?: string | null;
+  datumStart?: string | null;
+  datumEnde?: string | null;
+  quelleTyp?: EventSourceType | null;
+  quelleReferenz?: string | null;
+}): Promise<RallyeEvent> {
+  const userId = await requireUserId();
+  const { data, error } = await supabase
+    .from("events")
+    .insert({
+      user_id: userId,
+      name: input.name,
+      ort: input.ort ?? null,
+      datum_start: input.datumStart ?? null,
+      datum_ende: input.datumEnde ?? null,
+      quelle_typ: input.quelleTyp ?? null,
+      quelle_referenz: input.quelleReferenz ?? null,
+    })
+    .select("*")
+    .single();
+  if (error) throw error;
+  return mapEvent(data);
+}
+
+export async function updateEvent(
+  id: string,
+  patch: Partial<{
+    name: string;
+    ort: string | null;
+    datumStart: string | null;
+    datumEnde: string | null;
+    quelleTyp: EventSourceType | null;
+    quelleReferenz: string | null;
+    status: EventStatus;
+  }>,
+): Promise<RallyeEvent> {
+  const { data, error } = await supabase
+    .from("events")
+    .update({
+      ...(patch.name !== undefined && { name: patch.name }),
+      ...(patch.ort !== undefined && { ort: patch.ort }),
+      ...(patch.datumStart !== undefined && { datum_start: patch.datumStart }),
+      ...(patch.datumEnde !== undefined && { datum_ende: patch.datumEnde }),
+      ...(patch.quelleTyp !== undefined && { quelle_typ: patch.quelleTyp }),
+      ...(patch.quelleReferenz !== undefined && { quelle_referenz: patch.quelleReferenz }),
+      ...(patch.status !== undefined && { status: patch.status }),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", id)
+    .select("*")
+    .single();
+  if (error) throw error;
+  return mapEvent(data);
+}
+
+export async function deleteEvent(id: string): Promise<void> {
+  const { error } = await supabase.from("events").delete().eq("id", id);
+  if (error) throw error;
+}
+
+export async function listSchedule(eventId: string): Promise<EventScheduleEntry[]> {
+  const { data, error } = await supabase
+    .from("event_schedule")
+    .select("*")
+    .eq("event_id", eventId)
+    .order("uhrzeit", { ascending: true });
+  if (error) throw error;
+  return (data ?? []).map(mapSchedule);
+}
+
+export async function addScheduleEntry(
+  eventId: string,
+  input: { uhrzeit: string; programmpunkt: string },
+): Promise<EventScheduleEntry> {
+  const userId = await requireUserId();
+  const { data, error } = await supabase
+    .from("event_schedule")
+    .insert({
+      user_id: userId,
+      event_id: eventId,
+      uhrzeit: input.uhrzeit,
+      programmpunkt: input.programmpunkt,
+    })
+    .select("*")
+    .single();
+  if (error) throw error;
+  return mapSchedule(data);
+}
+
+export async function removeScheduleEntry(id: string): Promise<void> {
+  const { error } = await supabase.from("event_schedule").delete().eq("id", id);
+  if (error) throw error;
+}
+
+export async function listStages(eventId: string): Promise<EventStage[]> {
+  const { data, error } = await supabase
+    .from("event_stages")
+    .select("*")
+    .eq("event_id", eventId)
+    .order("start_uhrzeit", { ascending: true, nullsFirst: false });
+  if (error) throw error;
+  return (data ?? []).map(mapStage);
+}
+
+export async function addStage(
+  eventId: string,
+  input: {
+    wpNummer?: string | null;
+    name: string;
+    laengeKm?: number | null;
+    startUhrzeit?: string | null;
+  },
+): Promise<EventStage> {
+  const userId = await requireUserId();
+  const { data, error } = await supabase
+    .from("event_stages")
+    .insert({
+      user_id: userId,
+      event_id: eventId,
+      wp_nummer: input.wpNummer ?? null,
+      name: input.name,
+      laenge_km: input.laengeKm ?? null,
+      start_uhrzeit: input.startUhrzeit ?? null,
+    })
+    .select("*")
+    .single();
+  if (error) throw error;
+  return mapStage(data);
+}
+
+export async function removeStage(id: string): Promise<void> {
+  const { error } = await supabase.from("event_stages").delete().eq("id", id);
+  if (error) throw error;
+}
