@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Gauge, Timer, Mountain, Flag, ChevronRight, Settings2 } from "lucide-react";
+import { Gauge, Timer, Mountain, Flag, ChevronRight, Settings2, Compass } from "lucide-react";
 import { Section, EmptyState, Note } from "./ui";
 import { useAppStore } from "@/lib/dragy/store";
 import { computeSegment, splitTime, runDistance, W_TO_PS } from "@/lib/dragy/physics";
@@ -13,9 +13,10 @@ const MODULE_ICON: Record<ModuleId, typeof Gauge> = {
   circuit: Flag,
 };
 
-export function HomeTab({ onOpenModule, onOpenSim, onOpenGarage }: {
+export function HomeTab({ onOpenModule, onOpenSim, onOpenTrip, onOpenGarage }: {
   onOpenModule: (m: ModuleId) => void;
   onOpenSim: () => void;
+  onOpenTrip: () => void;
   onOpenGarage: () => void;
 }) {
   const { state } = useAppStore();
@@ -61,68 +62,90 @@ export function HomeTab({ onOpenModule, onOpenSim, onOpenGarage }: {
     return out;
   }, [state, vehicle]);
 
-  if (!vehicle) {
-    return (
-      <Section title="Start">
-        <EmptyState
-          title="Kein Fahrzeug ausgewählt"
-          description="Fahrzeuge gelten über alle Module hinweg. Lege zuerst ein Fahrzeug an und wähle es oben aus."
-          actionLabel="Zur Garage"
-          onAction={onOpenGarage}
-        />
-      </Section>
-    );
-  }
-
   return (
-    <Section title={`Module – ${vehicle.name}`}>
-      <Note>Jedes Modul hat eigene Sessions, Läufe und Auswertungen. Das Fahrzeug bleibt über alle Module hinweg aktiv.</Note>
-      <ul className="mt-2 grid gap-2 sm:grid-cols-2">
-        {MODULE_IDS.map((m) => {
-          const Icon = MODULE_ICON[m];
-          const st = stats[m];
-          return (
-            <li key={m}>
+    <>
+      {!vehicle ? (
+        <Section title="Start">
+          <EmptyState
+            title="Kein Fahrzeug ausgewählt"
+            description="Fahrzeuge gelten über alle Module hinweg. Lege zuerst ein Fahrzeug an und wähle es oben aus."
+            actionLabel="Zur Garage"
+            onAction={onOpenGarage}
+          />
+        </Section>
+      ) : (
+        <Section title={`Module – ${vehicle.name}`}>
+          <Note>Jedes Modul hat eigene Sessions, Läufe und Auswertungen. Das Fahrzeug bleibt über alle Module hinweg aktiv.</Note>
+          <ul className="mt-2 grid gap-2 sm:grid-cols-2">
+            {MODULE_IDS.map((m) => {
+              const Icon = MODULE_ICON[m];
+              const st = stats[m];
+              return (
+                <li key={m}>
+                  <button
+                    onClick={() => onOpenModule(m)}
+                    className="flex w-full items-start gap-3 rounded-md border border-border bg-card p-4 text-left transition-colors hover:border-ring"
+                  >
+                    <span className="flex h-11 w-11 flex-none items-center justify-center rounded-md bg-secondary text-foreground">
+                      <Icon className="h-5 w-5" />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="flex items-center justify-between gap-2">
+                        <span className="text-body font-semibold text-foreground">{MODULE_LABEL[m]}</span>
+                        <ChevronRight className="h-4 w-4 flex-none text-muted-foreground" />
+                      </span>
+                      <span className="mt-1 block text-caption text-muted-foreground">{MODULE_DESC[m]}</span>
+                      <span className="mt-2 block text-caption text-foreground">
+                        <b className="tabular-nums">{st.best}</b>
+                        <span className="text-muted-foreground"> {MODULE_METRIC[m]} · {st.sessions} Sessions · {st.runs} Läufe</span>
+                      </span>
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+            <li className="sm:col-span-2">
               <button
-                onClick={() => onOpenModule(m)}
+                onClick={onOpenSim}
                 className="flex w-full items-start gap-3 rounded-md border border-border bg-card p-4 text-left transition-colors hover:border-ring"
               >
                 <span className="flex h-11 w-11 flex-none items-center justify-center rounded-md bg-secondary text-foreground">
-                  <Icon className="h-5 w-5" />
+                  <Settings2 className="h-5 w-5" />
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="flex items-center justify-between gap-2">
-                    <span className="text-body font-semibold text-foreground">{MODULE_LABEL[m]}</span>
+                    <span className="text-body font-semibold text-foreground">Getriebe-Simulator</span>
                     <ChevronRight className="h-4 w-4 flex-none text-muted-foreground" />
                   </span>
-                  <span className="mt-1 block text-caption text-muted-foreground">{MODULE_DESC[m]}</span>
-                  <span className="mt-2 block text-caption text-foreground">
-                    <b className="tabular-nums">{st.best}</b>
-                    <span className="text-muted-foreground"> {MODULE_METRIC[m]} · {st.sessions} Sessions · {st.runs} Läufe</span>
-                  </span>
+                  <span className="mt-1 block text-caption text-muted-foreground">Setups vergleichen, ohne das Fahrzeug zu ändern</span>
                 </span>
               </button>
             </li>
-          );
-        })}
-        <li className="sm:col-span-2">
-          <button
-            onClick={onOpenSim}
-            className="flex w-full items-start gap-3 rounded-md border border-border bg-card p-4 text-left transition-colors hover:border-ring"
-          >
-            <span className="flex h-11 w-11 flex-none items-center justify-center rounded-md bg-secondary text-foreground">
-              <Settings2 className="h-5 w-5" />
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="flex items-center justify-between gap-2">
-                <span className="text-body font-semibold text-foreground">Getriebe-Simulator</span>
-                <ChevronRight className="h-4 w-4 flex-none text-muted-foreground" />
+          </ul>
+        </Section>
+      )}
+
+      <Section title="Weitere Werkzeuge">
+        <ul className="grid gap-2 sm:grid-cols-2">
+          <li className="sm:col-span-2">
+            <button
+              onClick={onOpenTrip}
+              className="flex w-full items-start gap-3 rounded-md border border-border bg-card p-4 text-left transition-colors hover:border-ring"
+            >
+              <span className="flex h-11 w-11 flex-none items-center justify-center rounded-md bg-secondary text-foreground">
+                <Compass className="h-5 w-5" />
               </span>
-              <span className="mt-1 block text-caption text-muted-foreground">Setups vergleichen, ohne das Fahrzeug zu ändern</span>
-            </span>
-          </button>
-        </li>
-      </ul>
-    </Section>
+              <span className="min-w-0 flex-1">
+                <span className="flex items-center justify-between gap-2">
+                  <span className="text-body font-semibold text-foreground">Trip-Master</span>
+                  <ChevronRight className="h-4 w-4 flex-none text-muted-foreground" />
+                </span>
+                <span className="mt-1 block text-caption text-muted-foreground">Distanzmessung und Soll-Ist-Vergleich für Etappen – ohne Fahrzeugbindung.</span>
+              </span>
+            </button>
+          </li>
+        </ul>
+      </Section>
+    </>
   );
 }

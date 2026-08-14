@@ -45,6 +45,11 @@ export function resetTrip(trip: Trip): Trip {
   };
 }
 
+/** Setzt nur Distanz/Zeit auf den Start zurück, Wegpunkte inkl. Splits bleiben erhalten. */
+export function restartTripOrigin(trip: Trip): Trip {
+  return { ...trip, rawGpsMeters: 0, manualOffset: 0, elapsedSeconds: 0 };
+}
+
 /**
  * Fügt gefahrene Meter hinzu und schreibt die Zeit fort.
  * TODO: durch echte GPS-Updates ersetzen (expo-location)

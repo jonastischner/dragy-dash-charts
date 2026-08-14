@@ -1,13 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { BarChart3, Car, Home, Radio, MoreHorizontal, Mountain } from "lucide-react";
+import { BarChart3, Car, Home, Radio, MoreHorizontal } from "lucide-react";
 import { VehiclesTab } from "@/components/dragy/VehiclesTab";
 import { HomeTab } from "@/components/dragy/HomeTab";
 import { CaptureTab } from "@/components/dragy/CaptureTab";
 import { MoreTab } from "@/components/dragy/MoreTab";
-import { TripMasterPage } from "@/components/TripMasterPage";
 import { ModuleWorkspace } from "@/components/dragy/module/ModuleWorkspace";
 import { GearSimWorkspace } from "@/components/dragy/sim/GearSimWorkspace";
+import { TripMasterWorkspace } from "@/components/dragy/trip/TripMasterWorkspace";
 import { usePersistedState } from "@/components/dragy/ui";
 import { useAppStore } from "@/lib/dragy/store";
 import type { ModuleId } from "@/lib/dragy/types";
@@ -27,11 +27,10 @@ export const Route = createFileRoute("/")({
   component: Index,
 });
 
-type Tab = "start" | "capture" | "trip" | "garage" | "more";
+type Tab = "start" | "capture" | "garage" | "more";
 const TABS: Array<{ id: Tab; label: string; icon: typeof Home }> = [
   { id: "start", label: "Start", icon: Home },
   { id: "capture", label: "Aufnehmen", icon: Radio },
-  { id: "trip", label: "Trip-Master", icon: Mountain },
   { id: "garage", label: "Garage", icon: Car },
   { id: "more", label: "Mehr", icon: MoreHorizontal },
 ];
@@ -42,8 +41,9 @@ function Index() {
   const [module, setModule] = usePersistedState<ModuleId>("dragy.activeModule", "power");
   const [openModule, setOpenModule] = useState<ModuleId | null>(null);
   const [openSim, setOpenSim] = useState(false);
+  const [openTrip, setOpenTrip] = useState(false);
 
-  const goGarage = () => { setOpenModule(null); setOpenSim(false); setTab("garage"); };
+  const goGarage = () => { setOpenModule(null); setOpenSim(false); setOpenTrip(false); setTab("garage"); };
   const goPower = () => { setOpenSim(false); setModule("power"); setOpenModule("power"); };
 
   return (
@@ -82,7 +82,7 @@ function Index() {
                 key={t.id}
                 role="tab"
                 aria-selected={isActive}
-                onClick={() => { setTab(t.id); if (t.id !== "start") { setOpenModule(null); setOpenSim(false); } }}
+                onClick={() => { setTab(t.id); if (t.id !== "start") { setOpenModule(null); setOpenSim(false); setOpenTrip(false); } }}
                 className={`inline-flex min-h-[44px] items-center gap-2 rounded-md px-3 text-caption font-medium transition-ui focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                   isActive ? "bg-primary/15 text-primary" : "text-muted-foreground hover:bg-accent hover:text-foreground"
                 }`}
@@ -101,10 +101,11 @@ function Index() {
             ? <ModuleWorkspace module={openModule} onBack={() => setOpenModule(null)} onOpenGarage={goGarage} />
             : openSim
             ? <GearSimWorkspace onBack={() => setOpenSim(false)} onOpenGarage={goGarage} onOpenPower={goPower} />
-            : <HomeTab onOpenModule={(m) => { setModule(m); setOpenModule(m); }} onOpenSim={() => setOpenSim(true)} onOpenGarage={goGarage} />
+            : openTrip
+            ? <TripMasterWorkspace onBack={() => setOpenTrip(false)} />
+            : <HomeTab onOpenModule={(m) => { setModule(m); setOpenModule(m); }} onOpenSim={() => setOpenSim(true)} onOpenTrip={() => setOpenTrip(true)} onOpenGarage={goGarage} />
         )}
         {tab === "capture" && <CaptureTab module={module} onModuleChange={setModule} onOpenGarage={goGarage} />}
-        {tab === "trip" && <TripMasterPage />}
         {tab === "garage" && <VehiclesTab />}
         {tab === "more" && <MoreTab />}
       </main>
@@ -125,7 +126,7 @@ function Index() {
                 key={t.id}
                 role="tab"
                 aria-selected={isActive}
-                onClick={() => { setTab(t.id); if (t.id !== "start") { setOpenModule(null); setOpenSim(false); } }}
+                onClick={() => { setTab(t.id); if (t.id !== "start") { setOpenModule(null); setOpenSim(false); setOpenTrip(false); } }}
                 className={`flex min-h-[44px] flex-1 flex-col items-center justify-center gap-0.5 rounded-md text-caption font-medium transition-ui focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                   isActive ? "bg-primary/15 text-primary" : "text-muted-foreground"
                 }`}
