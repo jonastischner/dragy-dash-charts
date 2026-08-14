@@ -81,7 +81,8 @@ export function getCalibratedDistance(trip: Trip): number {
 }
 
 /** Distanz seit Trip-Erstellung, nie zurückgesetzt. Kalibrierung wirkt global,
- *  manualOffset (einmalige Korrektur der aktuellen Etappe) nicht. */
+ *  manualOffset (einmalige Korrektur der aktuellen Etappe) nicht. Dient auch
+ *  als stabile Referenzdistanz für Wegpunkte (bleibt über Resets hinweg gültig). */
 export function getLifetimeDistance(trip: Trip): number {
   return trip.totalRawGpsMeters * trip.calibrationFactor;
 }
@@ -136,7 +137,7 @@ export function setWarningDistance(trip: Trip, meters: number): Trip {
 
 /** Wegpunkte in Vorwarn-Reichweite, die noch nicht quittiert sind. */
 export function checkWaypointWarnings(trip: Trip): Waypoint[] {
-  const done = getCalibratedDistance(trip);
+  const done = getLifetimeDistance(trip);
   return trip.waypoints.filter(
     (w) => !w.timestamp && w.distance - done <= trip.warningDistance && w.distance - done >= 0,
   );
