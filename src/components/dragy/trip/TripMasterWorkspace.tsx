@@ -107,7 +107,7 @@ export function TripMasterWorkspace({ onBack }: { onBack: () => void }) {
   const progress = trip.totalDistance > 0 ? Math.min(1, distance / trip.totalDistance) : 0;
   const liveSpeedKmh = trip.isRunning && simOn ? simSpeed * 3.6 : 0;
   const nextWaypoint = trip.waypoints
-    .filter((w) => !w.timestamp && w.distance >= distance)
+    .filter((w) => !w.timestamp && w.distance >= lifetimeDistance)
     .sort((a, b) => a.distance - b.distance)[0] ?? null;
   const warnings = checkWaypointWarnings(trip).filter((w) => !dismissed.includes(w.id));
   const warn = warnings[0];
@@ -238,7 +238,12 @@ export function TripMasterWorkspace({ onBack }: { onBack: () => void }) {
           onEditTarget={() => setDialog("target")}
           onRemoveWaypoint={(id) => update((t) => removeWaypoint(t, id))}
           onWarningDistanceChange={(m) => setTrips((prev) => prev.map((t) => setWarningDistance(t, m)))}
-          onImportWaypoints={(rows) => update((t) => rows.reduce((acc, r) => addWaypoint(acc, r.distance, r.name, r.note), t))}
+          onImportWaypoints={(rows) => {
+            // Roadbook-Distanzen sind stage-lokal (ab 0) – auf die stabile
+            // Gesamtdistanz umrechnen, einmalig pro Import erfasst.
+            const baseline = lifetimeDistance;
+            update((t) => rows.reduce((acc, r) => addWaypoint(acc, r.distance + baseline, r.name, r.note), t));
+          }}
           simOn={simOn}
           simSpeed={simSpeed}
           onToggleSim={() => setSimOn((s) => !s)}
@@ -257,7 +262,7 @@ export function TripMasterWorkspace({ onBack }: { onBack: () => void }) {
           <div className="w-full max-w-sm rounded-2xl border-2 border-rally bg-card/95 p-6 text-center shadow-e3">
             <AlertTriangle className="mx-auto h-10 w-10 text-rally" strokeWidth={2} aria-hidden="true" />
             <div className="mt-3 text-4xl font-semibold tabular-nums text-rally">
-              {Math.max(0, Math.round(warn.distance - distance))} m
+              {Math.max(0, Math.round(warn.distance - lifetimeDistance))} m
             </div>
             <div className="mt-2 text-subtitle text-foreground">{warn.name || "Wegpunkt"}</div>
             {warn.note && <p className="mt-1 text-caption text-muted-foreground">{warn.note}</p>}
@@ -287,7 +292,7 @@ export function TripMasterWorkspace({ onBack }: { onBack: () => void }) {
 
       {dialog === "waypoint" && (
         <WaypointDialog
-          defaultDistance={Math.round(distance)}
+          defaultDistance={Math.round(lifetimeDistance)}
           onClose={() => setDialog(null)}
           onAdd={(d, n, note) => { update((t) => addWaypoint(t, d, n, note)); setDialog(null); }}
         />

@@ -53,7 +53,7 @@ export function DurchschnittDisplay({
       </div>
       <div className="text-caption text-muted-foreground sm:col-span-3">
         {nextWaypoint
-          ? `Nächster Wegpunkt: ${nextWaypoint.name || "Wegpunkt"} in ${formatKm(Math.max(0, nextWaypoint.distance - resetDistance))}`
+          ? `Nächster Wegpunkt: ${nextWaypoint.name || "Wegpunkt"} in ${formatKm(Math.max(0, nextWaypoint.distance - lifetimeDistance))}`
           : "Keine weiteren Wegpunkte."}
       </div>
     </div>
