@@ -1,11 +1,11 @@
-import { Gauge, MapPin, Ruler, Trash2 } from "lucide-react";
+import { Gauge, MapPin, Ruler, Target, Trash2 } from "lucide-react";
 import { Button } from "@/components/dragy/ui";
 import { TripMasterSettings } from "./TripMasterSettings";
 import { formatClock, formatKm } from "@/services/tripEngine";
 import type { Trip, Waypoint } from "@/types/trip";
 
 export function TripSetupPanel({
-  trip, onCalibrate, onAddWaypoint, onRemoveWaypoint,
+  trip, onCalibrate, onAddWaypoint, onRemoveWaypoint, onEditTarget,
   onWarningDistanceChange, onImportWaypoints,
   simOn, simSpeed, onToggleSim, onSimSpeedChange,
 }: {
@@ -13,6 +13,7 @@ export function TripSetupPanel({
   onCalibrate: () => void;
   onAddWaypoint: () => void;
   onRemoveWaypoint: (id: string) => void;
+  onEditTarget: () => void;
   onWarningDistanceChange: (m: number) => void;
   onImportWaypoints: (rows: Array<Pick<Waypoint, "distance" | "name" | "note">>) => void;
   simOn: boolean;
@@ -24,13 +25,18 @@ export function TripSetupPanel({
     <div className="mt-4 rounded-lg border border-border bg-card p-4">
       <h2 className="mb-3 text-subtitle text-foreground">Einrichten</h2>
 
-      <div className="grid grid-cols-2 gap-2">
+      <div className={`grid gap-2 ${trip.mode === "durchschnitt" ? "grid-cols-1 sm:grid-cols-3" : "grid-cols-2"}`}>
         <Button variant="secondary" onClick={onCalibrate} className="min-h-[48px]">
           <Ruler className="h-4 w-4" strokeWidth={2} aria-hidden="true" />Kalibrieren
         </Button>
         <Button variant="secondary" onClick={onAddWaypoint} className="min-h-[48px]">
           <MapPin className="h-4 w-4" strokeWidth={2} aria-hidden="true" />Wegpunkt setzen
         </Button>
+        {trip.mode === "durchschnitt" && (
+          <Button variant="secondary" onClick={onEditTarget} className="min-h-[48px]">
+            <Target className="h-4 w-4" strokeWidth={2} aria-hidden="true" />Sollwerte bearbeiten
+          </Button>
+        )}
       </div>
 
       <div className="mt-4 grid grid-cols-2 gap-2 text-caption text-muted-foreground sm:grid-cols-4">

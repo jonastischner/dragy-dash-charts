@@ -3,10 +3,12 @@ import { formatClock, formatKm } from "@/services/tripEngine";
 import type { Waypoint } from "@/types/trip";
 
 export function DurchschnittDisplay({
-  elapsedSeconds, distance, avg, targetAvg, targetTime, deviation, progress, nextWaypoint, onReset,
+  elapsedSeconds, resetDistance, lifetimeDistance, totalElapsedSeconds, avg, targetAvg, targetTime, deviation, progress, nextWaypoint, onReset,
 }: {
   elapsedSeconds: number;
-  distance: number;
+  resetDistance: number;
+  lifetimeDistance: number;
+  totalElapsedSeconds: number;
   avg: number;
   targetAvg: number;
   targetTime: number | undefined;
@@ -27,9 +29,15 @@ export function DurchschnittDisplay({
           tapHint="Zum Zurücksetzen tippen"
         />
       </div>
-      <BigMetricTile label="Kalibrierte Distanz" value={formatKm(distance)} />
+      <BigMetricTile label="Distanz seit Reset" value={formatKm(resetDistance)} />
       <BigMetricTile label="Soll-Ø" value={`${(targetAvg || 0).toFixed(1)} km/h`} />
       <BigMetricTile label="Ist-Ø" value={`${avg.toFixed(1)} km/h`} />
+
+      <div className="grid grid-cols-2 gap-3 sm:col-span-3">
+        <BigMetricTile label="Gesamtdistanz" value={formatKm(lifetimeDistance)} />
+        <BigMetricTile label="Gesamtzeit" value={formatClock(totalElapsedSeconds)} />
+      </div>
+
       <div className="sm:col-span-3">
         <div className="mb-1 flex justify-between text-caption text-muted-foreground">
           <span>Soll-Ist-Verlauf</span>
@@ -45,7 +53,7 @@ export function DurchschnittDisplay({
       </div>
       <div className="text-caption text-muted-foreground sm:col-span-3">
         {nextWaypoint
-          ? `Nächster Wegpunkt: ${nextWaypoint.name || "Wegpunkt"} in ${formatKm(Math.max(0, nextWaypoint.distance - distance))}`
+          ? `Nächster Wegpunkt: ${nextWaypoint.name || "Wegpunkt"} in ${formatKm(Math.max(0, nextWaypoint.distance - resetDistance))}`
           : "Keine weiteren Wegpunkte."}
       </div>
     </div>
