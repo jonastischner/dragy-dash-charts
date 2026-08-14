@@ -3,17 +3,18 @@ import { ArrowLeft, AlertTriangle, Plus } from "lucide-react";
 import { Button } from "@/components/dragy/ui";
 import {
   acknowledgeWaypoint, addGpsMeters, addManualCorrection, addWaypoint, checkWaypointWarnings,
-  createTrip, getAverageSpeed, getCalibratedDistance, getTimeDeviation,
-  removeWaypoint, resetTrip, restartTripOrigin, setCalibrationFactor, setWarningDistance,
-  startTrip, stopTrip, targetTimeFromSpeed,
+  createTrip, getAverageSpeed, getCalibratedDistance, getLifetimeDistance, getTimeDeviation,
+  removeWaypoint, resetTrip, restartTripOrigin, setCalibrationFactor, setTarget, setWarningDistance,
+  startTrip, stopTrip, targetTimeFromSpeed, tickElapsed,
 } from "@/services/tripEngine";
-import type { Trip } from "@/types/trip";
+import type { RallyeMode, Trip } from "@/types/trip";
 import { BestzeitDisplay } from "./BestzeitDisplay";
 import { DurchschnittDisplay } from "./DurchschnittDisplay";
 import { TripControlBar } from "./TripControlBar";
 import { TripSetupPanel } from "./TripSetupPanel";
 import { NewTripDialog } from "./NewTripDialog";
 import { CalibrationDialog } from "./CalibrationDialog";
+import { TargetDialog } from "./TargetDialog";
 import { WaypointDialog } from "./WaypointDialog";
 
 const STORAGE_KEY = "dragy.tripmaster.v1";
@@ -23,7 +24,14 @@ function loadTrips(): Trip[] {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw) as Trip[];
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed.map((t) => ({ ...t, isRunning: false }));
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed.map((t) => ({
+          ...t,
+          isRunning: false,
+          totalRawGpsMeters: t.totalRawGpsMeters ?? t.rawGpsMeters,
+          totalElapsedSeconds: t.totalElapsedSeconds ?? t.elapsedSeconds,
+        }));
+      }
     }
   } catch { /* ignore */ }
   return [
@@ -38,7 +46,7 @@ export function TripMasterWorkspace({ onBack }: { onBack: () => void }) {
   const [loaded, setLoaded] = useState(false);
   const [simOn, setSimOn] = useState(false);
   const [simSpeed, setSimSpeed] = useState(10); // Meter pro Sekunde (Simulation)
-  const [dialog, setDialog] = useState<null | "new" | "calib" | "waypoint">(null);
+  const [dialog, setDialog] = useState<null | "new-bestzeit" | "new-durchschnitt" | "calib" | "target" | "waypoint">(null);
   const [dismissed, setDismissed] = useState<string[]>([]);
   const [setupOpen, setSetupOpen] = useState(false);
   const [undo, setUndo] = useState<{ tripId: string; snapshot: Trip } | null>(null);
@@ -71,7 +79,7 @@ export function TripMasterWorkspace({ onBack }: { onBack: () => void }) {
   useEffect(() => {
     if (!trip?.isRunning) return;
     const id = window.setInterval(() => {
-      update((t) => ({ ...t, elapsedSeconds: t.elapsedSeconds + 1 }));
+      update((t) => tickElapsed(t));
     }, 1000);
     return () => window.clearInterval(id);
   }, [trip?.isRunning, update]);
@@ -91,6 +99,7 @@ export function TripMasterWorkspace({ onBack }: { onBack: () => void }) {
   if (!trip) return null;
 
   const distance = getCalibratedDistance(trip);
+  const lifetimeDistance = getLifetimeDistance(trip);
   const avg = getAverageSpeed(trip);
   const targetTime = trip.targetTimeSeconds ?? targetTimeFromSpeed(trip);
   const deviation = getTimeDeviation(trip);
@@ -134,28 +143,46 @@ export function TripMasterWorkspace({ onBack }: { onBack: () => void }) {
         </div>
       </div>
 
-      {/* Trip-Auswahl */}
-      <div className="flex flex-wrap items-center gap-2">
-        <div role="tablist" aria-label="Trips" className="flex min-w-0 flex-1 flex-wrap gap-2">
-          {trips.map((t) => (
-            <button
-              key={t.id}
-              role="tab"
-              aria-selected={t.id === trip.id}
-              onClick={() => { setActiveId(t.id); setDismissed([]); setUndo(null); }}
-              className={`min-h-[48px] rounded-md border px-4 text-caption font-medium transition-ui ${
-                t.id === trip.id ? "border-rally bg-rally/15 text-rally" : "border-border text-muted-foreground hover:bg-accent"
-              }`}
-            >
-              {t.name}
-              <span className="ml-2 text-muted-foreground">{t.mode === "bestzeit" ? "Bestzeit" : "Ø"}</span>
-            </button>
-          ))}
+      {/* Trip-Auswahl, nach Modus gruppiert */}
+      <div className="flex flex-col gap-3">
+        <div role="tablist" aria-label="Trips">
+          {(["bestzeit", "durchschnitt"] as const).map((m) => {
+            const group = trips.filter((t) => t.mode === m);
+            if (group.length === 0) return null;
+            return (
+              <div key={m} className="mb-2">
+                <div className="mb-1 text-caption text-muted-foreground">
+                  {m === "bestzeit" ? "Bestzeit-Etappen" : "Gleichmäßigkeits-Etappen"}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {group.map((t) => (
+                    <button
+                      key={t.id}
+                      role="tab"
+                      aria-selected={t.id === trip.id}
+                      onClick={() => { setActiveId(t.id); setDismissed([]); setUndo(null); }}
+                      className={`min-h-[48px] rounded-md border px-4 text-caption font-medium transition-ui ${
+                        t.id === trip.id ? "border-rally bg-rally/15 text-rally" : "border-border text-muted-foreground hover:bg-accent"
+                      }`}
+                    >
+                      {t.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
         </div>
-        <Button onClick={() => setDialog("new")} className="min-h-[48px]">
-          <Plus className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
-          Neuen Trip erstellen
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="secondary" onClick={() => setDialog("new-bestzeit")} className="min-h-[48px]">
+            <Plus className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
+            Bestzeit-Etappe
+          </Button>
+          <Button variant="secondary" onClick={() => setDialog("new-durchschnitt")} className="min-h-[48px]">
+            <Plus className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
+            Gleichmäßigkeits-Etappe
+          </Button>
+        </div>
       </div>
 
       {undo && (
@@ -169,7 +196,10 @@ export function TripMasterWorkspace({ onBack }: { onBack: () => void }) {
       <div className="mt-4 rounded-lg border border-border bg-card p-4">
         {trip.mode === "bestzeit" ? (
           <BestzeitDisplay
-            distance={distance}
+            resetDistance={distance}
+            lifetimeDistance={lifetimeDistance}
+            resetElapsedSeconds={trip.elapsedSeconds}
+            totalElapsedSeconds={trip.totalElapsedSeconds}
             liveSpeedKmh={liveSpeedKmh}
             nextWaypoint={nextWaypoint}
             onReset={handleReset}
@@ -177,7 +207,9 @@ export function TripMasterWorkspace({ onBack }: { onBack: () => void }) {
         ) : (
           <DurchschnittDisplay
             elapsedSeconds={trip.elapsedSeconds}
-            distance={distance}
+            resetDistance={distance}
+            lifetimeDistance={lifetimeDistance}
+            totalElapsedSeconds={trip.totalElapsedSeconds}
             avg={avg}
             targetAvg={targetAvg}
             targetTime={targetTime}
@@ -203,6 +235,7 @@ export function TripMasterWorkspace({ onBack }: { onBack: () => void }) {
           trip={trip}
           onCalibrate={() => setDialog("calib")}
           onAddWaypoint={() => setDialog("waypoint")}
+          onEditTarget={() => setDialog("target")}
           onRemoveWaypoint={(id) => update((t) => removeWaypoint(t, id))}
           onWarningDistanceChange={(m) => setTrips((prev) => prev.map((t) => setWarningDistance(t, m)))}
           onImportWaypoints={(rows) => update((t) => rows.reduce((acc, r) => addWaypoint(acc, r.distance, r.name, r.note), t))}
@@ -233,11 +266,14 @@ export function TripMasterWorkspace({ onBack }: { onBack: () => void }) {
         </button>
       )}
 
-      {dialog === "new" && (
+      {(dialog === "new-bestzeit" || dialog === "new-durchschnitt") && (
         <NewTripDialog
+          mode={dialog === "new-bestzeit" ? "bestzeit" : "durchschnitt"}
           onClose={() => setDialog(null)}
-          onCreate={(name, mode, total, targetTimeSeconds, targetSpeed) => {
-            const t: Trip = { ...createTrip(mode, total, name), targetTimeSeconds, targetSpeed, warningDistance: trip.warningDistance };
+          onCreate={(name, total, targetTimeSeconds, targetSpeed) => {
+            const mode: RallyeMode = dialog === "new-bestzeit" ? "bestzeit" : "durchschnitt";
+            const created = setTarget(createTrip(mode, total, name), { targetTimeSeconds, targetSpeed });
+            const t: Trip = { ...created, warningDistance: trip.warningDistance };
             setTrips((prev) => [...prev, t]);
             setActiveId(t.id);
             setDialog(null);
@@ -246,6 +282,8 @@ export function TripMasterWorkspace({ onBack }: { onBack: () => void }) {
       )}
 
       {dialog === "calib" && <CalibrationDialog trip={trip} onClose={() => setDialog(null)} onApply={(m) => { update((t) => setCalibrationFactor(t, m)); setDialog(null); }} />}
+
+      {dialog === "target" && <TargetDialog trip={trip} onClose={() => setDialog(null)} onApply={(target) => { update((t) => setTarget(t, target)); setDialog(null); }} />}
 
       {dialog === "waypoint" && (
         <WaypointDialog

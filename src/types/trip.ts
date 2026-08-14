@@ -16,12 +16,14 @@ export interface Trip {
   name: string;
   mode: RallyeMode;
   totalDistance: number;      // Meter Gesamtstrecke (Soll)
-  rawGpsMeters: number;       // rohe GPS-Meter
+  rawGpsMeters: number;       // rohe GPS-Meter seit letztem Reset
+  totalRawGpsMeters: number;  // rohe GPS-Meter seit Trip-Erstellung, nie zurückgesetzt
   calibrationFactor: number;  // Korrekturfaktor auf GPS-Meter
   manualOffset: number;       // manuelle Korrektur in Meter
   targetSpeed?: number;       // km/h Soll-Ø (Durchschnitts-Rallye)
   targetTimeSeconds?: number; // Sollzeit in Sekunden
-  elapsedSeconds: number;
+  elapsedSeconds: number;       // Laufzeit seit letztem Reset
+  totalElapsedSeconds: number;  // Laufzeit seit Trip-Erstellung, nie zurückgesetzt
   isRunning: boolean;
   waypoints: Waypoint[];
   warningDistance: number;    // Vorwarn-Distanz in Meter

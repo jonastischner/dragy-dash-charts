@@ -16,9 +16,11 @@ export function createTrip(mode: RallyeMode, totalDistance: number, name = "Neue
     mode,
     totalDistance,
     rawGpsMeters: 0,
+    totalRawGpsMeters: 0,
     calibrationFactor: 1,
     manualOffset: 0,
     elapsedSeconds: 0,
+    totalElapsedSeconds: 0,
     isRunning: false,
     waypoints: [],
     warningDistance: 100,
@@ -59,12 +61,29 @@ export function addGpsMeters(trip: Trip, meters: number, deltaSeconds = 0): Trip
   return {
     ...trip,
     rawGpsMeters: Math.max(0, trip.rawGpsMeters + meters),
+    totalRawGpsMeters: Math.max(0, trip.totalRawGpsMeters + meters),
     elapsedSeconds: trip.elapsedSeconds + deltaSeconds,
+  };
+}
+
+/** Erhöht die Laufzeit (seit Reset und seit Trip-Erstellung) um deltaSeconds. */
+export function tickElapsed(trip: Trip, deltaSeconds = 1): Trip {
+  if (!trip.isRunning) return trip;
+  return {
+    ...trip,
+    elapsedSeconds: trip.elapsedSeconds + deltaSeconds,
+    totalElapsedSeconds: trip.totalElapsedSeconds + deltaSeconds,
   };
 }
 
 export function getCalibratedDistance(trip: Trip): number {
   return trip.rawGpsMeters * trip.calibrationFactor + trip.manualOffset;
+}
+
+/** Distanz seit Trip-Erstellung, nie zurückgesetzt. Kalibrierung wirkt global,
+ *  manualOffset (einmalige Korrektur der aktuellen Etappe) nicht. */
+export function getLifetimeDistance(trip: Trip): number {
+  return trip.totalRawGpsMeters * trip.calibrationFactor;
 }
 
 export function getAverageSpeed(trip: Trip): number {
@@ -79,6 +98,11 @@ export function addManualCorrection(trip: Trip, delta: number): Trip {
 export function setCalibrationFactor(trip: Trip, roadbookMeters: number): Trip {
   if (trip.rawGpsMeters <= 0 || roadbookMeters <= 0) return trip;
   return { ...trip, calibrationFactor: roadbookMeters / trip.rawGpsMeters, manualOffset: 0 };
+}
+
+/** Setzt Sollzeit/Soll-Ø (Durchschnitts-Rallye). Ersetzt beide Werte, kein Merge. */
+export function setTarget(trip: Trip, target: { targetTimeSeconds?: number; targetSpeed?: number }): Trip {
+  return { ...trip, targetTimeSeconds: target.targetTimeSeconds, targetSpeed: target.targetSpeed };
 }
 
 /** Nur Durchschnitts-Rallye: positiv = zu früh, negativ = zu spät. */
