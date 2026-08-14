@@ -7,6 +7,7 @@ import { CaptureTab } from "@/components/dragy/CaptureTab";
 import { MoreTab } from "@/components/dragy/MoreTab";
 import { TripMasterPage } from "@/components/TripMasterPage";
 import { ModuleWorkspace } from "@/components/dragy/module/ModuleWorkspace";
+import { GearSimWorkspace } from "@/components/dragy/sim/GearSimWorkspace";
 import { usePersistedState } from "@/components/dragy/ui";
 import { useAppStore } from "@/lib/dragy/store";
 import type { ModuleId } from "@/lib/dragy/types";
@@ -40,8 +41,10 @@ function Index() {
   const [tab, setTab] = useState<Tab>("start");
   const [module, setModule] = usePersistedState<ModuleId>("dragy.activeModule", "power");
   const [openModule, setOpenModule] = useState<ModuleId | null>(null);
+  const [openSim, setOpenSim] = useState(false);
 
-  const goGarage = () => { setOpenModule(null); setTab("garage"); };
+  const goGarage = () => { setOpenModule(null); setOpenSim(false); setTab("garage"); };
+  const goPower = () => { setOpenSim(false); setModule("power"); setOpenModule("power"); };
 
   return (
     <div className="min-h-dvh bg-background text-foreground" style={{ paddingTop: "env(safe-area-inset-top)" }}>
@@ -79,7 +82,7 @@ function Index() {
                 key={t.id}
                 role="tab"
                 aria-selected={isActive}
-                onClick={() => { setTab(t.id); if (t.id !== "start") setOpenModule(null); }}
+                onClick={() => { setTab(t.id); if (t.id !== "start") { setOpenModule(null); setOpenSim(false); } }}
                 className={`inline-flex min-h-[44px] items-center gap-2 rounded-md px-3 text-caption font-medium transition-ui focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                   isActive ? "bg-primary/15 text-primary" : "text-muted-foreground hover:bg-accent hover:text-foreground"
                 }`}
@@ -96,7 +99,9 @@ function Index() {
         {tab === "start" && (
           openModule
             ? <ModuleWorkspace module={openModule} onBack={() => setOpenModule(null)} onOpenGarage={goGarage} />
-            : <HomeTab onOpenModule={(m) => { setModule(m); setOpenModule(m); }} onOpenGarage={goGarage} />
+            : openSim
+            ? <GearSimWorkspace onBack={() => setOpenSim(false)} onOpenGarage={goGarage} onOpenPower={goPower} />
+            : <HomeTab onOpenModule={(m) => { setModule(m); setOpenModule(m); }} onOpenSim={() => setOpenSim(true)} onOpenGarage={goGarage} />
         )}
         {tab === "capture" && <CaptureTab module={module} onModuleChange={setModule} onOpenGarage={goGarage} />}
         {tab === "trip" && <TripMasterPage />}
@@ -120,7 +125,7 @@ function Index() {
                 key={t.id}
                 role="tab"
                 aria-selected={isActive}
-                onClick={() => { setTab(t.id); if (t.id !== "start") setOpenModule(null); }}
+                onClick={() => { setTab(t.id); if (t.id !== "start") { setOpenModule(null); setOpenSim(false); } }}
                 className={`flex min-h-[44px] flex-1 flex-col items-center justify-center gap-0.5 rounded-md text-caption font-medium transition-ui focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                   isActive ? "bg-primary/15 text-primary" : "text-muted-foreground"
                 }`}

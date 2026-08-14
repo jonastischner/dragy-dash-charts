@@ -5,9 +5,8 @@ import { Section, Field, TextInput, NumInput, Button, Note, Row, Collapsible, Ic
 import { useAppStore, newVehicle } from "@/lib/dragy/store";
 
 import { uid } from "@/lib/dragy/db";
-import { computeRpmFactor, tireCircumferenceM, normalizeDrive, resolveAllGears } from "@/lib/dragy/gear";
+import { computeRpmFactor, tireCircumferenceM, normalizeDrive } from "@/lib/dragy/gear";
 import type { Vehicle, DragPoint, GearPreset, GearboxDef, FinalDriveDef, TireDef, DriveSetup, GearRatio } from "@/lib/dragy/types";
-import { Chart, type Series } from "./Chart";
 
 
 function useLockBodyScroll() {
@@ -248,8 +247,6 @@ function VehicleEditor({ vehicle, onSave, onCancel }: { vehicle: Vehicle; onSave
           onChange={(patch) => setV({ ...v, ...patch })}
           onUseAsDefault={(f) => setV({ ...v, rpmFactorDefault: +f.toFixed(3) })}
         />
-
-        <ShiftDiagramCompare vehicle={v} />
 
         <GearPresetsEditor
           presets={v.gearPresets ?? []}
@@ -658,121 +655,6 @@ async function downscaleImage(file: File, maxSize: number, quality: number): Pro
   bitmap.close?.();
   return canvas.toDataURL("image/jpeg", quality);
 }
-
-// ================= Schaltdiagramm-Vergleich (im Fahrzeugdialog) =================
-function ShiftDiagramCompare({ vehicle }: { vehicle: Vehicle }) {
-  const { setups } = normalizeDrive(vehicle);
-  const [selected, setSelected] = usePersistedState<string[] | null>(`vehicleEditor.shiftSetups.${vehicle.id}`, null);
-  const effective = selected ?? setups.map((s) => s.id);
-
-  const resolved = resolveAllGears(vehicle).filter((r) => effective.includes(r.setupId));
-  const maxRpm = vehicle.maxRpm && vehicle.maxRpm > 0 ? vehicle.maxRpm : 8000;
-  const shiftRpm = vehicle.shiftRpm && vehicle.shiftRpm > 0 ? vehicle.shiftRpm : undefined;
-  const setupIds = Array.from(new Set(resolved.map((r) => r.setupId)));
-  const baseColors = ["#38bdf8", "#f472b6", "#a3e635", "#fbbf24", "#c084fc", "#f97316"];
-
-  const series: Series[] = [];
-  // maximale km/h für horizontale Referenzlinien
-  let kmhMax = 0;
-
-  setupIds.forEach((sid, setupIdx) => {
-    // Gänge dieses Setups in Gang-Reihenfolge (höchster rpmFactor zuerst = 1. Gang).
-    const gears = resolved
-      .filter((r) => r.setupId === sid)
-      .slice()
-      .sort((a, b) => b.rpmFactor - a.rpmFactor);
-    if (gears.length === 0) return;
-    const color = baseColors[setupIdx % baseColors.length];
-    const setupName = gears[0].setupName;
-
-    // Eine durchgehende Sägezahn-Kurve: pro Gang Anstieg 0→shiftRpm
-    // (bzw. maxRpm im letzten Gang), dann senkrechter Sprung auf die
-    // Drehzahl des nächsten Gangs bei gleicher km/h.
-    const pts: Array<{ x: number; y: number }> = [{ x: 0, y: 0 }];
-    gears.forEach((r, gi) => {
-      const isLast = gi === gears.length - 1;
-      const rpmTop = isLast ? maxRpm : (shiftRpm ?? maxRpm);
-      const kmhTop = rpmTop / r.rpmFactor;
-      if (kmhTop > kmhMax) kmhMax = kmhTop;
-      pts.push({ x: kmhTop, y: rpmTop });
-      const next = gears[gi + 1];
-      if (next && !isLast) {
-        const rpmNext = rpmTop * (next.rpmFactor / r.rpmFactor);
-        pts.push({ x: kmhTop, y: rpmNext });
-      }
-    });
-    series.push({ label: setupName, color, points: pts });
-  });
-
-
-  // Horizontale Referenzlinien (Schalt-/Maximaldrehzahl) über die volle x-Breite.
-  if (kmhMax > 0) {
-    if (shiftRpm) {
-      series.push({
-        label: "Schaltdrehzahl",
-        color: "#f59e0b",
-        points: [{ x: 0, y: shiftRpm }, { x: kmhMax, y: shiftRpm }],
-      });
-    }
-    if (vehicle.maxRpm && vehicle.maxRpm > 0) {
-      series.push({
-        label: "Maximaldrehzahl",
-        color: "#ef4444",
-        points: [{ x: 0, y: vehicle.maxRpm }, { x: kmhMax, y: vehicle.maxRpm }],
-      });
-    }
-  }
-
-  return (
-    <Collapsible
-      title="Schaltdiagramm (Setups vergleichen)"
-      persistKey="vehicleEditor.shiftDiagram"
-      subtitle={`${effective.length} von ${setups.length} Setups aktiv`}
-    >
-      <p className="text-caption text-muted-foreground">
-        U/min über km/h je Gang. Senkrechte Linien zeigen den Drehzahlabfall beim Schalten (bei gepflegter Schaltdrehzahl); waagerechte Linien markieren Schalt- (orange) und Maximaldrehzahl (rot).
-      </p>
-      {setups.length === 0 ? (
-        <p className="mt-2 text-caption text-muted-foreground">Erst mindestens ein Setup oben anlegen.</p>
-      ) : (
-        <>
-          <div className="mt-2 flex flex-wrap gap-2 text-caption text-foreground">
-            {setups.map((s) => {
-              const on = effective.includes(s.id);
-              return (
-                <label key={s.id} className="flex min-h-[44px] items-center gap-2 rounded-md bg-muted px-3 py-1">
-                  <input
-                    type="checkbox"
-                    checked={on}
-                    onChange={(e) => {
-                      const base = effective;
-                      const next = e.target.checked
-                        ? Array.from(new Set([...base, s.id]))
-                        : base.filter((x) => x !== s.id);
-                      setSelected(next);
-                    }}
-                  />
-                  {s.name}
-                </label>
-              );
-            })}
-          </div>
-          <div className="mt-2">
-            <Chart
-              series={series}
-              xLabel="km/h"
-              yLabel="U/min"
-              xFormat={(v) => v.toFixed(0)}
-              yFormat={(v) => v.toFixed(0)}
-              height={280}
-            />
-          </div>
-        </>
-      )}
-    </Collapsible>
-  );
-}
-
 
 // Hex-Farbe um einen Faktor aufhellen/abdunkeln (−1..+1).
 function shadeColor(hex: string, amount: number): string {
