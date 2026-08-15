@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Button, Field, Note, TextInput } from "@/components/dragy/ui";
+import { errorMessage } from "@/lib/dragy/errors";
 import { Modal } from "./Modal";
 
 export function AddScheduleEntryDialog({
@@ -25,7 +26,7 @@ export function AddScheduleEntryDialog({
         programmpunkt: programmpunkt.trim(),
       });
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Eintrag konnte nicht gespeichert werden.");
+      setError(errorMessage(e, "Eintrag konnte nicht gespeichert werden."));
     } finally {
       setSaving(false);
     }

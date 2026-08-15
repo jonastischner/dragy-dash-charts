@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Button, Field, Note, NumInput, TextInput } from "@/components/dragy/ui";
+import { errorMessage } from "@/lib/dragy/errors";
 import { Modal } from "./Modal";
 
 export function AddStageDialog({
@@ -34,7 +35,7 @@ export function AddStageDialog({
         startUhrzeit: datum && zeit ? new Date(`${datum}T${zeit}`).toISOString() : undefined,
       });
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Wertungsprüfung konnte nicht gespeichert werden.");
+      setError(errorMessage(e, "Wertungsprüfung konnte nicht gespeichert werden."));
     } finally {
       setSaving(false);
     }

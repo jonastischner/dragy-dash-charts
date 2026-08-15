@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { ArrowLeft, Plus } from "lucide-react";
 import { Button, EmptyState, Note, Skeleton } from "@/components/dragy/ui";
+import { errorMessage } from "@/lib/dragy/errors";
 import { useAppStore } from "@/lib/dragy/store";
 import { createEvent, listEvents } from "@/lib/dragy/events";
 import type { RallyeEvent } from "@/types/events";
@@ -32,7 +33,7 @@ export function EventsWorkspace({
     try {
       setEvents(await listEvents());
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Veranstaltungen konnten nicht geladen werden.");
+      setError(errorMessage(e, "Veranstaltungen konnten nicht geladen werden."));
     } finally {
       setLoading(false);
     }

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Button, Field, Note, TextInput } from "@/components/dragy/ui";
+import { errorMessage } from "@/lib/dragy/errors";
 import { Modal } from "./Modal";
 
 export function NewEventDialog({
@@ -33,7 +34,7 @@ export function NewEventDialog({
         datumEnde: datumEnde || undefined,
       });
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Veranstaltung konnte nicht erstellt werden.");
+      setError(errorMessage(e, "Veranstaltung konnte nicht erstellt werden."));
     } finally {
       setSaving(false);
     }
