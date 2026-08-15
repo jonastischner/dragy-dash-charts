@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { FileText, MapPin, Plus } from "lucide-react";
+import { FileText, Link2, MapPin, Plus } from "lucide-react";
 import { Button, Field, IconButton, Note, Section, Select, Skeleton } from "@/components/dragy/ui";
 import { errorMessage } from "@/lib/dragy/errors";
 import {
@@ -11,18 +11,26 @@ import {
   removeStage,
   updateEvent,
 } from "@/lib/dragy/events";
-import type { EventScheduleEntry, EventStage, EventStatus, RallyeEvent } from "@/types/events";
+import type {
+  EventScheduleEntry,
+  EventStage,
+  EventStatus,
+  ExtractedScheduleEntry,
+  ExtractedStage,
+  RallyeEvent,
+} from "@/types/events";
 import { AddScheduleEntryDialog } from "./AddScheduleEntryDialog";
 import { AddStageDialog } from "./AddStageDialog";
 import { STATUS_LABEL, formatDateRange, formatDateTime } from "./format";
 import { ImportPdfDialog } from "./ImportPdfDialog";
+import { ImportSportityDialog } from "./ImportSportityDialog";
 
 export function EventDetail({ event, onChanged }: { event: RallyeEvent; onChanged: () => void }) {
   const [schedule, setSchedule] = useState<EventScheduleEntry[]>([]);
   const [stages, setStages] = useState<EventStage[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [dialog, setDialog] = useState<null | "schedule" | "stage" | "pdf">(null);
+  const [dialog, setDialog] = useState<null | "schedule" | "stage" | "pdf" | "sportity">(null);
 
   const reload = async () => {
     setLoading(true);
@@ -41,6 +49,19 @@ export function EventDetail({ event, onChanged }: { event: RallyeEvent; onChange
   useEffect(() => {
     reload();
   }, [event.id]);
+
+  const importExtraction = async (result: {
+    schedule: ExtractedScheduleEntry[];
+    stages: ExtractedStage[];
+  }) => {
+    for (const entry of result.schedule) {
+      await addScheduleEntry(event.id, entry);
+    }
+    for (const stage of result.stages) {
+      await addStage(event.id, stage);
+    }
+    reload();
+  };
 
   return (
     <div>
@@ -78,10 +99,16 @@ export function EventDetail({ event, onChanged }: { event: RallyeEvent; onChange
             </Select>
           </Field>
         </div>
-        <Button variant="secondary" onClick={() => setDialog("pdf")} className="mt-3 w-full">
-          <FileText className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
-          Ausschreibung importieren (PDF)
-        </Button>
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <Button variant="secondary" onClick={() => setDialog("pdf")}>
+            <FileText className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
+            PDF hochladen
+          </Button>
+          <Button variant="secondary" onClick={() => setDialog("sportity")}>
+            <Link2 className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
+            Von Sportity importieren
+          </Button>
+        </div>
       </Section>
 
       <Section title="Zeitplan">
@@ -198,15 +225,15 @@ export function EventDetail({ event, onChanged }: { event: RallyeEvent; onChange
         <ImportPdfDialog
           eventId={event.id}
           onClose={() => setDialog(null)}
-          onImport={async (result) => {
-            for (const entry of result.schedule) {
-              await addScheduleEntry(event.id, entry);
-            }
-            for (const stage of result.stages) {
-              await addStage(event.id, stage);
-            }
-            reload();
-          }}
+          onImport={importExtraction}
+        />
+      )}
+      {dialog === "sportity" && (
+        <ImportSportityDialog
+          eventId={event.id}
+          onClose={() => setDialog(null)}
+          onImport={importExtraction}
+          onFallbackToUpload={() => setDialog("pdf")}
         />
       )}
     </div>

@@ -221,23 +221,44 @@ export async function uploadEventPdf(eventId: string, file: File): Promise<strin
   return path;
 }
 
-export async function extractEventPdf(storagePath: string): Promise<ExtractionResult> {
-  const { data, error } = await supabase.functions.invoke<ExtractionResult>("extract-event-pdf", {
-    body: { storagePath },
-  });
+async function invokeEventFunction<T>(name: string, body: Record<string, unknown>): Promise<T> {
+  const { data, error } = await supabase.functions.invoke<T>(name, { body });
   if (error) {
     const context = (error as { context?: { json?: () => Promise<{ error?: string }> } }).context;
     let serverMessage: string | undefined;
     if (context?.json) {
       try {
-        const body = await context.json();
-        serverMessage = body?.error;
+        const body2 = await context.json();
+        serverMessage = body2?.error;
       } catch {
         // Response-Body ist kein JSON – Fallback auf die generische Meldung unten.
       }
     }
-    throw new Error(serverMessage ?? error.message ?? "PDF-Extraktion fehlgeschlagen.");
+    throw new Error(serverMessage ?? error.message ?? "Anfrage fehlgeschlagen.");
   }
-  if (!data) throw new Error("Die PDF-Extraktion hat keine Daten geliefert.");
+  if (!data) throw new Error("Die Anfrage hat keine Daten geliefert.");
   return data;
+}
+
+export async function extractEventPdf(storagePath: string): Promise<ExtractionResult> {
+  return invokeEventFunction<ExtractionResult>("extract-event-pdf", { storagePath });
+}
+
+// Teil 3: Sportity-Link als Komfort-Import. Lädt (serverseitig) die
+// verlinkte Sportity-Seite, sucht darauf die Ausschreibungs-PDF, legt sie
+// im selben Bucket wie ein manueller Upload ab und liefert den Storage-Pfad
+// zurück – die eigentliche Extraktion läuft danach unverändert über
+// extractEventPdf() (dieselbe Pipeline wie beim manuellen Upload).
+export async function importFromSportityLink(
+  eventId: string,
+  sportityUrl: string,
+): Promise<string> {
+  const { storagePath } = await invokeEventFunction<{ storagePath: string }>(
+    "import-sportity-link",
+    {
+      eventId,
+      sportityUrl,
+    },
+  );
+  return storagePath;
 }
