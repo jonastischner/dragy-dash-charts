@@ -2,3 +2,6 @@ project_id = "fhnthodldayguyuigada"
 
 [functions.extract-event-pdf]
 verify_jwt = true
+
+[functions.import-sportity-link]
+verify_jwt = true

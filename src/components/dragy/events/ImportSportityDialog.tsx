@@ -1,16 +1,17 @@
-import { useRef, useState } from "react";
-import { Loader2, Upload } from "lucide-react";
-import { Button, Note } from "@/components/dragy/ui";
+import { useState } from "react";
+import { Link2, Loader2 } from "lucide-react";
+import { Button, Field, Note, TextInput } from "@/components/dragy/ui";
 import { errorMessage } from "@/lib/dragy/errors";
-import { extractEventPdf, uploadEventPdf } from "@/lib/dragy/events";
+import { extractEventPdf, importFromSportityLink } from "@/lib/dragy/events";
 import type { ExtractedScheduleEntry, ExtractedStage } from "@/types/events";
 import { ExtractionReview } from "./ExtractionReview";
 import { Modal } from "./Modal";
 
-export function ImportPdfDialog({
+export function ImportSportityDialog({
   eventId,
   onClose,
   onImport,
+  onFallbackToUpload,
 }: {
   eventId: string;
   onClose: () => void;
@@ -18,26 +19,27 @@ export function ImportPdfDialog({
     schedule: ExtractedScheduleEntry[];
     stages: ExtractedStage[];
   }) => Promise<void>;
+  onFallbackToUpload: () => void;
 }) {
-  const inputRef = useRef<HTMLInputElement>(null);
-  const [phase, setPhase] = useState<"pick" | "extracting" | "review" | "saving">("pick");
+  const [url, setUrl] = useState("");
+  const [phase, setPhase] = useState<"link" | "importing" | "review" | "saving">("link");
   const [error, setError] = useState<string | null>(null);
   const [schedule, setSchedule] = useState<ExtractedScheduleEntry[]>([]);
   const [stages, setStages] = useState<ExtractedStage[]>([]);
 
-  const pickFile = async (file: File | null | undefined) => {
-    if (!file) return;
+  const startImport = async () => {
+    if (!url.trim()) return;
     setError(null);
-    setPhase("extracting");
+    setPhase("importing");
     try {
-      const path = await uploadEventPdf(eventId, file);
+      const path = await importFromSportityLink(eventId, url.trim());
       const result = await extractEventPdf(path);
       setSchedule(result.schedule);
       setStages(result.stages);
       setPhase("review");
     } catch (e) {
-      setError(errorMessage(e, "PDF konnte nicht verarbeitet werden."));
-      setPhase("pick");
+      setError(errorMessage(e, "Import von Sportity ist fehlgeschlagen."));
+      setPhase("link");
     }
   };
 
@@ -54,33 +56,45 @@ export function ImportPdfDialog({
   };
 
   return (
-    <Modal title="Ausschreibung importieren (PDF)" onClose={onClose}>
-      {error && <Note>{error}</Note>}
-
-      {phase === "pick" && (
-        <div className="space-y-3">
-          <p className="text-caption text-muted-foreground">
-            Lade die Ausschreibung als PDF hoch. Zeitplan und WP-Plan werden automatisch ausgelesen
-            – du prüfst und bestätigst die Daten danach, bevor irgendetwas gespeichert wird.
-          </p>
-          <input
-            ref={inputRef}
-            type="file"
-            accept="application/pdf"
-            className="hidden"
-            onChange={(e) => pickFile(e.target.files?.[0])}
-          />
-          <Button onClick={() => inputRef.current?.click()} className="w-full">
-            <Upload className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
-            PDF wählen…
+    <Modal title="Von Sportity importieren" onClose={onClose}>
+      {error && (
+        <div className="space-y-2">
+          <Note>{error}</Note>
+          <Button variant="secondary" onClick={onFallbackToUpload} className="w-full">
+            PDF stattdessen direkt hochladen
           </Button>
         </div>
       )}
 
-      {phase === "extracting" && (
+      {phase === "link" && (
+        <div className="space-y-3">
+          {!error && (
+            <p className="text-caption text-muted-foreground">
+              Füge den Link zur Sportity-Veranstaltungsseite ein. Wir versuchen, die Ausschreibung
+              dort automatisch als PDF zu finden – das klappt nicht bei jeder Seite, dann kannst du
+              die PDF stattdessen direkt hochladen.
+            </p>
+          )}
+          <Field label="Sportity-Link">
+            <TextInput
+              type="url"
+              inputMode="url"
+              placeholder="https://www.sportity.de/…"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+            />
+          </Field>
+          <Button onClick={startImport} disabled={!url.trim()} className="w-full">
+            <Link2 className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
+            Importieren
+          </Button>
+        </div>
+      )}
+
+      {phase === "importing" && (
         <div className="flex flex-col items-center gap-3 py-8 text-muted-foreground">
           <Loader2 className="h-6 w-6 animate-spin" aria-hidden="true" />
-          <p className="text-caption">PDF wird hochgeladen und ausgelesen…</p>
+          <p className="text-caption">Sportity-Seite wird durchsucht und PDF ausgelesen…</p>
         </div>
       )}
 
