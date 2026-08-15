@@ -12,12 +12,25 @@
 // tool_choice, refusal stop_reason) fehlen lassen könnte.
 import Anthropic from "npm:@anthropic-ai/sdk";
 import { createClient } from "npm:@supabase/supabase-js@2.110.8";
-import { encodeBase64 } from "jsr:@std/encoding@1/base64";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+
+// Bewusst ohne externe Base64-Bibliothek (kein jsr:@std/encoding) – nur
+// eingebaute btoa()/String.fromCharCode(), in Chunks um Call-Stack-Limits
+// bei großen PDFs zu vermeiden. Reduziert das Risiko eines Boot-Fehlers
+// durch einen von Supabase' Edge-Runtime evtl. nicht unterstützten
+// Import-Specifier.
+function bytesToBase64(bytes: Uint8Array): string {
+  const chunkSize = 0x8000;
+  let binary = "";
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+  }
+  return btoa(binary);
+}
 
 function jsonError(status: number, message: string) {
   return new Response(JSON.stringify({ error: message }), {
@@ -122,7 +135,7 @@ Deno.serve(async (req) => {
     }
 
     const pdfBytes = new Uint8Array(await fileBlob.arrayBuffer());
-    const base64Pdf = encodeBase64(pdfBytes);
+    const base64Pdf = bytesToBase64(pdfBytes);
 
     const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY");
     if (!anthropicKey) {
