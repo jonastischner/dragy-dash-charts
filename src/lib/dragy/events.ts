@@ -224,14 +224,20 @@ export async function uploadEventPdf(eventId: string, file: File): Promise<strin
 async function invokeEventFunction<T>(name: string, body: Record<string, unknown>): Promise<T> {
   const { data, error } = await supabase.functions.invoke<T>(name, { body });
   if (error) {
-    const context = (error as { context?: { json?: () => Promise<{ error?: string }> } }).context;
+    const context = (error as { context?: { text?: () => Promise<string> } }).context;
     let serverMessage: string | undefined;
-    if (context?.json) {
+    if (context?.text) {
       try {
-        const body2 = await context.json();
-        serverMessage = body2?.error;
+        const raw = await context.text();
+        try {
+          serverMessage = JSON.parse(raw)?.error;
+        } catch {
+          // Body ist kein JSON (z. B. ein Boot-/Laufzeitfehler der Function) –
+          // Rohtext zeigen statt der uninformativen generischen Meldung.
+          if (raw.trim()) serverMessage = raw.trim().slice(0, 300);
+        }
       } catch {
-        // Response-Body ist kein JSON – Fallback auf die generische Meldung unten.
+        // Body nicht lesbar – Fallback auf die generische Meldung unten.
       }
     }
     throw new Error(serverMessage ?? error.message ?? "Anfrage fehlgeschlagen.");
