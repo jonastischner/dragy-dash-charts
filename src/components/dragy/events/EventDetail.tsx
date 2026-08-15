@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { MapPin, Plus } from "lucide-react";
 import { Button, Field, IconButton, Note, Section, Select, Skeleton } from "@/components/dragy/ui";
+import { errorMessage } from "@/lib/dragy/errors";
 import {
   addScheduleEntry,
   addStage,
@@ -30,7 +31,7 @@ export function EventDetail({ event, onChanged }: { event: RallyeEvent; onChange
       setSchedule(s);
       setStages(st);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Daten konnten nicht geladen werden.");
+      setError(errorMessage(e, "Daten konnten nicht geladen werden."));
     } finally {
       setLoading(false);
     }
@@ -60,8 +61,12 @@ export function EventDetail({ event, onChanged }: { event: RallyeEvent; onChange
             <Select
               value={event.status}
               onChange={async (e) => {
-                await updateEvent(event.id, { status: e.target.value as EventStatus });
-                onChanged();
+                try {
+                  await updateEvent(event.id, { status: e.target.value as EventStatus });
+                  onChanged();
+                } catch (err) {
+                  setError(errorMessage(err, "Status konnte nicht geändert werden."));
+                }
               }}
             >
               {(Object.keys(STATUS_LABEL) as EventStatus[]).map((s) => (
@@ -95,8 +100,12 @@ export function EventDetail({ event, onChanged }: { event: RallyeEvent; onChange
                 <IconButton
                   label="Eintrag löschen"
                   onClick={async () => {
-                    await removeScheduleEntry(entry.id);
-                    reload();
+                    try {
+                      await removeScheduleEntry(entry.id);
+                      reload();
+                    } catch (err) {
+                      setError(errorMessage(err, "Eintrag konnte nicht gelöscht werden."));
+                    }
                   }}
                 />
               </li>
@@ -142,8 +151,12 @@ export function EventDetail({ event, onChanged }: { event: RallyeEvent; onChange
                 <IconButton
                   label="Wertungsprüfung löschen"
                   onClick={async () => {
-                    await removeStage(stage.id);
-                    reload();
+                    try {
+                      await removeStage(stage.id);
+                      reload();
+                    } catch (err) {
+                      setError(errorMessage(err, "Wertungsprüfung konnte nicht gelöscht werden."));
+                    }
                   }}
                 />
               </li>
