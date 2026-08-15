@@ -104,48 +104,6 @@ export type Database = {
         }
         Relationships: []
       }
-      events: {
-        Row: {
-          created_at: string
-          datum_ende: string | null
-          datum_start: string | null
-          id: string
-          name: string
-          ort: string | null
-          quelle_referenz: string | null
-          quelle_typ: string | null
-          status: string
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          datum_ende?: string | null
-          datum_start?: string | null
-          id?: string
-          name: string
-          ort?: string | null
-          quelle_referenz?: string | null
-          quelle_typ?: string | null
-          status?: string
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          datum_ende?: string | null
-          datum_start?: string | null
-          id?: string
-          name?: string
-          ort?: string | null
-          quelle_referenz?: string | null
-          quelle_typ?: string | null
-          status?: string
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
       event_schedule: {
         Row: {
           created_at: string
@@ -221,6 +179,48 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      events: {
+        Row: {
+          created_at: string
+          datum_ende: string | null
+          datum_start: string | null
+          id: string
+          name: string
+          ort: string | null
+          quelle_referenz: string | null
+          quelle_typ: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          datum_ende?: string | null
+          datum_start?: string | null
+          id?: string
+          name: string
+          ort?: string | null
+          quelle_referenz?: string | null
+          quelle_typ?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          datum_ende?: string | null
+          datum_start?: string | null
+          id?: string
+          name?: string
+          ort?: string | null
+          quelle_referenz?: string | null
+          quelle_typ?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
     }
     Views: {
