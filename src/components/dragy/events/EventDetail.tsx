@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { MapPin, Plus } from "lucide-react";
+import { FileText, MapPin, Plus } from "lucide-react";
 import { Button, Field, IconButton, Note, Section, Select, Skeleton } from "@/components/dragy/ui";
 import { errorMessage } from "@/lib/dragy/errors";
 import {
@@ -15,13 +15,14 @@ import type { EventScheduleEntry, EventStage, EventStatus, RallyeEvent } from "@
 import { AddScheduleEntryDialog } from "./AddScheduleEntryDialog";
 import { AddStageDialog } from "./AddStageDialog";
 import { STATUS_LABEL, formatDateRange, formatDateTime } from "./format";
+import { ImportPdfDialog } from "./ImportPdfDialog";
 
 export function EventDetail({ event, onChanged }: { event: RallyeEvent; onChanged: () => void }) {
   const [schedule, setSchedule] = useState<EventScheduleEntry[]>([]);
   const [stages, setStages] = useState<EventStage[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [dialog, setDialog] = useState<null | "schedule" | "stage">(null);
+  const [dialog, setDialog] = useState<null | "schedule" | "stage" | "pdf">(null);
 
   const reload = async () => {
     setLoading(true);
@@ -77,6 +78,10 @@ export function EventDetail({ event, onChanged }: { event: RallyeEvent; onChange
             </Select>
           </Field>
         </div>
+        <Button variant="secondary" onClick={() => setDialog("pdf")} className="mt-3 w-full">
+          <FileText className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
+          Ausschreibung importieren (PDF)
+        </Button>
       </Section>
 
       <Section title="Zeitplan">
@@ -185,6 +190,21 @@ export function EventDetail({ event, onChanged }: { event: RallyeEvent; onChange
           onAdd={async (input) => {
             await addStage(event.id, input);
             setDialog(null);
+            reload();
+          }}
+        />
+      )}
+      {dialog === "pdf" && (
+        <ImportPdfDialog
+          eventId={event.id}
+          onClose={() => setDialog(null)}
+          onImport={async (result) => {
+            for (const entry of result.schedule) {
+              await addScheduleEntry(event.id, entry);
+            }
+            for (const stage of result.stages) {
+              await addStage(event.id, stage);
+            }
             reload();
           }}
         />

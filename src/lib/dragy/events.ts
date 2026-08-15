@@ -9,6 +9,7 @@ import type {
   EventSourceType,
   EventStage,
   EventStatus,
+  ExtractionResult,
   RallyeEvent,
 } from "@/types/events";
 
@@ -202,4 +203,41 @@ export async function addStage(
 export async function removeStage(id: string): Promise<void> {
   const { error } = await supabase.from("event_stages").delete().eq("id", id);
   if (error) throw error;
+}
+
+// Teil 2: PDF-Upload + Extraktion. Die Extraktion selbst schreibt nichts in
+// event_schedule/event_stages – das Frontend zeigt sie erst zur Review an;
+// erst addScheduleEntry/addStage (nach Bestätigung) persistiert etwas.
+
+export async function uploadEventPdf(eventId: string, file: File): Promise<string> {
+  const userId = await requireUserId();
+  const path = `${userId}/${eventId}/${Date.now()}-${file.name}`;
+  const { error } = await supabase.storage
+    .from("event-ausschreibungen")
+    .upload(path, file, { contentType: "application/pdf", upsert: false });
+  if (error) throw error;
+
+  await updateEvent(eventId, { quelleTyp: "pdf_upload", quelleReferenz: path });
+  return path;
+}
+
+export async function extractEventPdf(storagePath: string): Promise<ExtractionResult> {
+  const { data, error } = await supabase.functions.invoke<ExtractionResult>("extract-event-pdf", {
+    body: { storagePath },
+  });
+  if (error) {
+    const context = (error as { context?: { json?: () => Promise<{ error?: string }> } }).context;
+    let serverMessage: string | undefined;
+    if (context?.json) {
+      try {
+        const body = await context.json();
+        serverMessage = body?.error;
+      } catch {
+        // Response-Body ist kein JSON – Fallback auf die generische Meldung unten.
+      }
+    }
+    throw new Error(serverMessage ?? error.message ?? "PDF-Extraktion fehlgeschlagen.");
+  }
+  if (!data) throw new Error("Die PDF-Extraktion hat keine Daten geliefert.");
+  return data;
 }
