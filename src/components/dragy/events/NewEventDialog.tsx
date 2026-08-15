@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Button, Field, TextInput } from "@/components/dragy/ui";
+import { Button, Field, Note, TextInput } from "@/components/dragy/ui";
 import { Modal } from "./Modal";
 
 export function NewEventDialog({
@@ -19,10 +19,12 @@ export function NewEventDialog({
   const [datumStart, setDatumStart] = useState("");
   const [datumEnde, setDatumEnde] = useState("");
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const submit = async () => {
     if (!name.trim()) return;
     setSaving(true);
+    setError(null);
     try {
       await onCreate({
         name: name.trim(),
@@ -30,6 +32,8 @@ export function NewEventDialog({
         datumStart: datumStart || undefined,
         datumEnde: datumEnde || undefined,
       });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Veranstaltung konnte nicht erstellt werden.");
     } finally {
       setSaving(false);
     }
@@ -38,6 +42,7 @@ export function NewEventDialog({
   return (
     <Modal title="Neue Veranstaltung" onClose={onClose}>
       <div className="space-y-3">
+        {error && <Note>{error}</Note>}
         <Field label="Name">
           <TextInput
             value={name}
