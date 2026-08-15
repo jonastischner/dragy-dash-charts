@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Button, Field, NumInput, TextInput } from "@/components/dragy/ui";
+import { Button, Field, Note, NumInput, TextInput } from "@/components/dragy/ui";
 import { Modal } from "./Modal";
 
 export function AddStageDialog({
@@ -20,10 +20,12 @@ export function AddStageDialog({
   const [datum, setDatum] = useState("");
   const [zeit, setZeit] = useState("");
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const submit = async () => {
     if (!name.trim()) return;
     setSaving(true);
+    setError(null);
     try {
       await onAdd({
         wpNummer: wpNummer.trim() || undefined,
@@ -31,6 +33,8 @@ export function AddStageDialog({
         laengeKm: laengeKm === "" ? undefined : Number(laengeKm),
         startUhrzeit: datum && zeit ? new Date(`${datum}T${zeit}`).toISOString() : undefined,
       });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Wertungsprüfung konnte nicht gespeichert werden.");
     } finally {
       setSaving(false);
     }
@@ -39,6 +43,7 @@ export function AddStageDialog({
   return (
     <Modal title="Wertungsprüfung" onClose={onClose}>
       <div className="space-y-3">
+        {error && <Note>{error}</Note>}
         <div className="grid grid-cols-[1fr_2fr] gap-3">
           <Field label="WP-Nr.">
             <TextInput
