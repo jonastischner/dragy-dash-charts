@@ -88,9 +88,8 @@ function ImportPage() {
           vehicleId: vehicle.id,
           name: name.replace(/\.(data|ubx|csv|txt|tsv|xlsx|xlsm|xls)$/i, ""),
           records,
-          tempC: 20,
-          pressureHpa: 1013,
-          rh: 50,
+          // Keine Vorgabewerte: nicht gepflegte Umgebungsdaten bleiben leer,
+          // damit daraus keine Normkorrektur abgeleitet wird.
           manual: false,
           createdAt: Date.now(),
           module,

@@ -132,7 +132,10 @@ export function Select({ children, ...rest }: React.SelectHTMLAttributes<HTMLSel
   );
 }
 
-export function NumInput({ value, onChange, onBlur, onFocus, ...rest }: InputHTMLAttributes<HTMLInputElement>) {
+// allowEmpty: meldet ein geleertes Feld als leeren String an onChange, damit der
+// Aufrufer "nicht gesetzt" von "0" unterscheiden kann. Ohne das Flag bleibt das
+// bisherige Verhalten (leere Eingabe wird verworfen) unveraendert.
+export function NumInput({ value, onChange, onBlur, onFocus, allowEmpty, ...rest }: InputHTMLAttributes<HTMLInputElement> & { allowEmpty?: boolean }) {
   const [draft, setDraft] = useState<string | null>(null);
   const propStr = value === undefined || value === null || value === "" ? "" : String(value);
   const display = draft !== null ? draft : propStr;
@@ -147,6 +150,11 @@ export function NumInput({ value, onChange, onBlur, onFocus, ...rest }: InputHTM
         const typed = e.target.value;
         setDraft(typed);
         const raw = typed.replace(",", ".").trim();
+        if (raw === "" && allowEmpty) {
+          const target = { ...e.target, value: "" } as HTMLInputElement;
+          onChange?.({ ...e, target, currentTarget: target } as React.ChangeEvent<HTMLInputElement>);
+          return;
+        }
         if (raw === "" || raw === "-" || raw === "." || raw === "-." || raw.endsWith(".")) return;
         const n = Number(raw);
         if (!Number.isFinite(n)) return;

@@ -5,6 +5,7 @@ import { useAppStore } from "@/lib/dragy/store";
 import { computeSegment, splitTime, runDistance, W_TO_PS } from "@/lib/dragy/physics";
 import type { ModuleId } from "@/lib/dragy/types";
 import { MODULE_DESC, MODULE_IDS, MODULE_LABEL, MODULE_METRIC, sessionModule } from "@/lib/dragy/modules";
+import { sessionCorrection, useCorrectionStandard } from "./useCorrection";
 
 const MODULE_ICON: Record<ModuleId, typeof Gauge> = {
   power: Gauge,
@@ -22,6 +23,7 @@ export function HomeTab({ onOpenModule, onOpenSim, onOpenTrip, onOpenEvents, onO
 }) {
   const { state } = useAppStore();
   const vehicle = state.vehicles.find((v) => v.id === state.activeVehicleId);
+  const [standard] = useCorrectionStandard();
 
   const stats = useMemo(() => {
     const out = {} as Record<ModuleId, { sessions: number; runs: number; best: string }>;
@@ -34,13 +36,19 @@ export function HomeTab({ onOpenModule, onOpenSim, onOpenTrip, onOpenEvents, onO
       let best = "—";
       if (m === "power") {
         let ps = NaN;
+        // Der Zusatz „korr." darf nur stehen, wenn der Bestwert tatsächlich aus
+        // einem korrigierten Lauf stammt – ohne Umgebungsdaten bleibt alpha = 1.
+        let bestApplied = false;
         for (const { s, g } of segs) {
+          // Faktor je Session – normiert Läufe bei unterschiedlichem Wetter auf
+          // gemeinsame Bedingungen, damit die Bestmarke vergleichbar ist.
+          const corr = sessionCorrection(standard, s);
           for (const smp of computeSegment(s, g, vehicle)) {
-            const p = smp.pEngineW * W_TO_PS;
-            if (Number.isFinite(p) && (!Number.isFinite(ps) || p > ps)) ps = p;
+            const p = smp.pEngineW * W_TO_PS * corr.alpha;
+            if (Number.isFinite(p) && (!Number.isFinite(ps) || p > ps)) { ps = p; bestApplied = corr.applied; }
           }
         }
-        if (Number.isFinite(ps)) best = `${ps.toFixed(0)} PS`;
+        if (Number.isFinite(ps)) best = `${ps.toFixed(0)} PS${bestApplied ? " korr." : ""}`;
       } else if (m === "accel") {
         let t: number | null = null;
         for (const { s, g } of segs) {
@@ -61,7 +69,7 @@ export function HomeTab({ onOpenModule, onOpenSim, onOpenTrip, onOpenEvents, onO
       out[m] = { sessions: sessions.length, runs: segs.length, best };
     }
     return out;
-  }, [state, vehicle]);
+  }, [state, vehicle, standard]);
 
   return (
     <>

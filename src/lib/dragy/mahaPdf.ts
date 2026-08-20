@@ -279,9 +279,12 @@ function drawPage(doc: jsPDF, d: RunPdfData, info: PdfHeaderInfo) {
   const hEnv = 8 + rowH * 3;
   box(x2, tableY, colW - 2, hEnv, "Umgebungsdaten");
   y = tableY + 10;
-  kv(x2, y, colW - 2, "Umgebungs-Temperatur", "T_Umgebung", `${de(d.session.tempC)} °C`); y += rowH;
-  kv(x2, y, colW - 2, "Luftdruck", "p_Luft", `${de(d.session.pressureHpa)} hPa`); y += rowH;
-  kv(x2, y, colW - 2, "Relative Luftfeuchte", "H_Luft", `${de(d.session.rh)} %`);
+  // Nicht gepflegte Umgebungswerte werden als "n. a." ausgewiesen, statt den
+  // intern verwendeten Standardwert als gemessen darzustellen.
+  const env = (v: number | undefined, unit: string) => (v == null ? "n. a." : `${de(v)} ${unit}`);
+  kv(x2, y, colW - 2, "Umgebungs-Temperatur", "T_Umgebung", env(d.session.tempC, "°C")); y += rowH;
+  kv(x2, y, colW - 2, "Luftdruck", "p_Luft", env(d.session.pressureHpa, "hPa")); y += rowH;
+  kv(x2, y, colW - 2, "Relative Luftfeuchte", "H_Luft", env(d.session.rh, "%"));
 
   const hVeh = 8 + rowH * 5;
   box(x2, tableY + hEnv + 3, colW - 2, hVeh, "Fahrzeug- & Messdaten");

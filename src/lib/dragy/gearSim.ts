@@ -4,7 +4,7 @@
 
 import type { GearRatio, Segment, Session, Vehicle } from "./types";
 import { computeRpmFactor, normalizeDrive } from "./gear";
-import { airDensity, computeSegment, interpLinear, W_TO_PS } from "./physics";
+import { computeSegment, interpLinear, sessionAirDensity, W_TO_PS } from "./physics";
 import { sessionModule } from "./modules";
 
 /** Ein simulierbares Setup – kann gespeichert oder nur temporär („Testsetup“) sein. */
@@ -116,6 +116,11 @@ export interface PowerCurve {
  * Bester Leistungs-Lauf des Fahrzeugs → Radleistung, in 100-U/min-Bins
  * gemittelt. null, wenn es keine auswertbare Messung gibt.
  */
+// BEWUSST OHNE NORMKORREKTUR (correction.ts): Diese Kurve speist die
+// Beschleunigungsprognose. Sie muss die *gemessene* Leistung abbilden, damit die
+// Simulation die *tatsächliche* Beschleunigung vorhersagt. Mit einer auf
+// Referenzbedingungen normierten Kurve würde sie die Beschleunigung unter
+// Normbedingungen prognostizieren – eine Vorhersage, die zur Realität nicht passt.
 export function bestPowerCurve(
   vehicle: Vehicle,
   sessions: Session[],
@@ -146,7 +151,7 @@ export function bestPowerCurve(
         peakPs,
         rpm: keys,
         pWheelW: keys.map((k) => bins.get(k)!.sum / bins.get(k)!.n),
-        rho: airDensity(s.tempC, s.pressureHpa, s.rh),
+        rho: sessionAirDensity(s),
       };
       if (!best || curve.peakPs > best.peakPs) best = curve;
     }

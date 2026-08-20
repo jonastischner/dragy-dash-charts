@@ -3,6 +3,7 @@ import { Bluetooth, Circle, Square } from "lucide-react";
 import { Section, Field, Row, Button, Note, TextInput, NumInput, Select, EmptyState, usePersistedState } from "./ui";
 import { useAppStore } from "@/lib/dragy/store";
 import { uid } from "@/lib/dragy/db";
+import { STD_ENV } from "@/lib/dragy/physics";
 import { useCapacitorPlatform } from "@/lib/capacitor";
 import {
   NORDIC_UART, bleSupported, connectBle, createParser, pointsToRecords, toAscii, toHex,
@@ -18,9 +19,10 @@ export function LiveTab({ module = "power", onOpenVehicles }: { module?: ModuleI
   const [serviceUuid, setServiceUuid] = usePersistedState("live.serviceUuid", NORDIC_UART.service);
   const [notifyUuid, setNotifyUuid] = usePersistedState("live.notifyUuid", NORDIC_UART.notify);
   const [format, setFormat] = usePersistedState<StreamFormat>("live.format", "ubx");
-  const [tempC, setTempC] = usePersistedState("live.tempC", 20);
-  const [pressureHpa, setPressureHpa] = usePersistedState("live.pressureHpa", 1013);
-  const [rh, setRh] = usePersistedState("live.rh", 50);
+  // Leer = nicht angegeben (siehe ImportTab): keine erfundene Normkorrektur.
+  const [tempC, setTempC] = usePersistedState<number | undefined>("live.tempC", undefined);
+  const [pressureHpa, setPressureHpa] = usePersistedState<number | undefined>("live.pressureHpa", undefined);
+  const [rh, setRh] = usePersistedState<number | undefined>("live.rh", undefined);
 
   const [conn, setConn] = useState<BleConnection | null>(null);
   const [connecting, setConnecting] = useState(false);
@@ -161,9 +163,9 @@ export function LiveTab({ module = "power", onOpenVehicles }: { module?: ModuleI
 
       <Section title="Aufnahme">
         <Row>
-          <Field label="Temperatur (°C)"><NumInput value={tempC} onChange={(e) => setTempC(+e.target.value)} /></Field>
-          <Field label="Luftdruck (hPa)"><NumInput value={pressureHpa} onChange={(e) => setPressureHpa(+e.target.value)} /></Field>
-          <Field label="Rel. Luftfeuchte (%)"><NumInput value={rh} onChange={(e) => setRh(+e.target.value)} /></Field>
+          <Field label="Temperatur (°C)" hint="leer = nicht gemessen"><NumInput allowEmpty placeholder={`${STD_ENV.tempC}`} value={tempC ?? ""} onChange={(e) => setTempC(e.target.value === "" ? undefined : +e.target.value)} /></Field>
+          <Field label="Luftdruck (hPa)" hint="leer = nicht gemessen"><NumInput allowEmpty placeholder={`${STD_ENV.pressureHpa}`} value={pressureHpa ?? ""} onChange={(e) => setPressureHpa(e.target.value === "" ? undefined : +e.target.value)} /></Field>
+          <Field label="Rel. Luftfeuchte (%)" hint="leer = nicht gemessen"><NumInput allowEmpty placeholder={`${STD_ENV.rh}`} value={rh ?? ""} onChange={(e) => setRh(e.target.value === "" ? undefined : +e.target.value)} /></Field>
         </Row>
         <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
           <div className="rounded-md border border-border bg-card p-3">

@@ -3,6 +3,8 @@ import { Section, Field, Select, Note, Note as _N, usePersistedState } from "../
 import { computeSegment, splitTime, distanceRun, runDistance, W_TO_PS } from "@/lib/dragy/physics";
 import type { ModuleId, Segment, Session, Vehicle } from "@/lib/dragy/types";
 import { isPowerModule } from "@/lib/dragy/modules";
+import { sessionCorrection, useCorrectionStandard } from "../useCorrection";
+import { CORRECTION_LABEL } from "@/lib/dragy/correction";
 
 type Ctx = { sessions: Session[]; segments: Segment[]; vehicle: Vehicle };
 
@@ -20,6 +22,8 @@ function segsOf(sessions: Session[], segments: Segment[]) {
 
 function PowerAnalysis({ sessions, segments, vehicle }: Ctx) {
   const [refKey, setRefKey] = usePersistedState<string>(`dragy.power.ref.${vehicle.id}`, "");
+  const [standard] = useCorrectionStandard();
+  const corrected = standard !== "none";
 
   const rows = useMemo(() => segsOf(sessions, segments).map(({ session, seg }) => {
     const samples = computeSegment(session, seg, vehicle);
@@ -30,14 +34,26 @@ function PowerAnalysis({ sessions, segments, vehicle }: Ctx) {
       const t = s.torqueEngineNm;
       if (Number.isFinite(t) && (!Number.isFinite(nm) || t > nm)) { nm = t; nmRpm = s.rpm; }
     }
-    return { key: `${session.id}:${seg.id}`, session, seg, ps, psRpm, nm, nmRpm };
-  }).filter((r) => Number.isFinite(r.ps)).sort((a, b) => b.ps - a.ps), [sessions, segments, vehicle]);
+    // Faktor je Session: Läufe bei unterschiedlichem Wetter bekommen
+    // unterschiedliche alpha – genau das macht sie erst vergleichbar.
+    // Ohne hinterlegte Umgebungsdaten bleibt applied=false und alpha=1: der Lauf
+    // wird bewusst nicht korrigiert, statt einen Faktor zu erfinden.
+    const corr = sessionCorrection(standard, session);
+    return {
+      key: `${session.id}:${seg.id}`, session, seg, ps, psRpm, nm, nmRpm,
+      alpha: corr.alpha, inRange: corr.inRange, applied: corr.applied, missing: corr.missing,
+      psCorr: ps * corr.alpha, nmCorr: nm * corr.alpha,
+    };
+  }).filter((r) => Number.isFinite(r.ps))
+    .sort((a, b) => (corrected ? b.psCorr - a.psCorr : b.ps - a.ps)),
+  [sessions, segments, vehicle, standard, corrected]);
 
   if (rows.length === 0) {
     return <Section title="Auswertung"><p className="text-caption text-muted-foreground">Noch keine Läufe zum Auswerten.</p></Section>;
   }
 
   const ref = rows.find((r) => r.key === refKey);
+  const uncorrected = rows.filter((r) => !r.applied).length;
   const fmtDelta = (val: number, base: number, unit: string) => {
     if (!Number.isFinite(val) || !Number.isFinite(base) || base === 0) return "—";
     const abs = val - base, pct = (abs / base) * 100, sign = abs > 0 ? "+" : "";
@@ -48,6 +64,20 @@ function PowerAnalysis({ sessions, segments, vehicle }: Ctx) {
   return (
     <Section title="Bestenliste Leistung" note={`${rows.length} Läufe · ${vehicle.name}`}>
       <Note>Alle Läufe dieses Moduls nach geschätzter Motorleistung sortiert. Ein Lauf kann als Referenz gesetzt werden.</Note>
+      {corrected && (
+        <Note>
+          <b>Normkorrektur aktiv (experimentell):</b> {CORRECTION_LABEL[standard]}. Sortiert nach
+          korrigierter Leistung; jeder Lauf wird mit dem Faktor seiner eigenen Umgebungsbedingungen
+          umgerechnet. α-Werte außerhalb des zulässigen Bereichs sind markiert.
+          {uncorrected > 0 && (
+            <>
+              {" "}
+              <b>{uncorrected} von {rows.length} Läufen</b> haben keine Umgebungsdaten hinterlegt und
+              bleiben unkorrigiert – sie stehen mit ihrem Messwert in der Liste.
+            </>
+          )}
+        </Note>
+      )}
       <div className="mt-2">
         <Field label="Referenzlauf">
           <Select value={refKey} onChange={(e) => setRefKey(e.target.value)}>
@@ -62,10 +92,13 @@ function PowerAnalysis({ sessions, segments, vehicle }: Ctx) {
             <tr>
               <th className="py-1 pr-2 text-left font-medium">Session</th>
               <th className="py-1 pr-2 text-left font-medium">Lauf</th>
-              <th className="py-1 pr-2 text-right font-medium">Peak PS</th>
+              <th className="py-1 pr-2 text-right font-medium">{corrected ? "PS gemessen" : "Peak PS"}</th>
+              {corrected && <th className="py-1 pr-2 text-right font-medium">α</th>}
+              {corrected && <th className="py-1 pr-2 text-right font-medium">PS korrigiert</th>}
               <th className="py-1 pr-2 text-right font-medium">@ U/min</th>
               {ref && <th className="py-1 pr-2 text-right font-medium">Δ PS</th>}
-              <th className="py-1 pr-2 text-right font-medium">Peak Nm</th>
+              <th className="py-1 pr-2 text-right font-medium">{corrected ? "Nm gemessen" : "Peak Nm"}</th>
+              {corrected && <th className="py-1 pr-2 text-right font-medium">Nm korrigiert</th>}
               <th className="py-1 pr-2 text-right font-medium">@ U/min</th>
               {ref && <th className="py-1 pr-2 text-right font-medium">Δ Nm</th>}
             </tr>
@@ -79,11 +112,46 @@ function PowerAnalysis({ sessions, segments, vehicle }: Ctx) {
                   {r.seg.name}
                 </td>
                 <td className="py-1 pr-2 text-right tabular-nums">{r.ps.toFixed(0)}</td>
+                {corrected && (
+                  !r.applied ? (
+                    <td className="py-1 pr-2 text-right tabular-nums text-muted-foreground"
+                        title={`Nicht korrigiert – ${r.missing.join(", ")} nicht hinterlegt`}>—</td>
+                  ) : (
+                    <td className={`py-1 pr-2 text-right tabular-nums ${r.inRange ? "text-muted-foreground" : "text-warning"}`}
+                        title={r.inRange ? undefined : "Außerhalb des nach EWG 80/1269 zulässigen Bereichs"}>
+                      {r.alpha.toFixed(3).replace(".", ",")}{!r.inRange && " !"}
+                    </td>
+                  )
+                )}
+                {corrected && (
+                  <td className={`py-1 pr-2 text-right tabular-nums ${r.applied ? "font-medium" : "text-muted-foreground"}`}
+                      title={r.applied ? undefined : `Nicht korrigiert – ${r.missing.join(", ")} nicht hinterlegt`}>
+                    {r.applied ? r.psCorr.toFixed(0) : "—"}
+                  </td>
+                )}
                 <td className="py-1 pr-2 text-right tabular-nums">{Number.isFinite(r.psRpm) ? r.psRpm.toFixed(0) : "—"}</td>
-                {ref && <td className="py-1 pr-2 text-right tabular-nums">{r.key === refKey ? "—" : fmtDelta(r.ps, ref.ps, "PS")}</td>}
+                {ref && (
+                  <td className="py-1 pr-2 text-right tabular-nums"
+                      title={corrected && r.applied !== ref.applied ? "Vergleich mischt korrigierten und unkorrigierten Wert" : undefined}>
+                    {r.key === refKey ? "—" : fmtDelta(corrected ? r.psCorr : r.ps, corrected ? ref.psCorr : ref.ps, "PS")}
+                    {corrected && r.key !== refKey && r.applied !== ref.applied && <span className="ml-1 text-warning">!</span>}
+                  </td>
+                )}
                 <td className="py-1 pr-2 text-right tabular-nums">{Number.isFinite(r.nm) ? r.nm.toFixed(0) : "—"}</td>
+                {corrected && (
+                  <td className={`py-1 pr-2 text-right tabular-nums ${r.applied ? "font-medium" : "text-muted-foreground"}`}
+                      title={r.applied ? undefined : `Nicht korrigiert – ${r.missing.join(", ")} nicht hinterlegt`}>
+                    {r.applied && Number.isFinite(r.nmCorr) ? r.nmCorr.toFixed(0) : "—"}
+                  </td>
+                )}
                 <td className="py-1 pr-2 text-right tabular-nums">{Number.isFinite(r.nmRpm) ? r.nmRpm.toFixed(0) : "—"}</td>
-                {ref && <td className="py-1 pr-2 text-right tabular-nums">{r.key === refKey ? "—" : fmtDelta(r.nm, ref.nm, "Nm")}</td>}
+                {ref && (
+                  <td className="py-1 pr-2 text-right tabular-nums"
+                      title={corrected && r.applied !== ref.applied ? "Vergleich mischt korrigierten und unkorrigierten Wert" : undefined}>
+                    {r.key === refKey ? "—" : fmtDelta(corrected ? r.nmCorr : r.nm, corrected ? ref.nmCorr : ref.nm, "Nm")}
+                    {corrected && r.key !== refKey && r.applied !== ref.applied && <span className="ml-1 text-warning">!</span>}
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>

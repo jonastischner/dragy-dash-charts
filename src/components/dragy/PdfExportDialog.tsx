@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { FileText } from "lucide-react";
 import { Button, Field, TextInput, Note } from "./ui";
 import { exportRunPdf, type PdfHeaderInfo, type RunPdfData } from "@/lib/dragy/mahaPdf";
+import { useCorrectionStandard } from "./useCorrection";
+import { CORRECTION_LABEL } from "@/lib/dragy/correction";
 
 function storeKey(vehicleId: string) { return `dragy.pdfHeader.${vehicleId}`; }
 
@@ -12,6 +14,7 @@ function storeKey(vehicleId: string) { return `dragy.pdfHeader.${vehicleId}`; }
 export function PdfExportDialog({ runs, onClose }: { runs: RunPdfData[]; onClose: () => void }) {
   const vehicleId = runs[0]?.vehicle.id ?? "";
   const [info, setInfo] = useState<PdfHeaderInfo>({});
+  const [standard] = useCorrectionStandard();
 
   useEffect(() => {
     if (!vehicleId) return;
@@ -57,8 +60,15 @@ export function PdfExportDialog({ runs, onClose }: { runs: RunPdfData[]; onClose
           <Field label="Kunde (optional)"><TextInput value={info.customer ?? ""} onChange={set("customer")} /></Field>
         </div>
 
-        <div className="mt-3">
+        <div className="mt-3 space-y-2">
           <Note>GPS-Messung statt Rollenprüfstand: Motorwerte sind Schätzungen, ohne Normkorrektur nach EWG 80/1269. Das steht als Fußnote im PDF.</Note>
+          {standard !== "none" && (
+            <Note>
+              <b>Hinweis:</b> Die Normkorrektur ({CORRECTION_LABEL[standard]}) ist in der App aktiv,
+              das PDF enthält aber bewusst die unkorrigierten Messwerte. Die Zahlen im Protokoll
+              weichen deshalb von der Bildschirmanzeige ab.
+            </Note>
+          )}
         </div>
 
         <div className="mt-4 flex justify-end gap-2">

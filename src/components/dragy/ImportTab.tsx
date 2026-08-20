@@ -4,6 +4,7 @@ import { useAppStore } from "@/lib/dragy/store";
 import { parseUbx } from "@/lib/dragy/ubx";
 import { parseTableFile } from "@/lib/dragy/tabular";
 import { uid } from "@/lib/dragy/db";
+import { STD_ENV } from "@/lib/dragy/physics";
 import type { Session, ManualRow, Record as R, ModuleId } from "@/lib/dragy/types";
 
 
@@ -11,9 +12,11 @@ export function ImportTab({ module = "power", onOpenVehicles }: { module?: Modul
   const { state, saveSession } = useAppStore();
   const activeVehicle = state.vehicles.find((v) => v.id === state.activeVehicleId);
   const inputRef = useRef<HTMLInputElement>(null);
-  const [tempC, setTempC] = useState(20);
-  const [pressureHpa, setPressureHpa] = useState(1013);
-  const [rh, setRh] = useState(50);
+  // Leer = nicht angegeben. Für die Luftdichte greifen dann die Standardwerte
+  // (STD_ENV), eine Normkorrektur unterbleibt.
+  const [tempC, setTempC] = useState<number | undefined>(undefined);
+  const [pressureHpa, setPressureHpa] = useState<number | undefined>(undefined);
+  const [rh, setRh] = useState<number | undefined>(undefined);
   const [log, setLog] = useState<string[]>([]);
   const [manualOpen, setManualOpen] = useState(false);
 
@@ -54,9 +57,9 @@ export function ImportTab({ module = "power", onOpenVehicles }: { module?: Modul
     <div>
       <Section title="Umgebungsdaten (für Luftdichte)">
         <Row>
-          <Field label="Temperatur (°C)"><NumInput value={tempC} onChange={(e) => setTempC(+e.target.value)} /></Field>
-          <Field label="Luftdruck (hPa)"><NumInput value={pressureHpa} onChange={(e) => setPressureHpa(+e.target.value)} /></Field>
-          <Field label="Rel. Luftfeuchte (%)"><NumInput value={rh} onChange={(e) => setRh(+e.target.value)} /></Field>
+          <Field label="Temperatur (°C)" hint="leer = nicht gemessen"><NumInput allowEmpty placeholder={`${STD_ENV.tempC}`} value={tempC ?? ""} onChange={(e) => setTempC(e.target.value === "" ? undefined : +e.target.value)} /></Field>
+          <Field label="Luftdruck (hPa)" hint="leer = nicht gemessen"><NumInput allowEmpty placeholder={`${STD_ENV.pressureHpa}`} value={pressureHpa ?? ""} onChange={(e) => setPressureHpa(e.target.value === "" ? undefined : +e.target.value)} /></Field>
+          <Field label="Rel. Luftfeuchte (%)" hint="leer = nicht gemessen"><NumInput allowEmpty placeholder={`${STD_ENV.rh}`} value={rh ?? ""} onChange={(e) => setRh(e.target.value === "" ? undefined : +e.target.value)} /></Field>
         </Row>
       </Section>
 
@@ -96,7 +99,7 @@ function defaultRows(): ManualRow[] {
 }
 
 function ManualEditor({ vehicleId, module, tempC, pressureHpa, rh, onSave, onCancel }: {
-  vehicleId: string; module: ModuleId; tempC: number; pressureHpa: number; rh: number;
+  vehicleId: string; module: ModuleId; tempC?: number; pressureHpa?: number; rh?: number;
   onSave: (s: Session) => void; onCancel: () => void;
 }) {
   const [name, setName] = useState("Manuelle Session");

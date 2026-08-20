@@ -3,12 +3,33 @@ import type { Record, Vehicle, Segment, Session, DragPoint } from "./types";
 export const G = 9.81;
 export const W_TO_PS = 1 / 735.499;
 
+// Standard-Umgebungsbedingungen für Sessions ohne eigene Angaben. Sie gehen nur
+// in die Luftdichte (Luftwiderstand) ein – eine Normkorrektur findet ohne
+// echte Messwerte bewusst NICHT statt (siehe correction.ts).
+export const STD_ENV = { tempC: 20, pressureHpa: 1013, rh: 50 } as const;
+
+/** Luftdichte einer Session; fehlende Angaben werden durch STD_ENV ersetzt. */
+export function sessionAirDensity(
+  s: { tempC?: number; pressureHpa?: number; rh?: number },
+): number {
+  return airDensity(
+    s.tempC ?? STD_ENV.tempC,
+    s.pressureHpa ?? STD_ENV.pressureHpa,
+    s.rh ?? STD_ENV.rh,
+  );
+}
+
+// Wasserdampf-Partialdruck in hPa (Magnus). Eigene Funktion, weil auch die
+// Normkorrektur nach EWG 80/1269 den Trockendruck p - e braucht (correction.ts).
+export function vaporPressureHpa(tempC: number, rh: number): number {
+  const es = 6.1078 * Math.exp((17.27 * tempC) / (tempC + 237.3));
+  return (rh / 100) * es;
+}
+
 // Air density from T (C), P (hPa), RH (%)
 export function airDensity(tempC: number, pHpa: number, rh: number): number {
   const T = tempC + 273.15;
-  // Magnus saturation vapor pressure in hPa
-  const es = 6.1078 * Math.exp((17.27 * tempC) / (tempC + 237.3));
-  const e = (rh / 100) * es; // hPa
+  const e = vaporPressureHpa(tempC, rh); // hPa
   const Pd = (pHpa - e) * 100; // Pa
   const Pv = e * 100; // Pa
   return Pd / (287.05 * T) + Pv / (461.495 * T);
@@ -170,7 +191,7 @@ export function computeSegment(
 ): SegmentSample[] {
   const inSeg = session.records.filter((r) => r.t >= segment.startT && r.t <= segment.endT);
   if (inSeg.length < 3) return [];
-  const rho = airDensity(session.tempC, session.pressureHpa, session.rh);
+  const rho = sessionAirDensity(session);
   const rawT = inSeg.map((r) => r.t);
   const rawV = inSeg.map((r) => r.speedKmh);
 
@@ -232,7 +253,7 @@ export function coastdownFit(
 ): { crr: number; cdA: number; r2: number; n: number } | null {
   const inR = session.records.filter((r) => r.t >= startT && r.t <= endT);
   if (inR.length < 5) return null;
-  const rho = airDensity(session.tempC, session.pressureHpa, session.rh);
+  const rho = sessionAirDensity(session);
   const rawT = inR.map((r) => r.t);
   const rawV = inR.map((r) => r.speedKmh / 3.6);
   const medDt = (rawT[rawT.length - 1] - rawT[0]) / Math.max(1, rawT.length - 1);
