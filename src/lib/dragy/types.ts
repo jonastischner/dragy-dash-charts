@@ -96,9 +96,12 @@ export interface Session {
   vehicleId: string;
   name: string;
   records: Record[];
-  tempC: number;
-  pressureHpa: number;
-  rh: number;
+  // Optional: nicht gesetzt = vom Nutzer nie eingetragen. Für die Luftdichte
+  // wird dann mit Standardwerten gerechnet (STD_ENV in physics.ts), eine
+  // Normkorrektur unterbleibt aber bewusst – siehe correction.ts.
+  tempC?: number;
+  pressureHpa?: number;
+  rh?: number;
   manual: boolean;
   manualRows?: ManualRow[];
   createdAt: number;

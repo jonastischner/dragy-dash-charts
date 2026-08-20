@@ -5,6 +5,7 @@ import { BackupTab } from "./BackupTab";
 import { AccountTab } from "./AccountTab";
 import { useCorrectionStandard } from "./useCorrection";
 import { CORRECTION_LABEL, CORRECTION_REFERENCE, type CorrectionStandard } from "@/lib/dragy/correction";
+import { STD_ENV } from "@/lib/dragy/physics";
 
 export function MoreTab() {
   return (
@@ -94,8 +95,74 @@ function CorrectionSection() {
           <b>Beschleunigungsprognose und PDF-Export bleiben unkorrigiert</b> – die Prognose würde
           sonst die Beschleunigung unter Referenzbedingungen statt unter den realen vorhersagen.
         </li>
+        <li>
+          <b>Ohne hinterlegte Umgebungsdaten wird nicht korrigiert.</b> Für die Luftdichte rechnet
+          die App dann mit Standardwerten ({STD_ENV.tempC} °C / {STD_ENV.pressureHpa} hPa /{" "}
+          {STD_ENV.rh} % rF), ein Normfaktor wäre daraus aber frei erfunden. Solche Läufe zeigen
+          weiter ihren Messwert.
+        </li>
       </ul>
+      <LegacyEnvCleanup />
     </Section>
+  );
+}
+
+/**
+ * Vor der Umstellung auf optionale Umgebungsfelder hat der Import fest
+ * 20 °C / 1013 hPa / 50 % rF eingetragen. Diese Werte sind von echten Eingaben
+ * nicht zu unterscheiden, deshalb wird nichts automatisch geändert – nur auf
+ * ausdrückliche Bestätigung hin.
+ */
+function LegacyEnvCleanup() {
+  const { state, saveSession } = useAppStore();
+  const [msg, setMsg] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [confirm, setConfirm] = useState(false);
+
+  const candidates = state.sessions.filter(
+    (s) => s.tempC === STD_ENV.tempC && s.pressureHpa === STD_ENV.pressureHpa && s.rh === STD_ENV.rh,
+  );
+  if (candidates.length === 0 && !msg) return null;
+
+  const run = async () => {
+    setBusy(true);
+    try {
+      const list = [...candidates];
+      for (const s of list) {
+        await saveSession({ ...s, tempC: undefined, pressureHpa: undefined, rh: undefined });
+      }
+      setMsg(`${list.length} Session(s) geleert – sie werden ab jetzt nicht mehr korrigiert.`);
+      setConfirm(false);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="mt-3 border-t border-border pt-3">
+      <p className="text-caption text-muted-foreground">
+        <b className="text-foreground">{candidates.length} Session(s)</b> tragen exakt die alten
+        Import-Vorgaben {STD_ENV.tempC} °C / {STD_ENV.pressureHpa} hPa / {STD_ENV.rh} % rF. Ob das
+        gemessen oder nur voreingestellt war, lässt sich nicht mehr feststellen – deshalb werden sie
+        wie eingetragene Werte behandelt und korrigiert. Wurden sie nie gemessen, lassen sich die
+        Felder hier leeren.
+      </p>
+      {msg && <Note>{msg}</Note>}
+      <div className="mt-2 flex flex-wrap gap-2">
+        {confirm ? (
+          <>
+            <Button onClick={run} disabled={busy}>
+              {busy ? "Leere …" : `Ja, ${candidates.length} Session(s) leeren`}
+            </Button>
+            <Button variant="secondary" onClick={() => setConfirm(false)} disabled={busy}>Abbrechen</Button>
+          </>
+        ) : (
+          <Button onClick={() => setConfirm(true)} disabled={candidates.length === 0}>
+            Umgebungsdaten dieser Sessions leeren
+          </Button>
+        )}
+      </div>
+    </div>
   );
 }
 

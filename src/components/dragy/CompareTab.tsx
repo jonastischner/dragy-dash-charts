@@ -41,6 +41,14 @@ export function CompareTab({ module = "power", onOpenVehicles }: { module?: Modu
   const isAccel = !allowedModes.includes(mode) || mode === "accel";
   const isEngineMode = mode === "pEngine" || mode === "tqEngine";
   const corrected = standard !== "none";
+  // Läufe ohne hinterlegte Umgebungsdaten werden nicht korrigiert – im Chart
+  // erscheinen sie sonst unbemerkt neben korrigierten Kurven.
+  const uncorrectedRuns = corrected
+    ? segments.filter((g) => {
+        const s = state.sessions.find((x) => x.id === g.sessionId);
+        return !!s && !sessionCorrection(standard, s).applied;
+      }).length
+    : 0;
 
 
   const series: Series[] = segments.map((g) => {
@@ -117,11 +125,13 @@ export function CompareTab({ module = "power", onOpenVehicles }: { module?: Modu
       const vFrom = rec[0]?.speedKmh ?? NaN;
       const vMax = rec.length ? Math.max(...rec.map((r) => r.speedKmh)) : NaN;
       const dur = rec.length ? rec[rec.length - 1].t - rec[0].t : NaN;
+      // applied=false, wenn die Session keine Umgebungsdaten hat – dann bleibt
+      // alpha=1 und es wird bewusst nicht korrigiert.
       const corr = sessionCorrection(standard, session);
       return {
         label: `${session.name} · ${g.name}`, color: g.color,
         pW, pWRpm, pE, pERpm, tW, tWRpm, tE, tERpm, vFrom, vMax, dur,
-        alpha: corr.alpha, inRange: corr.inRange,
+        alpha: corr.alpha, inRange: corr.inRange, applied: corr.applied, missing: corr.missing,
         pECorr: pE * corr.alpha, tECorr: tE * corr.alpha,
       };
     });
@@ -162,6 +172,13 @@ export function CompareTab({ module = "power", onOpenVehicles }: { module?: Modu
                 <b>Normkorrektur aktiv (experimentell):</b> {CORRECTION_LABEL[standard]}. Jeder Lauf
                 wird mit dem Faktor seiner eigenen Umgebungsbedingungen umgerechnet. Gemessene und
                 korrigierte Werte stehen in der Übersicht unten nebeneinander.
+                {uncorrectedRuns > 0 && (
+                  <>
+                    {" "}
+                    <b>{uncorrectedRuns} Lauf/Läufe</b> haben keine Umgebungsdaten hinterlegt und
+                    werden unkorrigiert dargestellt.
+                  </>
+                )}
               </>
             ) : (
               <>
@@ -261,16 +278,26 @@ export function CompareTab({ module = "power", onOpenVehicles }: { module?: Modu
                       <td className="py-1 pr-2 text-right tabular-nums text-muted-foreground">{fmtRpm(r.pWRpm)}</td>
                       <td className="py-1 pr-2 text-right tabular-nums">{fmt(r.pE)}</td>
                       {corrected && (
-                        <td className={`py-1 pr-2 text-right font-medium tabular-nums ${r.inRange ? "" : "text-warning"}`}
-                            title={`α = ${r.alpha.toFixed(3)}${r.inRange ? "" : " – außerhalb des nach EWG 80/1269 zulässigen Bereichs"}`}>
-                          {fmt(r.pECorr)}{!r.inRange && " !"}
-                        </td>
+                        !r.applied ? (
+                          <td className="py-1 pr-2 text-right tabular-nums text-muted-foreground"
+                              title={`Nicht korrigiert – ${r.missing.join(", ")} nicht hinterlegt`}>—</td>
+                        ) : (
+                          <td className={`py-1 pr-2 text-right font-medium tabular-nums ${r.inRange ? "" : "text-warning"}`}
+                              title={`α = ${r.alpha.toFixed(3)}${r.inRange ? "" : " – außerhalb des nach EWG 80/1269 zulässigen Bereichs"}`}>
+                            {fmt(r.pECorr)}{!r.inRange && " !"}
+                          </td>
+                        )
                       )}
                       <td className="py-1 pr-2 text-right tabular-nums text-muted-foreground">{fmtRpm(r.pERpm)}</td>
                       <td className="py-1 pr-2 text-right tabular-nums">{fmt(r.tW)}</td>
                       <td className="py-1 pr-2 text-right tabular-nums text-muted-foreground">{fmtRpm(r.tWRpm)}</td>
                       <td className="py-1 pr-2 text-right tabular-nums">{fmt(r.tE)}</td>
-                      {corrected && <td className="py-1 pr-2 text-right font-medium tabular-nums">{fmt(r.tECorr)}</td>}
+                      {corrected && (
+                        <td className={`py-1 pr-2 text-right tabular-nums ${r.applied ? "font-medium" : "text-muted-foreground"}`}
+                            title={r.applied ? undefined : `Nicht korrigiert – ${r.missing.join(", ")} nicht hinterlegt`}>
+                          {r.applied ? fmt(r.tECorr) : "—"}
+                        </td>
+                      )}
                       <td className="py-1 pr-2 text-right tabular-nums text-muted-foreground">{fmtRpm(r.tERpm)}</td>
                       <td className="py-1 pr-2 text-right tabular-nums">{Number.isFinite(r.vFrom) ? `${r.vFrom.toFixed(0)}–${r.vMax.toFixed(0)}` : "—"}</td>
                       <td className="py-1 pr-2 text-right tabular-nums">{Number.isFinite(r.dur) ? `${r.dur.toFixed(2)} s` : "—"}</td>

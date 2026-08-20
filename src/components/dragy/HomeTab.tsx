@@ -36,16 +36,19 @@ export function HomeTab({ onOpenModule, onOpenSim, onOpenTrip, onOpenEvents, onO
       let best = "—";
       if (m === "power") {
         let ps = NaN;
+        // Der Zusatz „korr." darf nur stehen, wenn der Bestwert tatsächlich aus
+        // einem korrigierten Lauf stammt – ohne Umgebungsdaten bleibt alpha = 1.
+        let bestApplied = false;
         for (const { s, g } of segs) {
           // Faktor je Session – normiert Läufe bei unterschiedlichem Wetter auf
           // gemeinsame Bedingungen, damit die Bestmarke vergleichbar ist.
-          const alpha = sessionCorrection(standard, s).alpha;
+          const corr = sessionCorrection(standard, s);
           for (const smp of computeSegment(s, g, vehicle)) {
-            const p = smp.pEngineW * W_TO_PS * alpha;
-            if (Number.isFinite(p) && (!Number.isFinite(ps) || p > ps)) ps = p;
+            const p = smp.pEngineW * W_TO_PS * corr.alpha;
+            if (Number.isFinite(p) && (!Number.isFinite(ps) || p > ps)) { ps = p; bestApplied = corr.applied; }
           }
         }
-        if (Number.isFinite(ps)) best = `${ps.toFixed(0)} PS${standard !== "none" ? " korr." : ""}`;
+        if (Number.isFinite(ps)) best = `${ps.toFixed(0)} PS${bestApplied ? " korr." : ""}`;
       } else if (m === "accel") {
         let t: number | null = null;
         for (const { s, g } of segs) {

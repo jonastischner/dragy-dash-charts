@@ -3,7 +3,7 @@ import { Section, Field, TextInput, TextArea, NumInput, Select, Button, Note, Ro
 import { useAppStore, nextUnusedColor } from "@/lib/dragy/store";
 import {
   autoDetectSegments, computeSegment, splitTime, distanceRun, runDistance,
-  coastdownFit, autoDetectCoastdown, W_TO_PS,
+  coastdownFit, autoDetectCoastdown, STD_ENV, W_TO_PS,
 } from "@/lib/dragy/physics";
 import { computeRpmFactor, resolveAllGears } from "@/lib/dragy/gear";
 import { uid } from "@/lib/dragy/db";
@@ -136,9 +136,9 @@ function SessionDetail({ module, session, segments, usedColors, vehicle, onRenam
         <div className="flex items-end justify-end"><Button variant="danger" onClick={onDelete}>Session löschen</Button></div>
       </Row>
       <Row className="mt-2">
-        <Field label="Temperatur (°C)"><NumInput value={session.tempC} onChange={(e) => onEnvUpdate({ tempC: +e.target.value })} /></Field>
-        <Field label="Druck (hPa)"><NumInput value={session.pressureHpa} onChange={(e) => onEnvUpdate({ pressureHpa: +e.target.value })} /></Field>
-        <Field label="Luftfeuchte (%)"><NumInput value={session.rh} onChange={(e) => onEnvUpdate({ rh: +e.target.value })} /></Field>
+        <Field label="Temperatur (°C)" hint="leer = nicht gemessen"><NumInput allowEmpty placeholder={`${STD_ENV.tempC}`} value={session.tempC ?? ""} onChange={(e) => onEnvUpdate({ tempC: e.target.value === "" ? undefined : +e.target.value })} /></Field>
+        <Field label="Druck (hPa)" hint="leer = nicht gemessen"><NumInput allowEmpty placeholder={`${STD_ENV.pressureHpa}`} value={session.pressureHpa ?? ""} onChange={(e) => onEnvUpdate({ pressureHpa: e.target.value === "" ? undefined : +e.target.value })} /></Field>
+        <Field label="Luftfeuchte (%)" hint="leer = nicht gemessen"><NumInput allowEmpty placeholder={`${STD_ENV.rh}`} value={session.rh ?? ""} onChange={(e) => onEnvUpdate({ rh: e.target.value === "" ? undefined : +e.target.value })} /></Field>
       </Row>
 
       <div className="mt-2">
@@ -254,13 +254,13 @@ function SegmentEditor({ module, seg, session, vehicle, maxT, onChange, onDelete
       const points = samples
         .map((s) => ({ x: s.rpm, y: s.pEngineW * W_TO_PS * correction.alpha }))
         .filter((p) => Number.isFinite(p.x) && Number.isFinite(p.y));
-      return [{ label: correction.standard !== "none" ? `${seg.name} (korr.)` : seg.name, color: seg.color, points }];
+      return [{ label: correction.applied ? `${seg.name} (korr.)` : seg.name, color: seg.color, points }];
     }
     const points = session.records
       .filter((r) => r.t >= seg.startT && r.t <= seg.endT)
       .map((r) => ({ x: r.t - seg.startT, y: r.speedKmh }));
     return [{ label: seg.name, color: seg.color, points }];
-  }, [session, seg, vehicle, isPower, correction.alpha, correction.standard]);
+  }, [session, seg, vehicle, isPower, correction.alpha, correction.applied]);
 
   return (
     <li className="rounded-md border border-border bg-card p-3">
@@ -424,7 +424,7 @@ function CoastdownPanel({ session, seg, vehicle, onChange }: {
 function PeakOverview({ session, segments, vehicle }: { session: Session; segments: Segment[]; vehicle: Vehicle }) {
   const [refId, setRefId] = usePersistedState<string>(`dragy.peaks.ref.${session.id}`, "");
   const correction = useSessionCorrection(session);
-  const corrected = correction.standard !== "none";
+  const corrected = correction.applied;
 
   const rows = useMemo(() => segments.map((g) => {
     const samples = computeSegment(session, g, vehicle);
@@ -522,7 +522,7 @@ function SessionCurves({ session, segments, vehicle }: { session: Session; segme
   const [showRaw, setShowRaw] = usePersistedState<boolean>("dragy.session.showRaw", false);
   const correction = useSessionCorrection(session);
   // Die Norm korrigiert die Motorabgabe – die gemessene Radleistung nicht.
-  const applies = correction.standard !== "none" && mode !== "pWheel";
+  const applies = correction.applied && mode !== "pWheel";
 
   // Serien-Index -> Segment-ID: die Vergleichskurve verdoppelt die Serien, der
   // Legenden-Index passt dann nicht mehr direkt auf segments[i].
@@ -561,7 +561,7 @@ function SessionCurves({ session, segments, vehicle }: { session: Session; segme
     <div className="mt-3 rounded-md border border-border p-3">
       <div className="text-caption font-semibold text-foreground">Kurven dieser Session</div>
       <Note>Alle Läufe überlagert. Legende zum Ein-/Ausblenden antippen.</Note>
-      {mode === "pWheel" && correction.standard !== "none" ? (
+      {mode === "pWheel" && correction.applied ? (
         <Note>
           Radleistung ist ein Messwert – die Normkorrektur gilt nur für die Motorleistung und wird
           hier deshalb nicht angewendet.

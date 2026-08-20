@@ -4,7 +4,7 @@
 
 import type { GearRatio, Segment, Session, Vehicle } from "./types";
 import { computeRpmFactor, normalizeDrive } from "./gear";
-import { airDensity, computeSegment, interpLinear, W_TO_PS } from "./physics";
+import { computeSegment, interpLinear, sessionAirDensity, W_TO_PS } from "./physics";
 import { sessionModule } from "./modules";
 
 /** Ein simulierbares Setup – kann gespeichert oder nur temporär („Testsetup“) sein. */
@@ -151,7 +151,7 @@ export function bestPowerCurve(
         peakPs,
         rpm: keys,
         pWheelW: keys.map((k) => bins.get(k)!.sum / bins.get(k)!.n),
-        rho: airDensity(s.tempC, s.pressureHpa, s.rh),
+        rho: sessionAirDensity(s),
       };
       if (!best || curve.peakPs > best.peakPs) best = curve;
     }
