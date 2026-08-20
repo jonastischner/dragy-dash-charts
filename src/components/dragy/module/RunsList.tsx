@@ -11,6 +11,8 @@ import type { ModuleId, Session, Segment, Vehicle } from "@/lib/dragy/types";
 import { MODULE_IDS, MODULE_LABEL, isPowerModule, isTrackModule, sessionModule } from "@/lib/dragy/modules";
 import { Chart, type Series } from "../Chart";
 import { PdfExportDialog } from "../PdfExportDialog";
+import { CorrectionNote } from "../CorrectionNote";
+import { useSessionCorrection } from "../useCorrection";
 
 const ACCEL_SPLITS: Array<[number, number]> = [[0, 100], [100, 200], [60, 130], [80, 120]];
 
@@ -244,20 +246,21 @@ function SegmentEditor({ module, seg, session, vehicle, maxT, onChange, onDelete
   const hasAny = flatGearOptions.length + legacyPresets.length > 0;
   const isPower = isPowerModule(module);
   const [pdfOpen, setPdfOpen] = useState(false);
+  const correction = useSessionCorrection(session);
 
   const miniSeries: Series[] = useMemo(() => {
     if (isPower) {
       const samples = computeSegment(session, seg, vehicle);
       const points = samples
-        .map((s) => ({ x: s.rpm, y: s.pEngineW * W_TO_PS }))
+        .map((s) => ({ x: s.rpm, y: s.pEngineW * W_TO_PS * correction.alpha }))
         .filter((p) => Number.isFinite(p.x) && Number.isFinite(p.y));
-      return [{ label: seg.name, color: seg.color, points }];
+      return [{ label: correction.standard !== "none" ? `${seg.name} (korr.)` : seg.name, color: seg.color, points }];
     }
     const points = session.records
       .filter((r) => r.t >= seg.startT && r.t <= seg.endT)
       .map((r) => ({ x: r.t - seg.startT, y: r.speedKmh }));
     return [{ label: seg.name, color: seg.color, points }];
-  }, [session, seg, vehicle, isPower]);
+  }, [session, seg, vehicle, isPower, correction.alpha, correction.standard]);
 
   return (
     <li className="rounded-md border border-border bg-card p-3">
@@ -420,6 +423,8 @@ function CoastdownPanel({ session, seg, vehicle, onChange }: {
 
 function PeakOverview({ session, segments, vehicle }: { session: Session; segments: Segment[]; vehicle: Vehicle }) {
   const [refId, setRefId] = usePersistedState<string>(`dragy.peaks.ref.${session.id}`, "");
+  const correction = useSessionCorrection(session);
+  const corrected = correction.standard !== "none";
 
   const rows = useMemo(() => segments.map((g) => {
     const samples = computeSegment(session, g, vehicle);
@@ -430,8 +435,12 @@ function PeakOverview({ session, segments, vehicle }: { session: Session; segmen
       const nm = s.torqueEngineNm;
       if (Number.isFinite(nm) && (!Number.isFinite(best.nm) || nm > best.nm)) { best.nm = nm; best.nmRpm = s.rpm; }
     }
-    return { id: g.id, name: g.name, color: g.color, ...best };
-  }), [session, segments, vehicle]);
+    // alpha ist ein reiner Skalar – die Drehzahl zum Spitzenwert bleibt gleich.
+    return {
+      id: g.id, name: g.name, color: g.color, ...best,
+      psCorr: best.ps * correction.alpha, nmCorr: best.nm * correction.alpha,
+    };
+  }), [session, segments, vehicle, correction.alpha]);
 
   if (rows.length === 0) return null;
 
@@ -452,6 +461,7 @@ function PeakOverview({ session, segments, vehicle }: { session: Session; segmen
     <div className="mt-3 rounded-md border border-border p-3">
       <div className="text-caption font-semibold text-foreground">Spitzenwerte je Lauf (Motor, geschätzt)</div>
       <Note>Maximale Motorleistung/-drehmoment mit zugehöriger Drehzahl. Referenzlauf wählen, um Abweichungen zu sehen.</Note>
+      <CorrectionNote correction={correction} />
       <div className="mt-2">
         <Field label="Referenzlauf">
           <Select value={refId} onChange={(e) => setRefId(e.target.value)}>
@@ -465,10 +475,12 @@ function PeakOverview({ session, segments, vehicle }: { session: Session; segmen
           <thead className="text-muted-foreground">
             <tr>
               <th className="py-1 pr-2 text-left font-medium">Lauf</th>
-              <th className="py-1 pr-2 text-right font-medium">Peak PS</th>
+              <th className="py-1 pr-2 text-right font-medium">{corrected ? "PS gemessen" : "Peak PS"}</th>
+              {corrected && <th className="py-1 pr-2 text-right font-medium">PS korrigiert</th>}
               <th className="py-1 pr-2 text-right font-medium">@ U/min</th>
               {ref && <th className="py-1 pr-2 text-right font-medium">Δ PS</th>}
-              <th className="py-1 pr-2 text-right font-medium">Peak Nm</th>
+              <th className="py-1 pr-2 text-right font-medium">{corrected ? "Nm gemessen" : "Peak Nm"}</th>
+              {corrected && <th className="py-1 pr-2 text-right font-medium">Nm korrigiert</th>}
               <th className="py-1 pr-2 text-right font-medium">@ U/min</th>
               {ref && <th className="py-1 pr-2 text-right font-medium">Δ Nm</th>}
             </tr>
@@ -481,11 +493,13 @@ function PeakOverview({ session, segments, vehicle }: { session: Session; segmen
                   {r.name}{r.id === refId && <span className="ml-1 text-caption text-muted-foreground">(Ref)</span>}
                 </td>
                 <td className="py-1 pr-2 text-right tabular-nums">{Number.isFinite(r.ps) ? r.ps.toFixed(0) : "—"}</td>
+                {corrected && <td className="py-1 pr-2 text-right font-medium tabular-nums">{Number.isFinite(r.psCorr) ? r.psCorr.toFixed(0) : "—"}</td>}
                 <td className="py-1 pr-2 text-right tabular-nums">{Number.isFinite(r.psRpm) ? r.psRpm.toFixed(0) : "—"}</td>
-                {ref && <td className="py-1 pr-2 text-right tabular-nums">{r.id === refId ? "—" : fmtDelta(delta(r.ps, ref.ps), "PS")}</td>}
+                {ref && <td className="py-1 pr-2 text-right tabular-nums">{r.id === refId ? "—" : fmtDelta(delta(corrected ? r.psCorr : r.ps, corrected ? ref.psCorr : ref.ps), "PS")}</td>}
                 <td className="py-1 pr-2 text-right tabular-nums">{Number.isFinite(r.nm) ? r.nm.toFixed(0) : "—"}</td>
+                {corrected && <td className="py-1 pr-2 text-right font-medium tabular-nums">{Number.isFinite(r.nmCorr) ? r.nmCorr.toFixed(0) : "—"}</td>}
                 <td className="py-1 pr-2 text-right tabular-nums">{Number.isFinite(r.nmRpm) ? r.nmRpm.toFixed(0) : "—"}</td>
-                {ref && <td className="py-1 pr-2 text-right tabular-nums">{r.id === refId ? "—" : fmtDelta(delta(r.nm, ref.nm), "Nm")}</td>}
+                {ref && <td className="py-1 pr-2 text-right tabular-nums">{r.id === refId ? "—" : fmtDelta(delta(corrected ? r.nmCorr : r.nm, corrected ? ref.nmCorr : ref.nm), "Nm")}</td>}
               </tr>
             ))}
           </tbody>
@@ -505,19 +519,41 @@ const CURVE_LABEL: Record<CurveMode, string> = {
 function SessionCurves({ session, segments, vehicle }: { session: Session; segments: Segment[]; vehicle: Vehicle }) {
   const [mode, setMode] = usePersistedState<CurveMode>("dragy.session.curveMode", "pEngine");
   const [hidden, setHidden] = useState<Record<string, boolean>>({});
+  const [showRaw, setShowRaw] = usePersistedState<boolean>("dragy.session.showRaw", false);
+  const correction = useSessionCorrection(session);
+  // Die Norm korrigiert die Motorabgabe – die gemessene Radleistung nicht.
+  const applies = correction.standard !== "none" && mode !== "pWheel";
 
-  const series: Series[] = useMemo(() => segments.map((g) => {
-    const samples = computeSegment(session, g, vehicle);
-    const points = samples
-      .map((s) => {
-        const y = mode === "pEngine" ? s.pEngineW * W_TO_PS
-          : mode === "pWheel" ? s.pWheelW * W_TO_PS
-          : s.torqueEngineNm;
-        return { x: s.rpm, y };
-      })
-      .filter((p) => Number.isFinite(p.x) && Number.isFinite(p.y));
-    return { label: g.name, color: g.color, points, visible: !hidden[g.id] };
-  }), [segments, session, vehicle, mode, hidden]);
+  // Serien-Index -> Segment-ID: die Vergleichskurve verdoppelt die Serien, der
+  // Legenden-Index passt dann nicht mehr direkt auf segments[i].
+  const { series, seriesSegmentIds } = useMemo(() => {
+    const out: Series[] = [];
+    const ids: string[] = [];
+    for (const g of segments) {
+      const samples = computeSegment(session, g, vehicle);
+      const raw = samples
+        .map((s) => {
+          const y = mode === "pEngine" ? s.pEngineW * W_TO_PS
+            : mode === "pWheel" ? s.pWheelW * W_TO_PS
+            : s.torqueEngineNm;
+          return { x: s.rpm, y };
+        })
+        .filter((p) => Number.isFinite(p.x) && Number.isFinite(p.y));
+      const visible = !hidden[g.id];
+      out.push({
+        label: applies ? `${g.name} (korr.)` : g.name,
+        color: g.color,
+        points: applies ? raw.map((p) => ({ x: p.x, y: p.y * correction.alpha })) : raw,
+        visible,
+      });
+      ids.push(g.id);
+      if (applies && showRaw) {
+        out.push({ label: `${g.name} (gemessen)`, color: g.color, points: raw, visible, dashed: true });
+        ids.push(g.id);
+      }
+    }
+    return { series: out, seriesSegmentIds: ids };
+  }, [segments, session, vehicle, mode, hidden, applies, showRaw, correction.alpha]);
 
   if (segments.length === 0) return null;
 
@@ -525,6 +561,14 @@ function SessionCurves({ session, segments, vehicle }: { session: Session; segme
     <div className="mt-3 rounded-md border border-border p-3">
       <div className="text-caption font-semibold text-foreground">Kurven dieser Session</div>
       <Note>Alle Läufe überlagert. Legende zum Ein-/Ausblenden antippen.</Note>
+      {mode === "pWheel" && correction.standard !== "none" ? (
+        <Note>
+          Radleistung ist ein Messwert – die Normkorrektur gilt nur für die Motorleistung und wird
+          hier deshalb nicht angewendet.
+        </Note>
+      ) : (
+        <CorrectionNote correction={correction} />
+      )}
       <div className="mt-2">
         <Field label="Diagramm">
           <Select value={mode} onChange={(e) => setMode(e.target.value as CurveMode)}>
@@ -532,13 +576,19 @@ function SessionCurves({ session, segments, vehicle }: { session: Session; segme
           </Select>
         </Field>
       </div>
+      {applies && (
+        <label className="mt-2 flex items-center gap-2 text-caption text-foreground">
+          <input type="checkbox" checked={showRaw} onChange={(e) => setShowRaw(e.target.checked)} className="h-4 w-4" />
+          Unkorrigierte Kurve gestrichelt überlagern
+        </label>
+      )}
       <div className="mt-2">
         <Chart
           series={series} height={260} xLabel="U/min" yLabel={mode === "tqEngine" ? "Nm" : "PS"}
           xFormat={(v) => v.toFixed(0)} yFormat={(v) => v.toFixed(0)}
           onLegendToggle={(i) => {
-            const g = segments[i]; if (!g) return;
-            setHidden((h) => ({ ...h, [g.id]: !h[g.id] }));
+            const id = seriesSegmentIds[i]; if (!id) return;
+            setHidden((h) => ({ ...h, [id]: !h[id] }));
           }}
         />
       </div>

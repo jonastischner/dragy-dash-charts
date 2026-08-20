@@ -7,6 +7,8 @@ import { computeSegment, W_TO_PS } from "@/lib/dragy/physics";
 import { Chart, type Series } from "./Chart";
 import type { ModuleId } from "@/lib/dragy/types";
 import { isPowerModule, sessionModule } from "@/lib/dragy/modules";
+import { sessionCorrection, useCorrectionStandard } from "./useCorrection";
+import { CORRECTION_LABEL } from "@/lib/dragy/correction";
 
 type Mode = "pWheel" | "pEngine" | "tqWheel" | "tqEngine" | "accel";
 const MODE_LABEL: Record<Mode, string> = {
@@ -21,6 +23,7 @@ const SPLIT_TARGETS = [60, 100, 150, 200];
 
 export function CompareTab({ module = "power", onOpenVehicles }: { module?: ModuleId; onOpenVehicles?: () => void } = {}) {
   const { state, saveSegment } = useAppStore();
+  const [standard] = useCorrectionStandard();
   const activeVehicle = state.vehicles.find((v) => v.id === state.activeVehicleId);
   const allowPower = isPowerModule(module);
   const allowedModes: Mode[] = allowPower ? ["pWheel", "pEngine", "tqWheel", "tqEngine", "accel"] : ["accel"];
@@ -36,6 +39,8 @@ export function CompareTab({ module = "power", onOpenVehicles }: { module?: Modu
   if (!activeVehicle) return <Section title="Vergleich"><EmptyState title="Kein aktives Fahrzeug" description="Wähle ein Fahrzeug, um Läufe zu vergleichen." actionLabel="Zur Garage" onAction={onOpenVehicles} /></Section>;
 
   const isAccel = !allowedModes.includes(mode) || mode === "accel";
+  const isEngineMode = mode === "pEngine" || mode === "tqEngine";
+  const corrected = standard !== "none";
 
 
   const series: Series[] = segments.map((g) => {
@@ -47,13 +52,15 @@ export function CompareTab({ module = "power", onOpenVehicles }: { module?: Modu
       return { label: `${session.name} · ${g.name}`, color: g.color, points, visible: g.visible };
     }
     const samples = computeSegment(session, g, activeVehicle);
+    // Faktor je Session – nur auf die Motorgrößen, Radwerte bleiben Messwerte.
+    const alpha = isEngineMode ? sessionCorrection(standard, session).alpha : 1;
     const points = samples
       .map((s) => {
         let y: number = NaN;
         if (mode === "pWheel") y = s.pWheelW * W_TO_PS;
-        else if (mode === "pEngine") y = s.pEngineW * W_TO_PS;
+        else if (mode === "pEngine") y = s.pEngineW * W_TO_PS * alpha;
         else if (mode === "tqWheel") y = s.torqueWheelNm;
-        else y = s.torqueEngineNm;
+        else y = s.torqueEngineNm * alpha;
         return { x: s.rpm, y };
       })
       .filter((p) => Number.isFinite(p.y));
@@ -110,7 +117,13 @@ export function CompareTab({ module = "power", onOpenVehicles }: { module?: Modu
       const vFrom = rec[0]?.speedKmh ?? NaN;
       const vMax = rec.length ? Math.max(...rec.map((r) => r.speedKmh)) : NaN;
       const dur = rec.length ? rec[rec.length - 1].t - rec[0].t : NaN;
-      return { label: `${session.name} · ${g.name}`, color: g.color, pW, pWRpm, pE, pERpm, tW, tWRpm, tE, tERpm, vFrom, vMax, dur };
+      const corr = sessionCorrection(standard, session);
+      return {
+        label: `${session.name} · ${g.name}`, color: g.color,
+        pW, pWRpm, pE, pERpm, tW, tWRpm, tE, tERpm, vFrom, vMax, dur,
+        alpha: corr.alpha, inRange: corr.inRange,
+        pECorr: pE * corr.alpha, tECorr: tE * corr.alpha,
+      };
     });
 
   // Sichtbare Läufe als Datenbasis für den Sammel-PDF-Export.
@@ -142,6 +155,22 @@ export function CompareTab({ module = "power", onOpenVehicles }: { module?: Modu
         </div>
 
 
+        {corrected && !isAccel && (
+          <Note>
+            {isEngineMode ? (
+              <>
+                <b>Normkorrektur aktiv (experimentell):</b> {CORRECTION_LABEL[standard]}. Jeder Lauf
+                wird mit dem Faktor seiner eigenen Umgebungsbedingungen umgerechnet. Gemessene und
+                korrigierte Werte stehen in der Übersicht unten nebeneinander.
+              </>
+            ) : (
+              <>
+                Radleistung/-drehmoment sind Messwerte – die aktive Normkorrektur
+                ({CORRECTION_LABEL[standard]}) gilt nur für die Motorgrößen.
+              </>
+            )}
+          </Note>
+        )}
         {segments.length === 0 ? (
           <p className="text-caption text-muted-foreground">Keine Läufe im aktiven Fahrzeug.</p>
         ) : (
@@ -210,10 +239,12 @@ export function CompareTab({ module = "power", onOpenVehicles }: { module?: Modu
                     <th className="py-1 pr-2 text-right font-medium">Rad PS</th>
                     <th className="py-1 pr-2 text-right font-medium">@ Rad</th>
                     <th className="py-1 pr-2 text-right font-medium">Motor PS</th>
+                    {corrected && <th className="py-1 pr-2 text-right font-medium">Motor PS korr.</th>}
                     <th className="py-1 pr-2 text-right font-medium">@ Motor</th>
                     <th className="py-1 pr-2 text-right font-medium">Rad Nm</th>
                     <th className="py-1 pr-2 text-right font-medium">@ Nm</th>
                     <th className="py-1 pr-2 text-right font-medium">Motor Nm</th>
+                    {corrected && <th className="py-1 pr-2 text-right font-medium">Motor Nm korr.</th>}
                     <th className="py-1 pr-2 text-right font-medium">@ Nm</th>
                     <th className="py-1 pr-2 text-right font-medium">km/h</th>
                     <th className="py-1 pr-2 text-right font-medium">Dauer</th>
@@ -229,10 +260,17 @@ export function CompareTab({ module = "power", onOpenVehicles }: { module?: Modu
                       <td className="py-1 pr-2 text-right tabular-nums">{fmt(r.pW)}</td>
                       <td className="py-1 pr-2 text-right tabular-nums text-muted-foreground">{fmtRpm(r.pWRpm)}</td>
                       <td className="py-1 pr-2 text-right tabular-nums">{fmt(r.pE)}</td>
+                      {corrected && (
+                        <td className={`py-1 pr-2 text-right font-medium tabular-nums ${r.inRange ? "" : "text-warning"}`}
+                            title={`α = ${r.alpha.toFixed(3)}${r.inRange ? "" : " – außerhalb des nach EWG 80/1269 zulässigen Bereichs"}`}>
+                          {fmt(r.pECorr)}{!r.inRange && " !"}
+                        </td>
+                      )}
                       <td className="py-1 pr-2 text-right tabular-nums text-muted-foreground">{fmtRpm(r.pERpm)}</td>
                       <td className="py-1 pr-2 text-right tabular-nums">{fmt(r.tW)}</td>
                       <td className="py-1 pr-2 text-right tabular-nums text-muted-foreground">{fmtRpm(r.tWRpm)}</td>
                       <td className="py-1 pr-2 text-right tabular-nums">{fmt(r.tE)}</td>
+                      {corrected && <td className="py-1 pr-2 text-right font-medium tabular-nums">{fmt(r.tECorr)}</td>}
                       <td className="py-1 pr-2 text-right tabular-nums text-muted-foreground">{fmtRpm(r.tERpm)}</td>
                       <td className="py-1 pr-2 text-right tabular-nums">{Number.isFinite(r.vFrom) ? `${r.vFrom.toFixed(0)}–${r.vMax.toFixed(0)}` : "—"}</td>
                       <td className="py-1 pr-2 text-right tabular-nums">{Number.isFinite(r.dur) ? `${r.dur.toFixed(2)} s` : "—"}</td>

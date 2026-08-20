@@ -1,14 +1,17 @@
 import { useState } from "react";
-import { Section, Button, Note } from "./ui";
+import { Section, Button, Note, Field, Select } from "./ui";
 import { useAppStore } from "@/lib/dragy/store";
 import { BackupTab } from "./BackupTab";
 import { AccountTab } from "./AccountTab";
+import { useCorrectionStandard } from "./useCorrection";
+import { CORRECTION_LABEL, CORRECTION_REFERENCE, type CorrectionStandard } from "@/lib/dragy/correction";
 
 export function MoreTab() {
   return (
     <div>
       <AccountTab />
       <ColorsSection />
+      <CorrectionSection />
       <BackupTab />
 
       <Section title="Grenzen & Annahmen der Berechnung">
@@ -47,9 +50,52 @@ export function MoreTab() {
             <b>Luftdichte</b> aus Temperatur, Druck und Luftfeuchte je Session. Werden diese nicht
             gepflegt, weichen die Leistungswerte entsprechend ab.
           </li>
+          <li>
+            <b>Normkorrektur ist optional und experimentell.</b> Standardmäßig zeigt die App die aus
+            der Messung berechneten Werte. Wird eine Norm aktiviert, korrigiert sie nur den Einfluss
+            der Luftdichte auf die Motorabgabe – die größeren systematischen Fehler oben (rotierende
+            Massen, Antriebsstrangverluste) bleiben davon unberührt.
+          </li>
         </ul>
       </Section>
     </div>
+  );
+}
+
+function CorrectionSection() {
+  const [standard, setStandard] = useCorrectionStandard();
+  return (
+    <Section title="Experimentell: Normkorrektur">
+      <Note>
+        Rechnet die geschätzte <b>Motor</b>leistung auf genormte Umgebungsbedingungen um, damit Läufe
+        bei unterschiedlichem Wetter vergleichbar werden. Die Radleistung bleibt Messwert. Grundlage
+        sind Temperatur, Luftdruck und Luftfeuchte der jeweiligen Session.
+      </Note>
+      <div className="mt-2">
+        <Field label="Norm">
+          <Select value={standard} onChange={(e) => setStandard(e.target.value as CorrectionStandard)}>
+            {(Object.keys(CORRECTION_LABEL) as CorrectionStandard[]).map((s) => (
+              <option key={s} value={s}>{CORRECTION_LABEL[s]}</option>
+            ))}
+          </Select>
+        </Field>
+      </div>
+      <p className="mt-2 text-caption text-muted-foreground">{CORRECTION_REFERENCE[standard]}</p>
+      <ul className="mt-2 list-disc space-y-1 pl-4 text-caption text-muted-foreground">
+        <li>
+          <b>Nur Ottomotoren.</b> Die Diesel-Variante der EWG braucht den Kraftstoffdurchsatz, der
+          sich aus GPS-Daten nicht bestimmen lässt – sie wird deshalb nicht angeboten.
+        </li>
+        <li>
+          <b>Ersetzt keine Prüfstandsmessung.</b> Der Faktor normiert nur die Umgebungsbedingungen;
+          die zugrunde liegende Leistungsschätzung wird dadurch nicht genauer.
+        </li>
+        <li>
+          <b>Beschleunigungsprognose und PDF-Export bleiben unkorrigiert</b> – die Prognose würde
+          sonst die Beschleunigung unter Referenzbedingungen statt unter den realen vorhersagen.
+        </li>
+      </ul>
+    </Section>
   );
 }
 

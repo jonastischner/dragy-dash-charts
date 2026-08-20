@@ -3,12 +3,17 @@ import type { Record, Vehicle, Segment, Session, DragPoint } from "./types";
 export const G = 9.81;
 export const W_TO_PS = 1 / 735.499;
 
+// Wasserdampf-Partialdruck in hPa (Magnus). Eigene Funktion, weil auch die
+// Normkorrektur nach EWG 80/1269 den Trockendruck p - e braucht (correction.ts).
+export function vaporPressureHpa(tempC: number, rh: number): number {
+  const es = 6.1078 * Math.exp((17.27 * tempC) / (tempC + 237.3));
+  return (rh / 100) * es;
+}
+
 // Air density from T (C), P (hPa), RH (%)
 export function airDensity(tempC: number, pHpa: number, rh: number): number {
   const T = tempC + 273.15;
-  // Magnus saturation vapor pressure in hPa
-  const es = 6.1078 * Math.exp((17.27 * tempC) / (tempC + 237.3));
-  const e = (rh / 100) * es; // hPa
+  const e = vaporPressureHpa(tempC, rh); // hPa
   const Pd = (pHpa - e) * 100; // Pa
   const Pv = e * 100; // Pa
   return Pd / (287.05 * T) + Pv / (461.495 * T);

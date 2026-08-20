@@ -5,6 +5,8 @@ export interface Series {
   color: string;
   points: Array<{ x: number; y: number }>;
   visible?: boolean;
+  /** Gestrichelt zeichnen – z.B. für die unkorrigierte Vergleichskurve. */
+  dashed?: boolean;
 }
 export interface Band { xStart: number; xEnd: number; color: string; label?: string }
 
@@ -93,7 +95,9 @@ export function Chart({ series, bands = [], xLabel, yLabel, height = 280, onLege
     }
     // series
     for (const s of visSeries) {
-      ctx.strokeStyle = s.color; ctx.lineWidth = 2; ctx.beginPath();
+      ctx.strokeStyle = s.color; ctx.lineWidth = 2;
+      ctx.setLineDash(s.dashed ? [5, 4] : []);
+      ctx.beginPath();
       let started = false;
       for (const p of s.points) {
         if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) { started = false; continue; }
@@ -102,6 +106,7 @@ export function Chart({ series, bands = [], xLabel, yLabel, height = 280, onLege
       }
       ctx.stroke();
     }
+    ctx.setLineDash([]);
     // axis labels
     ctx.fillStyle = colText; ctx.font = "13px Inter, system-ui";
     if (xLabel) ctx.fillText(xLabel, W - padR - ctx.measureText(xLabel).width, H - 2);
