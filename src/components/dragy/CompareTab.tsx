@@ -5,10 +5,10 @@ import type { RunPdfData } from "@/lib/dragy/mahaPdf";
 import { useAppStore } from "@/lib/dragy/store";
 import { computeSegment, W_TO_PS } from "@/lib/dragy/physics";
 import { Chart, type Series } from "./Chart";
-import type { ModuleId, Segment } from "@/lib/dragy/types";
+import type { ModuleId } from "@/lib/dragy/types";
 import { isPowerModule, sessionModule } from "@/lib/dragy/modules";
 import { sessionCorrection, useCorrectionStandard } from "./useCorrection";
-import { compareNames } from "@/lib/dragy/sort";
+import { compareNames, compareNamesDesc } from "@/lib/dragy/sort";
 import { CORRECTION_LABEL } from "@/lib/dragy/correction";
 
 type Mode = "pWheel" | "pEngine" | "tqWheel" | "tqEngine" | "accel";
@@ -35,12 +35,15 @@ export function CompareTab({ module = "power", onOpenVehicles }: { module?: Modu
     if (!activeVehicle) return [];
     const own = state.sessions.filter((s) => s.vehicleId === activeVehicle.id && sessionModule(s) === module);
     const ownById = new Map(own.map((s) => [s.id, s]));
-    // Nach dem Legenden-Text sortieren, nicht nach dem Lauf-Namen allein –
-    // sonst stünde die Legende anders als die Tabelle darunter.
-    const label = (g: Segment) => `${ownById.get(g.sessionId)?.name ?? ""} · ${g.name}`;
+    // Primär nach Session absteigend (neueste zuerst, wie in der Sessions-
+    // Liste), sekundär nach Lauf-Name aufsteigend – sonst stünde die Legende
+    // anders als die Tabelle darunter.
     return state.segments
       .filter((g) => ownById.has(g.sessionId))
-      .sort((a, b) => compareNames(label(a), label(b)) || a.id.localeCompare(b.id));
+      .sort((a, b) => {
+        const sa = ownById.get(a.sessionId)!, sb = ownById.get(b.sessionId)!;
+        return compareNamesDesc(sa.name, sb.name) || compareNames(a.name, b.name) || a.id.localeCompare(b.id);
+      });
   }, [state, activeVehicle, module]);
 
   if (!activeVehicle) return <Section title="Vergleich"><EmptyState title="Kein aktives Fahrzeug" description="Wähle ein Fahrzeug, um Läufe zu vergleichen." actionLabel="Zur Garage" onAction={onOpenVehicles} /></Section>;
