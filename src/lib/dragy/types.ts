@@ -105,6 +105,13 @@ export interface Session {
   manual: boolean;
   manualRows?: ManualRow[];
   createdAt: number;
+  /**
+   * Zeitpunkt der Aufnahme als Epoch-ms – aus der GPS-Zeit der Rohdaten bzw.
+   * dem Dragy-Dateinamen. Nicht zu verwechseln mit createdAt: das ist der
+   * Import-Zeitpunkt. Fehlt bei Altdaten und bei Quellen ohne absolute Zeit
+   * (Tabellen-Exporte); Anzeige und Sortierung fallen dann auf createdAt zurück.
+   */
+  recordedAt?: number;
   notes?: string;
   massOverride?: number; // kg, optional per-session Abweichung vom Fahrzeug-Standardgewicht
   module?: ModuleId;     // Modul der Session (Altdaten werden migriert)

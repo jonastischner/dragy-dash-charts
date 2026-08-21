@@ -9,10 +9,18 @@ import { computeRpmFactor, resolveAllGears } from "@/lib/dragy/gear";
 import { uid } from "@/lib/dragy/db";
 import type { ModuleId, Session, Segment, Vehicle } from "@/lib/dragy/types";
 import { MODULE_IDS, MODULE_LABEL, isPowerModule, isTrackModule, sessionModule } from "@/lib/dragy/modules";
+import { formatSessionTime, sessionTimestamp } from "@/lib/dragy/sessionTime";
 import { Chart, type Series } from "../Chart";
 import { PdfExportDialog } from "../PdfExportDialog";
 import { CorrectionNote } from "../CorrectionNote";
 import { useSessionCorrection } from "../useCorrection";
+
+/** Aufnahmezeit als Zusatzzeile – leer, wenn der Session-Name sie bereits ist. */
+function recordedLabel(s: Session): string | null {
+  if (s.recordedAt == null) return null;
+  const stamp = formatSessionTime(s.recordedAt);
+  return s.name.trim() === stamp ? null : stamp;
+}
 
 const ACCEL_SPLITS: Array<[number, number]> = [[0, 100], [100, 200], [60, 130], [80, 120]];
 
@@ -34,7 +42,7 @@ export function RunsList({ module, onOpenGarage }: { module: ModuleId; onOpenGar
 
   const sessions = state.sessions
     .filter((s) => s.vehicleId === activeVehicle.id && sessionModule(s) === module)
-    .sort((a, b) => b.createdAt - a.createdAt);
+    .sort((a, b) => sessionTimestamp(b) - sessionTimestamp(a));
 
   return (
     <Section title={`Sessions – ${MODULE_LABEL[module]}`} note={activeVehicle.name}>
@@ -56,7 +64,12 @@ export function RunsList({ module, onOpenGarage }: { module: ModuleId; onOpenGar
                   <div className="text-body font-medium text-foreground">
                     {s.name} {s.manual && <span className="ml-1 rounded bg-warning px-1 text-caption text-warning-foreground">manuell</span>}
                   </div>
-                  <div className="text-caption text-muted-foreground">{dur.toFixed(1)} s · {s.records.length} Punkte · {segs.length} Lauf/Läufe</div>
+                  <div className="text-caption text-muted-foreground">
+                    {/* Aufnahmezeit nur zeigen, wenn sie nicht ohnehin schon der Name ist –
+                        etwa bei umbenannten Sessions („Nordschleife Runde 3"). */}
+                    {recordedLabel(s) && <>{recordedLabel(s)} · </>}
+                    {dur.toFixed(1)} s · {s.records.length} Punkte · {segs.length} Lauf/Läufe
+                  </div>
                 </div>
                 <span className="text-muted-foreground">{isOpen ? "▾" : "▸"}</span>
               </button>

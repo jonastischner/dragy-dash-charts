@@ -3,6 +3,7 @@ import { Bluetooth, Circle, Square } from "lucide-react";
 import { Section, Field, Row, Button, Note, TextInput, NumInput, Select, EmptyState, usePersistedState } from "./ui";
 import { useAppStore } from "@/lib/dragy/store";
 import { uid } from "@/lib/dragy/db";
+import { formatSessionTime } from "@/lib/dragy/sessionTime";
 import { STD_ENV } from "@/lib/dragy/physics";
 import { useCapacitorPlatform } from "@/lib/capacitor";
 import {
@@ -97,10 +98,14 @@ export function LiveTab({ module = "power", onOpenVehicles }: { module?: ModuleI
     const records = pointsToRecords(pointsRef.current);
     if (!activeVehicle) return;
     if (records.length < 3) { setSaveMsg("Zu wenige Datenpunkte – Lauf nicht gespeichert."); return; }
+    // Aufnahme*beginn*, nicht der Moment des Stoppens – damit die Live-Session
+    // genauso datiert ist wie eine importierte (dort die Zeit des ersten Fixes).
+    const recordedAt = Date.now() - Math.round(records[records.length - 1].t * 1000);
     const s: Session = {
       id: uid(), vehicleId: activeVehicle.id,
-      name: `Live ${new Date().toLocaleString("de-DE")}`,
-      records, tempC, pressureHpa, rh, manual: false, createdAt: Date.now(), module,
+      name: `Live ${formatSessionTime(recordedAt)}`,
+      records, tempC, pressureHpa, rh, manual: false, createdAt: Date.now(),
+      recordedAt, module,
     };
     await saveSession(s);
     setSaveMsg(`Session gespeichert: ${records.length} Punkte (${records[records.length - 1].t.toFixed(1)} s).`);

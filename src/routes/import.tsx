@@ -6,6 +6,7 @@ import { Section, Button, Note } from "@/components/dragy/ui";
 import { useAppStore } from "@/lib/dragy/store";
 import { parseUbx } from "@/lib/dragy/ubx";
 import { parseTableFile } from "@/lib/dragy/tabular";
+import { nameImportedSession } from "@/lib/dragy/sessionTime";
 import { uid } from "@/lib/dragy/db";
 import type { Session, Record as R, ModuleId } from "@/lib/dragy/types";
 
@@ -74,30 +75,36 @@ function ImportPage() {
         // Bestehende Parse-Logik weiterverwenden (kein neuer Parser).
         let records: R[];
         let info = "";
+        // Tabellen-Exporte tragen keine absolute Zeit – dort greift der Dateiname.
+        let startedAt: number | null = null;
         if (isTable) {
           const parsed = await parseTableFile(new File([blob], name));
           records = parsed.records;
           info = ` – ${parsed.info}`;
         } else {
-          records = parseUbx(await blob.arrayBuffer());
+          const parsed = parseUbx(await blob.arrayBuffer());
+          records = parsed.records;
+          startedAt = parsed.startedAt;
         }
         if (records.length < 3) throw new Error("Zu wenige gültige Datensätze in der Datei");
 
+        const { recordedAt, name: sessionName } = nameImportedSession(name, startedAt);
         const session: Session = {
           id: uid(),
           vehicleId: vehicle.id,
-          name: name.replace(/\.(data|ubx|csv|txt|tsv|xlsx|xlsm|xls)$/i, ""),
+          name: sessionName,
           records,
           // Keine Vorgabewerte: nicht gepflegte Umgebungsdaten bleiben leer,
           // damit daraus keine Normkorrektur abgeleitet wird.
           manual: false,
           createdAt: Date.now(),
+          ...(recordedAt != null ? { recordedAt } : {}),
           module,
         };
         await saveSession(session);
 
         setStatus("ok");
-        setMessage(`${name}: ${records.length} Punkte importiert${info}`);
+        setMessage(`${records.length} Punkte importiert als „${sessionName}"${info}`);
         setTimeout(() => navigate({ to: "/" }), 1400);
       } catch (e: any) {
         setStatus("error");
