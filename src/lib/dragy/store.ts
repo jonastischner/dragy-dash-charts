@@ -4,6 +4,7 @@ import type { AppState, Vehicle, Session, Segment, GearboxDef, FinalDriveDef, Ti
 import { supabase } from "@/integrations/supabase/client";
 import { pushLocal, pushDelete, pushActiveVehicle } from "./sync";
 import { migrateSessionModule } from "./modules";
+import { sessionTimestamp } from "./sessionTime";
 
 
 const DEFAULT_VEHICLE: Omit<Vehicle, "id" | "name"> = {
@@ -219,7 +220,7 @@ export function useAppStore() {
       });
       const ordered = [...scoped].sort((a, b) => {
         const sa = sessionsById.get(a.sessionId)!, sb = sessionsById.get(b.sessionId)!;
-        return (sa.createdAt - sb.createdAt) || (a.startT - b.startT) || a.id.localeCompare(b.id);
+        return (sessionTimestamp(sa) - sessionTimestamp(sb)) || (a.startT - b.startT) || a.id.localeCompare(b.id);
       });
 
       let changed = 0;

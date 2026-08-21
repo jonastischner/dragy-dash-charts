@@ -3,6 +3,7 @@ import { Section, Field, TextInput, NumInput, Button, Note, Row, EmptyState, use
 import { useAppStore } from "@/lib/dragy/store";
 import { parseUbx } from "@/lib/dragy/ubx";
 import { parseTableFile } from "@/lib/dragy/tabular";
+import { nameImportedSession } from "@/lib/dragy/sessionTime";
 import { uid } from "@/lib/dragy/db";
 import { STD_ENV } from "@/lib/dragy/physics";
 import type { Session, ManualRow, Record as R, ModuleId } from "@/lib/dragy/types";
@@ -31,21 +32,29 @@ export function ImportTab({ module = "power", onOpenVehicles }: { module?: Modul
         const isTable = /\.(csv|txt|tsv|xlsx|xlsm|xls)$/i.test(f.name);
         let records: R[];
         let extra = "";
+        // Tabellen-Exporte tragen keine absolute Zeit, nur eine relative
+        // Zeitachse – dort bleibt startedAt null und der Dateiname greift.
+        let startedAt: number | null = null;
         if (isTable) {
           const res = await parseTableFile(f);
           records = res.records;
           extra = ` – ${res.info}`;
           if (records.length < 3) { msgs.push(`${f.name}: zu wenige Datenzeilen gefunden`); continue; }
         } else {
-          records = parseUbx(await f.arrayBuffer());
+          const res = parseUbx(await f.arrayBuffer());
+          records = res.records;
+          startedAt = res.startedAt;
           if (records.length < 3) { msgs.push(`${f.name}: keine gültigen NAV-PVT Datensätze gefunden`); continue; }
         }
+        const { recordedAt, name } = nameImportedSession(f.name, startedAt);
         const s: Session = {
-          id: uid(), vehicleId: activeVehicle.id, name: f.name.replace(/\.(data|ubx|csv|txt|tsv|xlsx|xlsm|xls)$/i, ""),
+          id: uid(), vehicleId: activeVehicle.id, name,
           records, tempC, pressureHpa, rh, manual: false, createdAt: Date.now(), module,
+          ...(recordedAt != null ? { recordedAt } : {}),
         };
         await saveSession(s);
-        msgs.push(`${f.name}: ${records.length} Punkte importiert (${records[records.length - 1].t.toFixed(1)} s)${extra}`);
+        const when = recordedAt != null ? `„${name}"` : `${name} (keine Aufnahmezeit in der Datei)`;
+        msgs.push(`${f.name}: ${records.length} Punkte importiert (${records[records.length - 1].t.toFixed(1)} s) als ${when}${extra}`);
       } catch (e: any) {
         msgs.push(`${f.name}: Fehler – ${e.message ?? e}`);
       }

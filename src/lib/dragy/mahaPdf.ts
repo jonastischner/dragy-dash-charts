@@ -5,6 +5,7 @@
 import { jsPDF } from "jspdf";
 import { computeSegment, W_TO_PS } from "./physics";
 import type { Segment, Session, Vehicle } from "./types";
+import { sessionTimestamp } from "./sessionTime";
 
 export interface PdfHeaderInfo {
   vehicleType?: string;
@@ -128,7 +129,8 @@ function drawPage(doc: jsPDF, d: RunPdfData, info: PdfHeaderInfo) {
   doc.setTextColor(...COL.text);
 
   /* --- Kopfzeile --- */
-  const dt = new Date(d.session.createdAt);
+  // Meßdatum ist die Aufnahme, nicht der Import.
+  const dt = new Date(sessionTimestamp(d.session));
   const stamp = `${String(dt.getDate()).padStart(2, "0")}.${String(dt.getMonth() + 1).padStart(2, "0")}.${dt.getFullYear()} (${String(dt.getHours()).padStart(2, "0")}:${String(dt.getMinutes()).padStart(2, "0")})`;
   doc.setFontSize(8);
   doc.text(`Meßdatum: ${stamp}`, M, M);
