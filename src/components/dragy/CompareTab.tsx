@@ -5,9 +5,10 @@ import type { RunPdfData } from "@/lib/dragy/mahaPdf";
 import { useAppStore } from "@/lib/dragy/store";
 import { computeSegment, W_TO_PS } from "@/lib/dragy/physics";
 import { Chart, type Series } from "./Chart";
-import type { ModuleId } from "@/lib/dragy/types";
+import type { ModuleId, Segment } from "@/lib/dragy/types";
 import { isPowerModule, sessionModule } from "@/lib/dragy/modules";
 import { sessionCorrection, useCorrectionStandard } from "./useCorrection";
+import { compareNames } from "@/lib/dragy/sort";
 import { CORRECTION_LABEL } from "@/lib/dragy/correction";
 
 type Mode = "pWheel" | "pEngine" | "tqWheel" | "tqEngine" | "accel";
@@ -33,7 +34,13 @@ export function CompareTab({ module = "power", onOpenVehicles }: { module?: Modu
   const segments = useMemo(() => {
     if (!activeVehicle) return [];
     const own = state.sessions.filter((s) => s.vehicleId === activeVehicle.id && sessionModule(s) === module);
-    return state.segments.filter((g) => own.some((s) => s.id === g.sessionId));
+    const ownById = new Map(own.map((s) => [s.id, s]));
+    // Nach dem Legenden-Text sortieren, nicht nach dem Lauf-Namen allein –
+    // sonst stünde die Legende anders als die Tabelle darunter.
+    const label = (g: Segment) => `${ownById.get(g.sessionId)?.name ?? ""} · ${g.name}`;
+    return state.segments
+      .filter((g) => ownById.has(g.sessionId))
+      .sort((a, b) => compareNames(label(a), label(b)) || a.id.localeCompare(b.id));
   }, [state, activeVehicle, module]);
 
   if (!activeVehicle) return <Section title="Vergleich"><EmptyState title="Kein aktives Fahrzeug" description="Wähle ein Fahrzeug, um Läufe zu vergleichen." actionLabel="Zur Garage" onAction={onOpenVehicles} /></Section>;

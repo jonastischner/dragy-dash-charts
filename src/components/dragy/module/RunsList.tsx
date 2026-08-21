@@ -9,7 +9,8 @@ import { computeRpmFactor, resolveAllGears } from "@/lib/dragy/gear";
 import { uid } from "@/lib/dragy/db";
 import type { ModuleId, Session, Segment, Vehicle } from "@/lib/dragy/types";
 import { MODULE_IDS, MODULE_LABEL, isPowerModule, isTrackModule, sessionModule } from "@/lib/dragy/modules";
-import { formatSessionTime, sessionTimestamp } from "@/lib/dragy/sessionTime";
+import { formatSessionTime } from "@/lib/dragy/sessionTime";
+import { sortedByName } from "@/lib/dragy/sort";
 import { Chart, type Series } from "../Chart";
 import { PdfExportDialog } from "../PdfExportDialog";
 import { CorrectionNote } from "../CorrectionNote";
@@ -40,9 +41,9 @@ export function RunsList({ module, onOpenGarage }: { module: ModuleId; onOpenGar
   const vehicleSessionIds = new Set(state.sessions.filter((s) => s.vehicleId === activeVehicle.id).map((s) => s.id));
   const usedColors = state.segments.filter((g) => vehicleSessionIds.has(g.sessionId)).map((g) => g.color);
 
-  const sessions = state.sessions
-    .filter((s) => s.vehicleId === activeVehicle.id && sessionModule(s) === module)
-    .sort((a, b) => sessionTimestamp(b) - sessionTimestamp(a));
+  const sessions = sortedByName(
+    state.sessions.filter((s) => s.vehicleId === activeVehicle.id && sessionModule(s) === module),
+  );
 
   return (
     <Section title={`Sessions – ${MODULE_LABEL[module]}`} note={activeVehicle.name}>
@@ -54,7 +55,9 @@ export function RunsList({ module, onOpenGarage }: { module: ModuleId; onOpenGar
 
       <ul className="space-y-2">
         {sessions.map((s) => {
-          const segs = state.segments.filter((g) => g.sessionId === s.id);
+          // Einmal sortiert – Bänder, Kurven, Spitzenwerte und die Lauf-Liste
+          // hängen alle an diesem Array und bleiben so untereinander konsistent.
+          const segs = sortedByName(state.segments.filter((g) => g.sessionId === s.id));
           const isOpen = expanded === s.id;
           const dur = s.records.length ? s.records[s.records.length - 1].t : 0;
           return (

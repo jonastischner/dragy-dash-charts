@@ -1,0 +1,39 @@
+// Einheitliche Sortierung für alle Listen und Diagramm-Serien.
+//
+// Ein gemeinsamer Collator statt verstreuter localeCompare-Aufrufe: nur so
+// stehen Session-Liste, Legende und Tabellen garantiert in derselben Reihenfolge.
+
+const collator = new Intl.Collator("de", {
+  // "Lauf 2" vor "Lauf 10" – reiner Zeichenvergleich würde "Lauf 10" vorziehen,
+  // weil "1" < "2" ist.
+  numeric: true,
+  // Groß-/Kleinschreibung und Akzente sollen die Reihenfolge nicht bestimmen.
+  sensitivity: "base",
+});
+
+/**
+ * Namen alphabetisch aufsteigend, Zahlen darin natürlich sortiert.
+ *
+ * Achtung bei importierten Sessions: die heißen "20.08.2026 22:04", und
+ * alphabetisch heißt dort nach Tag, dann Monat. "05.09." landet damit vor
+ * "20.08." – die Liste ist alphabetisch korrekt, aber nicht chronologisch.
+ * Wer chronologisch will, muss das Namensformat in sessionTime.ts auf
+ * "2026-08-20 22:04" umstellen; dann fallen beide Ordnungen zusammen.
+ */
+export function compareNames(a: string, b: string): number {
+  return collator.compare(a, b);
+}
+
+/**
+ * Vergleicher für benannte Objekte. Die id als Stichentscheid hält die
+ * Reihenfolge auch bei doppelten Namen stabil – sonst hinge sie an der
+ * Lesereihenfolge aus IndexedDB und könnte zwischen zwei Aufrufen wechseln.
+ */
+export function byName<T extends { name: string; id: string }>(a: T, b: T): number {
+  return compareNames(a.name, b.name) || a.id.localeCompare(b.id);
+}
+
+/** Kopie der Liste, alphabetisch aufsteigend nach Name. */
+export function sortedByName<T extends { name: string; id: string }>(items: T[]): T[] {
+  return [...items].sort(byName);
+}
