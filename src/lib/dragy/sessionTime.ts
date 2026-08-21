@@ -12,7 +12,12 @@ const MAX_EPOCH_S = 4102444800; // 2100-01-01
 const p2 = (n: number) => String(n).padStart(2, "0");
 
 /**
- * „20.08.2026 22:04" – in der Zeitzone des Geräts.
+ * „2026-08-20 22:04" – in der Zeitzone des Geräts.
+ *
+ * ISO-Reihenfolge (Jahr, Monat, Tag) mit Absicht: die Listen sind alphabetisch
+ * sortiert, und nur in dieser Reihenfolge fällt alphabetisch mit chronologisch
+ * zusammen. Mit „20.08.2026" würde nach Tag vor Monat sortiert, ein Lauf vom
+ * 5. September stünde also vor einem vom 20. August.
  *
  * Gespeichert wird immer der zeitzonenfreie Epoch-Wert; erst hier wird
  * daraus Ortszeit. Ein in Spanien aufgenommener Lauf zeigt zu Hause also
@@ -21,7 +26,7 @@ const p2 = (n: number) => String(n).padStart(2, "0");
  */
 export function formatSessionTime(ms: number): string {
   const d = new Date(ms);
-  return `${p2(d.getDate())}.${p2(d.getMonth() + 1)}.${d.getFullYear()} ${p2(d.getHours())}:${p2(d.getMinutes())}`;
+  return `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())} ${p2(d.getHours())}:${p2(d.getMinutes())}`;
 }
 
 /**

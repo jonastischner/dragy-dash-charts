@@ -14,11 +14,10 @@ const collator = new Intl.Collator("de", {
 /**
  * Namen alphabetisch aufsteigend, Zahlen darin natürlich sortiert.
  *
- * Achtung bei importierten Sessions: die heißen "20.08.2026 22:04", und
- * alphabetisch heißt dort nach Tag, dann Monat. "05.09." landet damit vor
- * "20.08." – die Liste ist alphabetisch korrekt, aber nicht chronologisch.
- * Wer chronologisch will, muss das Namensformat in sessionTime.ts auf
- * "2026-08-20 22:04" umstellen; dann fallen beide Ordnungen zusammen.
+ * Importierte Sessions heißen "2026-08-20 22:04" (siehe formatSessionTime in
+ * sessionTime.ts). Diese ISO-Reihenfolge ist die Voraussetzung dafür, dass die
+ * alphabetische Sortierung hier zugleich chronologisch ist – wer das Format auf
+ * "20.08.2026" umstellt, sortiert nach Tag vor Monat und bricht das.
  */
 export function compareNames(a: string, b: string): number {
   return collator.compare(a, b);
