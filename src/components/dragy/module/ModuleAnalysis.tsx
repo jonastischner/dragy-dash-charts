@@ -1,10 +1,11 @@
 import { useMemo } from "react";
-import { Section, Field, Select, Note, Note as _N, usePersistedState } from "../ui";
-import { computeSegment, splitTime, distanceRun, runDistance, W_TO_PS } from "@/lib/dragy/physics";
+import { Section, Field, Select, Note, Row, usePersistedState } from "../ui";
+import { computeSegment, splitTime, distanceRun, runDistance, W_TO_PS, ACCEL_SPLITS } from "@/lib/dragy/physics";
 import type { ModuleId, Segment, Session, Vehicle } from "@/lib/dragy/types";
 import { isPowerModule } from "@/lib/dragy/modules";
 import { sessionCorrection, useCorrectionStandard } from "../useCorrection";
 import { CORRECTION_LABEL } from "@/lib/dragy/correction";
+import { CorrectionSelect } from "../CorrectionSelect";
 
 type Ctx = { sessions: Session[]; segments: Segment[]; vehicle: Vehicle };
 
@@ -78,14 +79,15 @@ function PowerAnalysis({ sessions, segments, vehicle }: Ctx) {
           )}
         </Note>
       )}
-      <div className="mt-2">
+      <Row className="mt-2">
         <Field label="Referenzlauf">
           <Select value={refKey} onChange={(e) => setRefKey(e.target.value)}>
             <option value="">– keine Referenz –</option>
             {rows.map((r) => <option key={r.key} value={r.key}>{r.session.name} – {r.seg.name}</option>)}
           </Select>
         </Field>
-      </div>
+        <CorrectionSelect />
+      </Row>
       <div className="mt-2 overflow-x-auto">
         <table className="w-full text-caption text-foreground">
           <thead className="text-muted-foreground">
@@ -163,12 +165,10 @@ function PowerAnalysis({ sessions, segments, vehicle }: Ctx) {
 
 /* ---------------- Beschleunigung ---------------- */
 
-const SPLITS: Array<[number, number]> = [[0, 100], [100, 200], [60, 130], [80, 120]];
-
 function AccelAnalysis({ sessions, segments, vehicle }: Ctx) {
   const rows = useMemo(() => segsOf(sessions, segments).map(({ session, seg }) => ({
     key: `${session.id}:${seg.id}`, session, seg,
-    splits: SPLITS.map(([a, b]) => splitTime(session.records, seg.startT, seg.endT, a, b)),
+    splits: ACCEL_SPLITS.map(([a, b]) => splitTime(session.records, seg.startT, seg.endT, a, b)),
     quarter: distanceRun(session.records, seg.startT, seg.endT),
   })), [sessions, segments]);
 
@@ -176,7 +176,7 @@ function AccelAnalysis({ sessions, segments, vehicle }: Ctx) {
     return <Section title="Auswertung"><p className="text-caption text-muted-foreground">Noch keine Läufe zum Auswerten.</p></Section>;
   }
 
-  const bestPerSplit = SPLITS.map((_, i) => {
+  const bestPerSplit = ACCEL_SPLITS.map((_, i) => {
     const vals = rows.map((r) => r.splits[i]).filter((v): v is number => v != null);
     return vals.length ? Math.min(...vals) : null;
   });
@@ -190,7 +190,7 @@ function AccelAnalysis({ sessions, segments, vehicle }: Ctx) {
             <tr>
               <th className="py-1 pr-2 text-left font-medium">Session</th>
               <th className="py-1 pr-2 text-left font-medium">Lauf</th>
-              {SPLITS.map(([a, b]) => <th key={`${a}-${b}`} className="py-1 pr-2 text-right font-medium">{a}–{b}</th>)}
+              {ACCEL_SPLITS.map(([a, b]) => <th key={`${a}-${b}`} className="py-1 pr-2 text-right font-medium">{a}–{b}</th>)}
               <th className="py-1 pr-2 text-right font-medium">1/4 Meile</th>
               <th className="py-1 pr-2 text-right font-medium">Trap</th>
             </tr>

@@ -3,7 +3,7 @@ import { Section, Field, TextInput, TextArea, NumInput, Select, Button, Note, Ro
 import { useAppStore, nextUnusedColor } from "@/lib/dragy/store";
 import {
   autoDetectSegments, computeSegment, splitTime, distanceRun, runDistance,
-  coastdownFit, autoDetectCoastdown, STD_ENV, W_TO_PS,
+  coastdownFit, autoDetectCoastdown, STD_ENV, W_TO_PS, ACCEL_SPLITS,
 } from "@/lib/dragy/physics";
 import { computeRpmFactor, resolveAllGears } from "@/lib/dragy/gear";
 import { uid } from "@/lib/dragy/db";
@@ -22,8 +22,6 @@ function recordedLabel(s: Session): string | null {
   const stamp = formatSessionTime(s.recordedAt);
   return s.name.trim() === stamp ? null : stamp;
 }
-
-const ACCEL_SPLITS: Array<[number, number]> = [[0, 100], [100, 200], [60, 130], [80, 120]];
 
 export function RunsList({ module, onOpenGarage }: { module: ModuleId; onOpenGarage?: () => void }) {
   const { state, saveSession, deleteSession, saveSegment, deleteSegment } = useAppStore();
@@ -107,6 +105,7 @@ function SessionDetail({ module, session, segments, usedColors, vehicle, onRenam
   onEnvUpdate: (patch: Partial<Session>) => Promise<void>;
 }) {
   const [name, setName] = useState(session.name);
+  const correction = useSessionCorrection(session);
   const [autoStart, setAutoStart] = useState(30);
   const [autoTarget, setAutoTarget] = useState(150);
   const [autoMin, setAutoMin] = useState(40);
@@ -148,15 +147,20 @@ function SessionDetail({ module, session, segments, usedColors, vehicle, onRenam
 
   return (
     <div className="border-t border-border p-3">
-      <Row>
+      <div>
         <Field label="Name"><TextInput value={name} onChange={(e) => setName(e.target.value)} onBlur={() => onRename(name)} /></Field>
-        <div className="flex items-end justify-end"><Button variant="danger" onClick={onDelete}>Session löschen</Button></div>
-      </Row>
-      <Row className="mt-2">
-        <Field label="Temperatur (°C)" hint="leer = nicht gemessen"><NumInput allowEmpty placeholder={`${STD_ENV.tempC}`} value={session.tempC ?? ""} onChange={(e) => onEnvUpdate({ tempC: e.target.value === "" ? undefined : +e.target.value })} /></Field>
-        <Field label="Druck (hPa)" hint="leer = nicht gemessen"><NumInput allowEmpty placeholder={`${STD_ENV.pressureHpa}`} value={session.pressureHpa ?? ""} onChange={(e) => onEnvUpdate({ pressureHpa: e.target.value === "" ? undefined : +e.target.value })} /></Field>
-        <Field label="Luftfeuchte (%)" hint="leer = nicht gemessen"><NumInput allowEmpty placeholder={`${STD_ENV.rh}`} value={session.rh ?? ""} onChange={(e) => onEnvUpdate({ rh: e.target.value === "" ? undefined : +e.target.value })} /></Field>
-      </Row>
+      </div>
+      {/* Drei Felder in einer Zeile mit einem gemeinsamen Hinweis – dreimal
+          derselbe Hinweistext war der größte Platzfresser am Kopf. */}
+      <div className="mt-2">
+        <span className="mb-1 block text-caption text-muted-foreground">Umgebung (für Luftdichte und Normkorrektur)</span>
+        <Row cols={3}>
+          <NumInput allowEmpty aria-label="Temperatur (°C)" placeholder={`${STD_ENV.tempC} °C`} value={session.tempC ?? ""} onChange={(e) => onEnvUpdate({ tempC: e.target.value === "" ? undefined : +e.target.value })} />
+          <NumInput allowEmpty aria-label="Luftdruck (hPa)" placeholder={`${STD_ENV.pressureHpa} hPa`} value={session.pressureHpa ?? ""} onChange={(e) => onEnvUpdate({ pressureHpa: e.target.value === "" ? undefined : +e.target.value })} />
+          <NumInput allowEmpty aria-label="Relative Luftfeuchte (%)" placeholder={`${STD_ENV.rh} %`} value={session.rh ?? ""} onChange={(e) => onEnvUpdate({ rh: e.target.value === "" ? undefined : +e.target.value })} />
+        </Row>
+        <span className="mt-1 block text-caption text-muted-foreground">°C · hPa · % rF — leer = nicht gemessen</span>
+      </div>
 
       <div className="mt-2">
         <Field label="Notizen zur Session" hint="z.B. Strecke, Wetter, Setup">
@@ -191,9 +195,14 @@ function SessionDetail({ module, session, segments, usedColors, vehicle, onRenam
       </details>
 
       <div className="mt-2">
-        <Chart series={speedSeries} bands={bands} xLabel="t (s)" yLabel="km/h" xFormat={(v) => v.toFixed(1)} yFormat={(v) => v.toFixed(0)} />
+        <span className="mb-1 block text-caption font-semibold text-muted-foreground">Geschwindigkeitsverlauf</span>
+        <Chart series={speedSeries} bands={bands} xLabel="t (s)" yLabel="km/h" xFormat={(v) => v.toFixed(1)} yFormat={(v) => v.toFixed(0)} showLegend={false} />
       </div>
 
+      <h4 className="mt-4 text-body font-semibold text-foreground">Ergebnisse</h4>
+      {/* Der Korrektur-Hinweis steht einmal für die ganze Gruppe. Vorher hing er
+          in SessionCurves und PeakOverview – zwei identische Kästen untereinander. */}
+      <CorrectionNote correction={correction} />
       {isPowerModule(module) && (
         <>
           <SessionCurves session={session} segments={segments} vehicle={vehicle} />
@@ -203,19 +212,25 @@ function SessionDetail({ module, session, segments, usedColors, vehicle, onRenam
       {module === "accel" && <AccelOverview session={session} segments={segments} />}
       {isTrackModule(module) && <TrackOverview session={session} segments={segments} />}
 
-      <div className="mt-3 rounded-md border border-border p-3">
-        <div className="text-caption font-semibold text-foreground">Auto-Erkennung (Vorschlag, danach prüfen)</div>
-        <Note>Sucht rückwärts von Zielgeschwindigkeit zum tiefsten Punkt des vorangegangenen Anstiegs.</Note>
-        <Row className="mt-2">
-          <Field label="Start ≈ (km/h)"><NumInput value={autoStart} onChange={(e) => setAutoStart(+e.target.value)} /></Field>
-          <Field label="Ziel ≈ (km/h)"><NumInput value={autoTarget} onChange={(e) => setAutoTarget(+e.target.value)} /></Field>
-          <Field label="Min. Anstieg (km/h)"><NumInput value={autoMin} onChange={(e) => setAutoMin(+e.target.value)} /></Field>
-        </Row>
-        <Button className="mt-2" variant="secondary" onClick={doAutoDetect}>Läufe erkennen</Button>
-      </div>
+      <h4 className="mt-4 text-body font-semibold text-foreground">Läufe</h4>
+      {/* Ohne open-Attribut bleibt das <details> unkontrolliert und damit
+          zuklappbar; ein festes open={…} würde bei jedem Re-Render aufspringen. */}
+      <details className="mt-1 rounded-md border border-border bg-card/50" {...(segments.length === 0 ? { open: true } : {})}>
+        <summary className="cursor-pointer select-none px-3 py-2 text-caption font-semibold text-muted-foreground">
+          Auto-Erkennung (Vorschlag, danach prüfen)
+        </summary>
+        <div className="p-3">
+          <Note>Sucht rückwärts von Zielgeschwindigkeit zum tiefsten Punkt des vorangegangenen Anstiegs.</Note>
+          <Row className="mt-2" cols={3}>
+            <Field label="Start ≈ (km/h)"><NumInput value={autoStart} onChange={(e) => setAutoStart(+e.target.value)} /></Field>
+            <Field label="Ziel ≈ (km/h)"><NumInput value={autoTarget} onChange={(e) => setAutoTarget(+e.target.value)} /></Field>
+            <Field label="Min. Anstieg (km/h)"><NumInput value={autoMin} onChange={(e) => setAutoMin(+e.target.value)} /></Field>
+          </Row>
+          <Button className="mt-2" variant="secondary" onClick={doAutoDetect}>Läufe erkennen</Button>
+        </div>
+      </details>
 
-      <div className="mt-3">
-        <h4 className="mb-1 text-body font-semibold text-foreground">Läufe</h4>
+      <div className="mt-2">
         <ul className="space-y-2">
           {segments.map((g) => (
             <SegmentEditor
@@ -229,6 +244,11 @@ function SessionDetail({ module, session, segments, usedColors, vehicle, onRenam
         <div className="mt-2">
           <Button variant="secondary" onClick={addSegment}>+ Lauf</Button>
         </div>
+      </div>
+
+      {/* Ganz ans Ende, weg von den häufig benutzten Bedienelementen. */}
+      <div className="mt-6 flex justify-end border-t border-border pt-3">
+        <Button variant="danger" onClick={onDelete}>Session löschen</Button>
       </div>
     </div>
   );
@@ -261,6 +281,21 @@ function SegmentEditor({ module, seg, session, vehicle, maxT, onChange, onDelete
 
   const flatGearOptions: GearOpt[] = gearboxGroups.flatMap((g) => g.options);
   const hasAny = flatGearOptions.length + legacyPresets.length > 0;
+
+  // Der gewählte Gang und der tatsächlich gerechnete rpmFactor können
+  // auseinanderlaufen, wenn die Fahrzeug-Übersetzung nach der Messung geändert
+  // wurde. Gerechnet wird mit seg.rpmFactor – das Dropdown suggeriert aber, der
+  // Wert käme aus dem Gang. Da der Faktor die ganze Drehmomentkurve staucht,
+  // muss diese Abweichung sichtbar sein.
+  const selectedGear = seg.gearPresetId
+    ? [...flatGearOptions, ...legacyPresets.map((lp) => ({ id: lp.id, label: lp.name, rpmFactor: lp.rpmFactor }))]
+        .find((x) => x.id === seg.gearPresetId)
+    : undefined;
+  const gearMismatch =
+    selectedGear && Number.isFinite(selectedGear.rpmFactor) && Number.isFinite(seg.rpmFactor)
+      && Math.abs(selectedGear.rpmFactor - seg.rpmFactor) > 0.01
+      ? selectedGear
+      : null;
   const isPower = isPowerModule(module);
   const [pdfOpen, setPdfOpen] = useState(false);
   const correction = useSessionCorrection(session);
@@ -329,6 +364,38 @@ function SegmentEditor({ module, seg, session, vehicle, maxT, onChange, onDelete
         )}
       </Row>
 
+      {gearMismatch && (
+        <p className="mt-2 text-caption text-warning">
+          „{gearMismatch.label}" ergibt {gearMismatch.rpmFactor.toFixed(2).replace(".", ",")} U/min pro km/h –
+          gerechnet wird mit {seg.rpmFactor.toFixed(2).replace(".", ",")}. Vermutlich wurde die
+          Fahrzeug-Übersetzung nach der Messung geändert.{" "}
+          <button
+            type="button"
+            className="underline"
+            onClick={() => onChange({ rpmFactor: +gearMismatch.rpmFactor.toFixed(3) })}
+          >
+            Auf {gearMismatch.rpmFactor.toFixed(2).replace(".", ",")} setzen
+          </button>
+        </p>
+      )}
+
+      {/* Direkt unter den Feldern: Start/Ende verschieben den Ausschnitt,
+          Gang/rpmFactor skalieren die x-Achse – das Diagramm ist die Rückmeldung darauf. */}
+      <div className="mt-2">
+        <div className="mb-1 text-caption font-semibold text-muted-foreground">
+          {isPower ? "Leistung (PS) über Drehzahl" : "Geschwindigkeit (km/h) über Zeit"}
+        </div>
+        <Chart
+          series={miniSeries}
+          height={160}
+          xLabel={isPower ? "U/min" : "t (s)"}
+          yLabel={isPower ? "PS" : "km/h"}
+          xFormat={(v) => v.toFixed(isPower ? 0 : 1)}
+          yFormat={(v) => v.toFixed(0)}
+          showLegend={false}
+        />
+      </div>
+
       <div className="mt-2">
         <Field label="Notizen zum Lauf" hint="z.B. Gang, Bedingungen, Auffälligkeiten">
           <TextArea rows={2} value={seg.notes ?? ""} onChange={(e) => onChange({ notes: e.target.value })} placeholder="Notizen…" />
@@ -346,19 +413,6 @@ function SegmentEditor({ module, seg, session, vehicle, maxT, onChange, onDelete
         <PdfExportDialog runs={[{ session, segment: seg, vehicle }]} onClose={() => setPdfOpen(false)} />
       )}
 
-      <div className="mt-2">
-        <div className="mb-1 text-caption font-semibold text-muted-foreground">
-          {isPower ? "Leistung (PS) über Drehzahl" : "Geschwindigkeit (km/h) über Zeit"}
-        </div>
-        <Chart
-          series={miniSeries}
-          height={160}
-          xLabel={isPower ? "U/min" : "t (s)"}
-          yLabel={isPower ? "PS" : "km/h"}
-          xFormat={(v) => v.toFixed(isPower ? 0 : 1)}
-          yFormat={(v) => v.toFixed(0)}
-        />
-      </div>
     </li>
   );
 }
@@ -414,6 +468,7 @@ function CoastdownPanel({ session, seg, vehicle, onChange }: {
                 series={[{ label: "km/h", color: "#38bdf8", points: session.records.map((r) => ({ x: r.t, y: r.speedKmh })) }]}
                 bands={[{ xStart: range.startT, xEnd: range.endT, color: "#f59e0b", label: "Coastdown" }]}
                 height={160} xLabel="t (s)" yLabel="km/h" xFormat={(v) => v.toFixed(1)} yFormat={(v) => v.toFixed(0)}
+                showLegend={false}
               />
             </div>
             {fit && (
@@ -478,7 +533,6 @@ function PeakOverview({ session, segments, vehicle }: { session: Session; segmen
     <div className="mt-3 rounded-md border border-border p-3">
       <div className="text-caption font-semibold text-foreground">Spitzenwerte je Lauf (Motor, geschätzt)</div>
       <Note>Maximale Motorleistung/-drehmoment mit zugehöriger Drehzahl. Referenzlauf wählen, um Abweichungen zu sehen.</Note>
-      <CorrectionNote correction={correction} />
       <div className="mt-2">
         <Field label="Referenzlauf">
           <Select value={refId} onChange={(e) => setRefId(e.target.value)}>
@@ -578,13 +632,12 @@ function SessionCurves({ session, segments, vehicle }: { session: Session; segme
     <div className="mt-3 rounded-md border border-border p-3">
       <div className="text-caption font-semibold text-foreground">Kurven dieser Session</div>
       <Note>Alle Läufe überlagert. Legende zum Ein-/Ausblenden antippen.</Note>
-      {mode === "pWheel" && correction.applied ? (
+      {/* Nur der modusabhängige Hinweis; der allgemeine steht einmal über den Ergebnissen. */}
+      {mode === "pWheel" && correction.applied && (
         <Note>
           Radleistung ist ein Messwert – die Normkorrektur gilt nur für die Motorleistung und wird
           hier deshalb nicht angewendet.
         </Note>
-      ) : (
-        <CorrectionNote correction={correction} />
       )}
       <div className="mt-2">
         <Field label="Diagramm">
