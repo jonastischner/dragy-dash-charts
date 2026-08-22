@@ -6,6 +6,7 @@ import { jsPDF } from "jspdf";
 import { computeSegment, W_TO_PS } from "./physics";
 import type { Segment, Session, Vehicle } from "./types";
 import { sessionTimestamp } from "./sessionTime";
+import { correctionFactor, CORRECTION_LABEL, type CorrectionResult, type CorrectionStandard } from "./correction";
 
 export interface PdfHeaderInfo {
   vehicleType?: string;
@@ -41,7 +42,7 @@ export interface RunPdfData {
   vehicle: Vehicle;
 }
 
-function buildCurves(d: RunPdfData): Curve[] {
+function buildCurves(d: RunPdfData, alpha = 1): Curve[] {
   const samples = computeSegment(d.session, d.segment, d.vehicle)
     .filter((s) => Number.isFinite(s.rpm) && s.rpm > 0 && Number.isFinite(s.pEngineW));
   if (samples.length === 0) return [];
@@ -72,8 +73,9 @@ function buildCurves(d: RunPdfData): Curve[] {
       rpm: s.rpm,
       pWheel: s.pWheelW * W_TO_PS,
       pDrag: s.pDragW * W_TO_PS,
-      pEngine: s.pEngineW * W_TO_PS,
-      nm: s.torqueEngineNm,
+      // alpha wirkt nur auf die Motorgrößen; Rad- und Schleppleistung sind Messwerte.
+      pEngine: s.pEngineW * W_TO_PS * alpha,
+      nm: s.torqueEngineNm * alpha,
     };
     if (!cur) buckets.set(key, { n: 1, c: add });
     else {
@@ -111,6 +113,16 @@ function peaks(curves: Curve[], d: RunPdfData) {
   };
 }
 
+/** Fußnote je nach Korrekturzustand – sie darf nie "normiert" behaupten, wenn alpha = 1 blieb. */
+function footnote(standard: CorrectionStandard, corr: CorrectionResult): string {
+  const base = "GPS-basierte Messung (kein Rollenprüfstand). Motorleistung/-drehmoment sind Schätzungen aus Radleistung + Schleppkurve";
+  if (standard === "none") return `${base}; keine Normkorrektur nach EWG 80/1269.`;
+  if (!corr.applied) {
+    return `${base}. ${CORRECTION_LABEL[standard]} gewählt, mangels Umgebungsdaten (${corr.missing.join(", ")}) aber nicht angewandt – die Werte sind unkorrigiert.`;
+  }
+  return `${base}. Motorwerte auf ${CORRECTION_LABEL[standard]} normiert (alpha = ${corr.alpha.toFixed(3).replace(".", ",")}); Radleistung und Schleppleistung bleiben Messwerte.`;
+}
+
 function drawPolyline(doc: jsPDF, pts: Array<[number, number]>) {
   if (pts.length < 2) return;
   const lines = pts.slice(1).map((p, i) => [p[0] - pts[i][0], p[1] - pts[i][1]] as [number, number]);
@@ -118,11 +130,19 @@ function drawPolyline(doc: jsPDF, pts: Array<[number, number]>) {
 }
 
 /** Zeichnet eine komplette Protokollseite in ein bestehendes Dokument. */
-function drawPage(doc: jsPDF, d: RunPdfData, info: PdfHeaderInfo) {
+/** Korrektur dieses Laufs – alpha gilt je Session, bei Sammel-Exporten also je Seite. */
+function runCorrection(d: RunPdfData, standard: CorrectionStandard): CorrectionResult {
+  return correctionFactor(standard, d.session.tempC, d.session.pressureHpa, d.session.rh);
+}
+
+function drawPage(doc: jsPDF, d: RunPdfData, info: PdfHeaderInfo, standard: CorrectionStandard) {
   const W = doc.internal.pageSize.getWidth();
   const H = doc.internal.pageSize.getHeight();
   const M = 12;
-  const curves = buildCurves(d);
+  const corr = runCorrection(d, standard);
+  const curves = buildCurves(d, corr.alpha);
+  // Gemessene Werte separat, damit P_Mot und P_Norm nebeneinander stehen können.
+  const rawPeaks = corr.applied ? peaks(buildCurves(d, 1), d) : null;
   const p = peaks(curves, d);
 
   doc.setFont("helvetica", "normal");
@@ -224,8 +244,10 @@ function drawPage(doc: jsPDF, d: RunPdfData, info: PdfHeaderInfo) {
   const legend: Array<[string, [number, number, number]]> = [
     ["P-Rad [PS]", COL.wheel],
     ["P-Schlepp [PS]", COL.drag],
-    ["P-Motor [PS]", COL.engine],
-    ["M-Motor [Nm]", COL.torque],
+    // Bei aktiver Norm zeigt die Kurve die normierten Motorwerte (wie beim Prüfstand);
+    // die gemessenen stehen in der Tabelle darunter.
+    [corr.applied ? "P-Motor norm. [PS]" : "P-Motor [PS]", COL.engine],
+    [corr.applied ? "M-Motor norm. [Nm]" : "M-Motor [Nm]", COL.torque],
   ];
   const lw = 34, lh = 4 + legend.length * 4;
   const lx = plot.x + 3, ly = plot.y + 3;
@@ -265,20 +287,30 @@ function drawPage(doc: jsPDF, d: RunPdfData, info: PdfHeaderInfo) {
     doc.text(value, x + w - 2, y, { align: "right" });
   };
 
-  const hLeft = 8 + rowH * 7;
+  const hLeft = 8 + rowH * (rawPeaks ? 9 : 7);
   box(M, tableY, colW - 2, hLeft, "Leistungsdaten");
   let y = tableY + 10;
   const kw = (ps: number) => `${de(ps)} PS / ${de(ps * 0.7355)} kW`;
-  kv(M, y, colW - 2, "Motorleistung", "P_Mot", kw(p.pEngine)); y += rowH;
+  if (rawPeaks) {
+    kv(M, y, colW - 2, "Motorleistung (gemessen)", "P_Mot", kw(rawPeaks.pEngine)); y += rowH;
+    kv(M, y, colW - 2, "Normleistung", "P_Norm", kw(p.pEngine)); y += rowH;
+  } else {
+    kv(M, y, colW - 2, "Motorleistung", "P_Mot", kw(p.pEngine)); y += rowH;
+  }
   kv(M, y, colW - 2, "Radleistung", "P_Rad", kw(p.pWheel)); y += rowH;
   kv(M, y, colW - 2, "Schleppleistung", "P_Schlepp", kw(p.pDrag)); y += rowH;
   kv(M, y, colW - 2, "Max. Leistung bei", "", `${de(p.pERpm, 0)} U/min / ${de(p.pEKmh)} km/h`); y += rowH;
-  kv(M, y, colW - 2, "Drehmoment", "M_Mot", `${de(p.nm)} Nm`); y += rowH;
+  if (rawPeaks) {
+    kv(M, y, colW - 2, "Drehmoment (gemessen)", "M_Mot", `${de(rawPeaks.nm)} Nm`); y += rowH;
+    kv(M, y, colW - 2, "Norm-Drehmoment", "M_Norm", `${de(p.nm)} Nm`); y += rowH;
+  } else {
+    kv(M, y, colW - 2, "Drehmoment", "M_Mot", `${de(p.nm)} Nm`); y += rowH;
+  }
   kv(M, y, colW - 2, "Max. Drehmoment bei", "", `${de(p.nmRpm, 0)} U/min / ${de(p.nmKmh)} km/h`); y += rowH;
   kv(M, y, colW - 2, "Max. erreichte Drehzahl", "", `${de(p.maxRpm, 0)} U/min / ${de(p.vMax)} km/h`);
 
   const x2 = M + colW;
-  const hEnv = 8 + rowH * 3;
+  const hEnv = 8 + rowH * (standard === "none" ? 3 : 5);
   box(x2, tableY, colW - 2, hEnv, "Umgebungsdaten");
   y = tableY + 10;
   // Nicht gepflegte Umgebungswerte werden als "n. a." ausgewiesen, statt den
@@ -287,6 +319,15 @@ function drawPage(doc: jsPDF, d: RunPdfData, info: PdfHeaderInfo) {
   kv(x2, y, colW - 2, "Umgebungs-Temperatur", "T_Umgebung", env(d.session.tempC, "°C")); y += rowH;
   kv(x2, y, colW - 2, "Luftdruck", "p_Luft", env(d.session.pressureHpa, "hPa")); y += rowH;
   kv(x2, y, colW - 2, "Relative Luftfeuchte", "H_Luft", env(d.session.rh, "%"));
+  if (standard !== "none") {
+    y += rowH;
+    kv(x2, y, colW - 2, "Normbedingungen", "", CORRECTION_LABEL[standard]); y += rowH;
+    // Ohne Umgebungsdaten bleibt alpha = 1 – das muss dastehen, statt "1,000"
+    // als gemessenen Faktor auszugeben.
+    kv(x2, y, colW - 2, "Korrekturfaktor", "alpha", corr.applied
+      ? de(corr.alpha, 3)
+      : `nicht angewandt (${corr.missing.join(", ")} fehlt)`);
+  }
 
   const hVeh = 8 + rowH * 5;
   box(x2, tableY + hEnv + 3, colW - 2, hVeh, "Fahrzeug- & Messdaten");
@@ -315,23 +356,23 @@ function drawPage(doc: jsPDF, d: RunPdfData, info: PdfHeaderInfo) {
   const notes = [d.session.notes, d.segment.notes].filter(Boolean).join(" · ");
   if (notes) doc.text(doc.splitTextToSize(`Notizen: ${notes}`, W - 2 * M).slice(0, 2), M, fy + 4);
   doc.text(
-    "GPS-basierte Messung (kein Rollenprüfstand). Motorleistung/-drehmoment sind Schätzungen aus Radleistung + Schleppkurve; keine Normkorrektur nach EWG 80/1269.",
+    footnote(standard, corr),
     M, H - M, { maxWidth: W - 2 * M },
   );
 }
 
-export function buildRunPdf(runs: RunPdfData[], info: PdfHeaderInfo): jsPDF {
+export function buildRunPdf(runs: RunPdfData[], info: PdfHeaderInfo, standard: CorrectionStandard = "none"): jsPDF {
   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
   runs.forEach((r, i) => {
     if (i > 0) doc.addPage();
-    drawPage(doc, r, info);
+    drawPage(doc, r, info, standard);
   });
   return doc;
 }
 
-export function exportRunPdf(runs: RunPdfData[], info: PdfHeaderInfo) {
+export function exportRunPdf(runs: RunPdfData[], info: PdfHeaderInfo, standard: CorrectionStandard = "none") {
   if (runs.length === 0) return;
-  const doc = buildRunPdf(runs, info);
+  const doc = buildRunPdf(runs, info, standard);
   const first = runs[0];
   const safe = (s: string) => s.replace(/[^\w\-]+/g, "_");
   const name = runs.length === 1

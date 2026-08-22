@@ -363,6 +363,40 @@ export function autoDetectSegments(
 
 const QUARTER_MILE_M = 402.336;
 
+/**
+ * Die Split-Paare der App – eine Quelle für Session-Ansicht, Bestenliste und
+ * Vergleich. Alle drei zeigten dieselben Werte aus je eigener Konstante.
+ */
+export const ACCEL_SPLITS: Array<[number, number]> = [[0, 100], [100, 200], [60, 130], [80, 120]];
+
+/**
+ * Erster Zeitpunkt (s), an dem der Lauf die Zielgeschwindigkeit von unten
+ * durchfährt – linear zwischen den Abtastpunkten interpoliert. null, wenn die
+ * Geschwindigkeit im Lauf nie erreicht wird.
+ */
+export function crossingTime(
+  records: Record[],
+  startT: number,
+  endT: number,
+  targetKmh: number,
+): number | null {
+  const rec = records.filter((r) => r.t >= startT && r.t <= endT);
+  return crossIn(rec, targetKmh, 1)?.t ?? null;
+}
+
+/** Interne Suche im bereits zugeschnittenen Ausschnitt; gibt auch den Index für Folgesuchen zurück. */
+function crossIn(rec: Record[], target: number, fromIdx: number): { t: number; idx: number } | null {
+  for (let i = Math.max(1, fromIdx); i < rec.length; i++) {
+    const a = rec[i - 1], b = rec[i];
+    if (a.speedKmh <= target && b.speedKmh >= target) {
+      const dv = b.speedKmh - a.speedKmh;
+      const t = dv === 0 ? b.t : a.t + ((target - a.speedKmh) / dv) * (b.t - a.t);
+      return { t, idx: i };
+    }
+  }
+  return null;
+}
+
 /** Zeit (s) zwischen zwei Geschwindigkeiten innerhalb eines Laufs, linear interpoliert. */
 export function splitTime(
   records: Record[],
@@ -373,20 +407,9 @@ export function splitTime(
 ): number | null {
   const rec = records.filter((r) => r.t >= startT && r.t <= endT);
   if (rec.length < 2) return null;
-  const cross = (target: number, fromIdx: number): { t: number; idx: number } | null => {
-    for (let i = Math.max(1, fromIdx); i < rec.length; i++) {
-      const a = rec[i - 1], b = rec[i];
-      if (a.speedKmh <= target && b.speedKmh >= target) {
-        const dv = b.speedKmh - a.speedKmh;
-        const t = dv === 0 ? b.t : a.t + ((target - a.speedKmh) / dv) * (b.t - a.t);
-        return { t, idx: i };
-      }
-    }
-    return null;
-  };
-  const a = cross(fromKmh, 1);
+  const a = crossIn(rec, fromKmh, 1);
   if (!a) return null;
-  const b = cross(toKmh, a.idx);
+  const b = crossIn(rec, toKmh, a.idx);
   if (!b) return null;
   const dt = b.t - a.t;
   return dt > 0 ? dt : null;

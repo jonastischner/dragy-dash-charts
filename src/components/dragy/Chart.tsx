@@ -19,9 +19,11 @@ interface Props {
   onLegendToggle?: (i: number) => void;
   xFormat?: (v: number) => string;
   yFormat?: (v: number) => string;
+  /** Legende ausblenden – für Diagramme mit nur einer Serie, wo sie nichts zu schalten gibt. */
+  showLegend?: boolean;
 }
 
-export function Chart({ series, bands = [], xLabel, yLabel, height = 280, onLegendToggle, xFormat, yFormat }: Props) {
+export function Chart({ series, bands = [], xLabel, yLabel, height = 280, onLegendToggle, xFormat, yFormat, showLegend = true }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const [hover, setHover] = useState<{ x: number } | null>(null);
@@ -177,7 +179,7 @@ export function Chart({ series, bands = [], xLabel, yLabel, height = 280, onLege
     <div ref={wrapRef} className="w-full">
       <canvas ref={canvasRef} onPointerMove={onMove} onPointerDown={onMove} onPointerLeave={onLeave} className="touch-none rounded-md" />
       <div className="mt-1 min-h-[1.25rem] text-caption text-muted-foreground">{hoverText}</div>
-      {series.length > 0 && (
+      {showLegend && series.length > 0 && (
         <div className="mt-1 flex flex-wrap gap-2">
           {series.map((s, i) => (
             <button key={i} type="button" onClick={() => onLegendToggle?.(i)}

@@ -3,7 +3,7 @@ import { FileText } from "lucide-react";
 import { Button, Field, TextInput, Note } from "./ui";
 import { exportRunPdf, type PdfHeaderInfo, type RunPdfData } from "@/lib/dragy/mahaPdf";
 import { useCorrectionStandard } from "./useCorrection";
-import { CORRECTION_LABEL } from "@/lib/dragy/correction";
+import { CorrectionSelect } from "./CorrectionSelect";
 
 function storeKey(vehicleId: string) { return `dragy.pdfHeader.${vehicleId}`; }
 
@@ -38,7 +38,7 @@ export function PdfExportDialog({ runs, onClose }: { runs: RunPdfData[]; onClose
 
   const submit = () => {
     try { localStorage.setItem(storeKey(vehicleId), JSON.stringify(info)); } catch { /* ignorieren */ }
-    exportRunPdf(runs, info);
+    exportRunPdf(runs, info, standard);
     onClose();
   };
 
@@ -60,15 +60,17 @@ export function PdfExportDialog({ runs, onClose }: { runs: RunPdfData[]; onClose
           <Field label="Kunde (optional)"><TextInput value={info.customer ?? ""} onChange={set("customer")} /></Field>
         </div>
 
+        <div className="mt-3">
+          <CorrectionSelect label="Normkorrektur im Protokoll" />
+        </div>
+
         <div className="mt-3 space-y-2">
-          <Note>GPS-Messung statt Rollenprüfstand: Motorwerte sind Schätzungen, ohne Normkorrektur nach EWG 80/1269. Das steht als Fußnote im PDF.</Note>
-          {standard !== "none" && (
-            <Note>
-              <b>Hinweis:</b> Die Normkorrektur ({CORRECTION_LABEL[standard]}) ist in der App aktiv,
-              das PDF enthält aber bewusst die unkorrigierten Messwerte. Die Zahlen im Protokoll
-              weichen deshalb von der Bildschirmanzeige ab.
-            </Note>
-          )}
+          <Note>
+            GPS-Messung statt Rollenprüfstand: Motorwerte sind Schätzungen.
+            {standard === "none"
+              ? " Das Protokoll weist sie als unkorrigiert aus."
+              : " Norm und Korrekturfaktor stehen im Protokoll; Radleistung bleibt Messwert."}
+          </Note>
         </div>
 
         <div className="mt-4 flex justify-end gap-2">

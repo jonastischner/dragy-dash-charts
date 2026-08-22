@@ -197,8 +197,10 @@ export function Note({ children }: { children: ReactNode }) {
   );
 }
 
-export function Row({ children, className = "" }: { children: ReactNode; className?: string }) {
-  return <div className={`grid grid-cols-2 gap-3 ${className}`}>{children}</div>;
+export function Row({ children, className = "", cols = 2 }: { children: ReactNode; className?: string; cols?: 2 | 3 }) {
+  // Literale Klassennamen – Tailwind wertet Template-Strings nicht aus.
+  const grid = cols === 3 ? "grid-cols-3" : "grid-cols-2";
+  return <div className={`grid ${grid} gap-3 ${className}`}>{children}</div>;
 }
 
 // Loading-Zustand für Inhaltsflächen (Skeleton statt Spinner)

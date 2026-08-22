@@ -1,9 +1,9 @@
 import { useMemo, useState } from "react";
-import { Section, Note, EmptyState, Button } from "./ui";
+import { Section, Note, EmptyState, Button, Field, NumInput, usePersistedState } from "./ui";
 import { PdfExportDialog } from "./PdfExportDialog";
 import type { RunPdfData } from "@/lib/dragy/mahaPdf";
 import { useAppStore } from "@/lib/dragy/store";
-import { computeSegment, W_TO_PS } from "@/lib/dragy/physics";
+import { computeSegment, W_TO_PS, ACCEL_SPLITS, crossingTime, splitTime } from "@/lib/dragy/physics";
 import { Chart, type Series } from "./Chart";
 import type { ModuleId } from "@/lib/dragy/types";
 import { isPowerModule, sessionModule } from "@/lib/dragy/modules";
@@ -20,8 +20,6 @@ const MODE_LABEL: Record<Mode, string> = {
   accel: "Beschleunigung (km/h vs. s)",
 };
 
-const SPLIT_TARGETS = [60, 100, 150, 200];
-
 export function CompareTab({ module = "power", onOpenVehicles }: { module?: ModuleId; onOpenVehicles?: () => void } = {}) {
   const { state, saveSegment } = useAppStore();
   const [standard] = useCorrectionStandard();
@@ -30,6 +28,8 @@ export function CompareTab({ module = "power", onOpenVehicles }: { module?: Modu
   const allowedModes: Mode[] = allowPower ? ["pWheel", "pEngine", "tqWheel", "tqEngine", "accel"] : ["accel"];
   const [mode, setMode] = useState<Mode>(allowPower ? "pWheel" : "accel");
   const [pdfOpen, setPdfOpen] = useState(false);
+  // null = automatisch, 0 = ab Segmentstart (altes Verhalten), sonst fester Wert.
+  const [alignKmh, setAlignKmh] = usePersistedState<number | null>("dragy.compare.alignKmh", null);
 
   const segments = useMemo(() => {
     if (!activeVehicle) return [];
@@ -61,13 +61,40 @@ export function CompareTab({ module = "power", onOpenVehicles }: { module?: Modu
     : 0;
 
 
+  // Ohne gemeinsame Startgeschwindigkeit beginnt jede Kurve bei dem Tempo, das
+  // am Segmentanfang zufällig anlag – ein Lauf, der 5 km/h schneller startet,
+  // liegt dann über die ganze Kurve vorn, ohne schneller zu sein.
+  const visibleAccel = segments.filter((g) => g.visible !== false);
+  const autoAlignKmh = (() => {
+    let hi = 0;
+    for (const g of visibleAccel) {
+      const session = state.sessions.find((s) => s.id === g.sessionId);
+      const first = session?.records.find((r) => r.t >= g.startT && r.t <= g.endT);
+      if (first && first.speedKmh > hi) hi = first.speedKmh;
+    }
+    // Auf die nächsten 5 km/h aufrunden: die niedrigste Geschwindigkeit, die
+    // alle sichtbaren Läufe sicher durchfahren.
+    return Math.ceil(hi / 5) * 5;
+  })();
+  const effAlignKmh = alignKmh ?? autoAlignKmh;
+  const alignedOut: string[] = [];
+
   const series: Series[] = segments.map((g) => {
     const session = state.sessions.find((s) => s.id === g.sessionId)!;
     if (isAccel) {
+      const label = `${session.name} · ${g.name}`;
+      const t0 = effAlignKmh > 0
+        ? crossingTime(session.records, g.startT, g.endT, effAlignKmh)
+        : g.startT;
+      if (t0 == null) {
+        // Erreicht die Ausrichtgeschwindigkeit nicht – nicht stillschweigend weglassen.
+        if (g.visible !== false) alignedOut.push(label);
+        return { label, color: g.color, points: [], visible: g.visible };
+      }
       const points = session.records
-        .filter((r) => r.t >= g.startT && r.t <= g.endT)
-        .map((r) => ({ x: r.t - g.startT, y: r.speedKmh }));
-      return { label: `${session.name} · ${g.name}`, color: g.color, points, visible: g.visible };
+        .filter((r) => r.t >= t0 && r.t <= g.endT)
+        .map((r) => ({ x: r.t - t0, y: r.speedKmh }));
+      return { label, color: g.color, points, visible: g.visible };
     }
     const samples = computeSegment(session, g, activeVehicle);
     // Faktor je Session – nur auf die Motorgrößen, Radwerte bleiben Messwerte.
@@ -92,29 +119,18 @@ export function CompareTab({ module = "power", onOpenVehicles }: { module?: Modu
 
 
 
-  // Split-Zeiten (nur im Beschleunigungs-Modus): lineare Interpolation an Zielgeschwindigkeit.
+  // Split-Zeiten über splitTime() – geschwindigkeitsverankert (von → bis) und
+  // damit unabhängig davon, wo die Segmentgrenze liegt. Die frühere eigene
+  // Rechnung maß ab Segmentstart und war zwischen Läufen nicht vergleichbar.
   const splitRows = isAccel
-    ? segments
-        .filter((g) => g.visible !== false)
-        .map((g) => {
-          const session = state.sessions.find((s) => s.id === g.sessionId)!;
-          const rec = session.records.filter((r) => r.t >= g.startT && r.t <= g.endT);
-          const t0 = rec[0]?.t ?? g.startT;
-          const splits: Record<number, number | null> = {};
-          for (const target of SPLIT_TARGETS) {
-            let found: number | null = null;
-            for (let i = 1; i < rec.length; i++) {
-              const a = rec[i - 1], b = rec[i];
-              if (a.speedKmh <= target && b.speedKmh >= target && b.speedKmh !== a.speedKmh) {
-                const frac = (target - a.speedKmh) / (b.speedKmh - a.speedKmh);
-                found = (a.t + frac * (b.t - a.t)) - t0;
-                break;
-              }
-            }
-            splits[target] = found;
-          }
-          return { label: `${session.name} · ${g.name}`, color: g.color, splits };
-        })
+    ? visibleAccel.map((g) => {
+        const session = state.sessions.find((s) => s.id === g.sessionId)!;
+        return {
+          label: `${session.name} · ${g.name}`,
+          color: g.color,
+          splits: ACCEL_SPLITS.map(([a, b]) => splitTime(session.records, g.startT, g.endT, a, b)),
+        };
+      })
     : [];
 
   // Übersicht: alle aktiven (sichtbaren) Läufe mit Peak-Resultaten.
@@ -161,7 +177,7 @@ export function CompareTab({ module = "power", onOpenVehicles }: { module?: Modu
         title="Vergleich"
         note={
           isAccel
-            ? "Beschleunigung: rein GPS-basiert, gangübergreifend – zeigt reale Zeit ab Segmentstart bis zur jeweiligen Geschwindigkeit."
+            ? "Beschleunigung: rein GPS-basiert, gangübergreifend. Alle Läufe starten bei derselben Geschwindigkeit, damit sie vergleichbar sind; die Split-Zeiten darunter sind ohnehin von Tempo zu Tempo gemessen."
             : "Motorleistung/-drehmoment sind Schätzungen (RPM aus Vmax abgeleitet, Schleppkurve als Näherung). Drehmoment ist gegenüber RPM-Faktor-Fehlern empfindlicher als die Leistung."
         }
       >
@@ -175,6 +191,31 @@ export function CompareTab({ module = "power", onOpenVehicles }: { module?: Modu
         </div>
 
 
+        {isAccel && (
+          <div className="mb-2">
+            <Field
+              label="Ausrichten ab (km/h)"
+              hint={
+                alignKmh == null
+                  ? `leer = automatisch – aktuell ${effAlignKmh} km/h, die niedrigste Geschwindigkeit, die alle sichtbaren Läufe durchfahren. 0 = ab Segmentstart.`
+                  : "leer = automatisch (gemeinsame Startgeschwindigkeit). 0 = ab Segmentstart."
+              }
+            >
+              <NumInput
+                allowEmpty
+                placeholder={`${autoAlignKmh}`}
+                value={alignKmh ?? ""}
+                onChange={(e) => setAlignKmh(e.target.value === "" ? null : Math.max(0, +e.target.value))}
+              />
+            </Field>
+            {alignedOut.length > 0 && (
+              <Note>
+                <b>Nicht im Diagramm:</b> {alignedOut.join(", ")} – {alignedOut.length === 1 ? "dieser Lauf erreicht" : "diese Läufe erreichen"}{" "}
+                {effAlignKmh} km/h nicht. Ausrichtgeschwindigkeit senken oder Segmentgrenzen prüfen.
+              </Note>
+            )}
+          </div>
+        )}
         {corrected && !isAccel && (
           <Note>
             {isEngineMode ? (
@@ -204,7 +245,7 @@ export function CompareTab({ module = "power", onOpenVehicles }: { module?: Modu
           <>
             <Chart
               series={series}
-              xLabel={isAccel ? "t (s)" : "U/min"}
+              xLabel={isAccel ? (effAlignKmh > 0 ? `s ab ${effAlignKmh} km/h` : "t (s)") : "U/min"}
               yLabel={isAccel ? "km/h" : MODE_LABEL[mode]}
               xFormat={(v) => (isAccel ? v.toFixed(2) : v.toFixed(0))}
               yFormat={(v) => v.toFixed(0)}
@@ -217,8 +258,8 @@ export function CompareTab({ module = "power", onOpenVehicles }: { module?: Modu
                   <thead className="text-muted-foreground">
                     <tr>
                       <th className="py-1 pr-2 text-left font-medium">Lauf</th>
-                      {SPLIT_TARGETS.map((t) => (
-                        <th key={t} className="py-1 pr-2 text-right font-medium">0–{t} km/h</th>
+                      {ACCEL_SPLITS.map(([a, b]) => (
+                        <th key={`${a}-${b}`} className="py-1 pr-2 text-right font-medium">{a}–{b} km/h</th>
                       ))}
                     </tr>
                   </thead>
@@ -229,9 +270,9 @@ export function CompareTab({ module = "power", onOpenVehicles }: { module?: Modu
                           <span className="mr-1 inline-block h-2 w-3 rounded-sm align-middle" style={{ backgroundColor: r.color }} />
                           {r.label}
                         </td>
-                        {SPLIT_TARGETS.map((t) => (
-                          <td key={t} className="py-1 pr-2 text-right tabular-nums">
-                            {r.splits[t] != null ? `${r.splits[t]!.toFixed(2)} s` : "—"}
+                        {r.splits.map((v, k) => (
+                          <td key={k} className="py-1 pr-2 text-right tabular-nums">
+                            {v != null ? `${v.toFixed(2)} s` : "—"}
                           </td>
                         ))}
                       </tr>
