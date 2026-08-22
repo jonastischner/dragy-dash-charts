@@ -5,6 +5,8 @@
 // Exporte nach dem Unix-Zeitstempel der Aufnahme. Gibt beides nichts her,
 // bleibt es beim Dateinamen als Session-Name.
 
+import { compareNamesDesc } from "./sort";
+
 /** Plausibler Bereich für Aufnahme-Zeitstempel: ab 2015 bis 2100. */
 const MIN_EPOCH_S = 1420070400; // 2015-01-01
 const MAX_EPOCH_S = 4102444800; // 2100-01-01
@@ -30,12 +32,62 @@ export function formatSessionTime(ms: number): string {
 }
 
 /**
- * Der Zeitpunkt, der eine Session fachlich datiert: wann gefahren wurde, nicht
- * wann importiert. Altdaten und Tabellen-Exporte haben kein recordedAt und
- * fallen auf createdAt zurück – für die bleibt es beim bisherigen Verhalten.
+ * Datum aus einem Session-Namen lesen. Altdaten heißen nach ihrer Quelldatei und
+ * tragen ihr Datum oft im Namen – mal als ISO (2026-08-06), mal deutsch
+ * (27-07-2026). Ohne diese Auswertung landen alle TT-MM-JJJJ-Namen in der
+ * Sortierung geschlossen unten, weil der Collator die erste Zahlengruppe
+ * vergleicht: beim einen ist das das Jahr, beim anderen der Tag.
+ *
+ * Bewusst nur am Namensanfang verankert – ein „-3" am Ende ist ein Zähler, kein
+ * Datumsteil. Eine Uhrzeit wird nur mit Doppelpunkt erkannt (so schreibt sie
+ * formatSessionTime); „2026-08-20 17-1" ist zu mehrdeutig für eine Uhrzeit.
  */
-export function sessionTimestamp(s: { recordedAt?: number; createdAt: number }): number {
-  return s.recordedAt ?? s.createdAt;
+export function dateFromName(name: string): number | null {
+  const t = name.trim();
+  let y: number, mo: number, d: number;
+  const iso = /^(\d{4})[-.](\d{1,2})[-.](\d{1,2})/.exec(t);
+  const de = /^(\d{1,2})[-.](\d{1,2})[-.](\d{4})/.exec(t);
+  if (iso) { y = +iso[1]; mo = +iso[2]; d = +iso[3]; }
+  else if (de) { d = +de[1]; mo = +de[2]; y = +de[3]; }
+  else return null;
+  if (y < 2000 || y > 2100 || mo < 1 || mo > 12 || d < 1 || d > 31) return null;
+
+  let h = 0, mi = 0;
+  const time = /\s(\d{1,2}):(\d{2})/.exec(t);
+  if (time && +time[1] <= 23 && +time[2] <= 59) { h = +time[1]; mi = +time[2]; }
+
+  const ms = new Date(y, mo - 1, d, h, mi).getTime();
+  // Round-Trip verwirft Unsinn wie den 31. Februar.
+  const back = new Date(ms);
+  if (back.getFullYear() !== y || back.getMonth() !== mo - 1 || back.getDate() !== d) return null;
+  return ms;
+}
+
+/**
+ * Der Zeitpunkt, der eine Session fachlich datiert: wann gefahren wurde, nicht
+ * wann importiert.
+ *
+ * Reihenfolge: recordedAt (neue Importe, GPS-genau) → Datum aus dem Namen
+ * (Altdaten) → createdAt als letzter Rückfall.
+ */
+export function sessionTimestamp(s: { recordedAt?: number; createdAt: number; name?: string }): number {
+  if (s.recordedAt != null) return s.recordedAt;
+  const fromName = s.name ? dateFromName(s.name) : null;
+  return fromName ?? s.createdAt;
+}
+
+/**
+ * Sessions chronologisch absteigend – neueste zuerst. Bei gleichem Datum
+ * entscheidet der Name absteigend, damit „…-3" vor „…-2" steht; die id hält die
+ * Reihenfolge stabil, wenn auch der Name gleich ist.
+ */
+export function compareSessionsDesc(
+  a: { id: string; name: string; recordedAt?: number; createdAt: number },
+  b: { id: string; name: string; recordedAt?: number; createdAt: number },
+): number {
+  return (sessionTimestamp(b) - sessionTimestamp(a))
+    || compareNamesDesc(a.name, b.name)
+    || b.id.localeCompare(a.id);
 }
 
 /** Dateiname ohne bekannte Endung – Rückfall für den Session-Namen. */
