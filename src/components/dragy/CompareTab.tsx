@@ -8,7 +8,8 @@ import { Chart, type Series } from "./Chart";
 import type { ModuleId } from "@/lib/dragy/types";
 import { isPowerModule, sessionModule } from "@/lib/dragy/modules";
 import { sessionCorrection, useCorrectionStandard } from "./useCorrection";
-import { compareNames, compareNamesDesc } from "@/lib/dragy/sort";
+import { compareNames } from "@/lib/dragy/sort";
+import { compareSessionsDesc } from "@/lib/dragy/sessionTime";
 import { CORRECTION_LABEL } from "@/lib/dragy/correction";
 
 type Mode = "pWheel" | "pEngine" | "tqWheel" | "tqEngine" | "accel";
@@ -35,14 +36,14 @@ export function CompareTab({ module = "power", onOpenVehicles }: { module?: Modu
     if (!activeVehicle) return [];
     const own = state.sessions.filter((s) => s.vehicleId === activeVehicle.id && sessionModule(s) === module);
     const ownById = new Map(own.map((s) => [s.id, s]));
-    // Primär nach Session absteigend (neueste zuerst, wie in der Sessions-
-    // Liste), sekundär nach Lauf-Name aufsteigend – sonst stünde die Legende
-    // anders als die Tabelle darunter.
+    // Primär nach Session chronologisch absteigend (neueste zuerst, wie in der
+    // Sessions-Liste), sekundär nach Lauf-Name aufsteigend – sonst stünde die
+    // Legende anders als die Tabelle darunter.
     return state.segments
       .filter((g) => ownById.has(g.sessionId))
       .sort((a, b) => {
         const sa = ownById.get(a.sessionId)!, sb = ownById.get(b.sessionId)!;
-        return compareNamesDesc(sa.name, sb.name) || compareNames(a.name, b.name) || a.id.localeCompare(b.id);
+        return compareSessionsDesc(sa, sb) || compareNames(a.name, b.name) || a.id.localeCompare(b.id);
       });
   }, [state, activeVehicle, module]);
 

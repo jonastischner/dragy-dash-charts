@@ -9,8 +9,8 @@ import { computeRpmFactor, resolveAllGears } from "@/lib/dragy/gear";
 import { uid } from "@/lib/dragy/db";
 import type { ModuleId, Session, Segment, Vehicle } from "@/lib/dragy/types";
 import { MODULE_IDS, MODULE_LABEL, isPowerModule, isTrackModule, sessionModule } from "@/lib/dragy/modules";
-import { formatSessionTime } from "@/lib/dragy/sessionTime";
-import { sortedByName, sortedByNameDesc } from "@/lib/dragy/sort";
+import { compareSessionsDesc, formatSessionTime } from "@/lib/dragy/sessionTime";
+import { sortedByName } from "@/lib/dragy/sort";
 import { Chart, type Series } from "../Chart";
 import { PdfExportDialog } from "../PdfExportDialog";
 import { CorrectionNote } from "../CorrectionNote";
@@ -39,10 +39,12 @@ export function RunsList({ module, onOpenGarage }: { module: ModuleId; onOpenGar
   const vehicleSessionIds = new Set(state.sessions.filter((s) => s.vehicleId === activeVehicle.id).map((s) => s.id));
   const usedColors = state.segments.filter((g) => vehicleSessionIds.has(g.sessionId)).map((g) => g.color);
 
-  // Absteigend: die neueste Session (höchster ISO-Zeitstempel im Namen) steht oben.
-  const sessions = sortedByNameDesc(
-    state.sessions.filter((s) => s.vehicleId === activeVehicle.id && sessionModule(s) === module),
-  );
+  // Chronologisch absteigend – neueste zuerst. Sortiert wird nach dem Datum der
+  // Session, nicht nach ihrem Namen: Altdaten heißen teils "2026-08-06", teils
+  // "27-07-2026", und rein alphabetisch landen alle TT-MM-JJJJ-Namen unten.
+  const sessions = [...state.sessions]
+    .filter((s) => s.vehicleId === activeVehicle.id && sessionModule(s) === module)
+    .sort(compareSessionsDesc);
 
   return (
     <Section title={`Sessions – ${MODULE_LABEL[module]}`} note={activeVehicle.name}>
