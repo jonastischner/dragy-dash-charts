@@ -1,10 +1,12 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Field, TextInput, NumInput, Select, Button, Note, Row } from "./ui";
 import { Chart, type Series } from "./Chart";
 import { NM_PER_PS_RPM } from "@/lib/dragy/physics";
 import { CORRECTION_LABEL, type CorrectionStandard } from "@/lib/dragy/correction";
 import { formatSessionTime } from "@/lib/dragy/sessionTime";
 import type { DynoPoint, DynoRun } from "@/lib/dragy/types";
+import { extractDynoSheet, sheetToRun, ANCHOR_WARN, type AnchorInfo } from "@/lib/dragy/dynoExtract";
+import { errorMessage } from "@/lib/dragy/errors";
 
 /**
  * Eingabe und Kontrolle einer gemessenen Prüfstandskurve.
@@ -19,12 +21,27 @@ interface RowInput { rpm: string; pWheel: string; pDrag: string; pEngine: string
 
 const emptyRow = (): RowInput => ({ rpm: "", pWheel: "", pDrag: "", pEngine: "" });
 
+/**
+ * Epoch-ms als Wert für <input type="datetime-local">. Bewusst über die
+ * lokalen Getter statt toISOString(): letzteres rechnet nach UTC um und
+ * verschöbe das Meßdatum um den Zeitzonen-Versatz.
+ */
+function localInputValue(ms: number): string {
+  const d = new Date(ms);
+  const p2 = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}T${p2(d.getHours())}:${p2(d.getMinutes())}`;
+}
+
 const num = (v: string): number | null => {
   const s = v.trim().replace(",", ".");
   if (!s) return null;
   const n = Number(s);
   return Number.isFinite(n) ? n : null;
 };
+
+/** Eckwert auf eine Nachkommastelle, NaN wird weggelassen statt gespeichert. */
+const num1 = (v: number, key: string): Record<string, number> =>
+  Number.isFinite(v) ? { [key]: +v.toFixed(1) } : {};
 
 const fmt = (n: number | null | undefined, digits = 1): string =>
   n == null || !Number.isFinite(n) ? "" : String(+n.toFixed(digits));
@@ -68,13 +85,47 @@ export function DynoImportDialog({ initial, initialName, defaultRpmFactor, onSav
   const [operator, setOperator] = useState(initial?.operator ?? "");
   const [standard, setStandard] = useState<CorrectionStandard>(initial?.correctedBy ?? "din70020");
   const [measured, setMeasured] = useState(
-    initial?.measuredAt != null ? new Date(initial.measuredAt).toISOString().slice(0, 16) : "",
+    initial?.measuredAt != null ? localInputValue(initial.measuredAt) : "",
   );
   const [rpmFactor, setRpmFactor] = useState<number>(defaultRpmFactor);
   const [tempC, setTempC] = useState<number | undefined>(initial?.env?.tempC);
   const [pressureHpa, setPressureHpa] = useState<number | undefined>(initial?.env?.pressureHpa);
   const [rh, setRh] = useState<number | undefined>(initial?.env?.rh);
   const [rows, setRows] = useState<RowInput[]>(() => rowsFromRun(initial ?? null));
+  const [anchor, setAnchor] = useState<AnchorInfo | null>(null);
+  // Herkunft mitführen: aus dem Protokoll ausgelesene Werte sind etwas
+  // anderes als von Hand eingetippte, auch wenn beide danach editierbar sind.
+  const [source, setSource] = useState<DynoRun["source"]>(initial?.source ?? "manual");
+  const [busy, setBusy] = useState(false);
+  const [readError, setReadError] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  /** Foto/PDF auslesen lassen und die Felder vorbefüllen – nichts speichern. */
+  const readSheet = async (file: File | undefined) => {
+    if (!file) return;
+    setBusy(true); setReadError(null);
+    try {
+      const sheet = await extractDynoSheet(file);
+      const { run, rpmFactor: f, anchor: a } = sheetToRun(sheet);
+      if (run.points.length === 0) throw new Error("Im Protokoll wurden keine Kurvenpunkte gefunden.");
+      setRows(rowsFromRun(run));
+      setAnchor(a);
+      setSource("vision");
+      setStandard(run.correctedBy);
+      if (run.bench) setBench(run.bench);
+      if (run.operator) setOperator(run.operator);
+      if (run.measuredAt != null) setMeasured(localInputValue(run.measuredAt));
+      if (run.env?.tempC != null) setTempC(run.env.tempC);
+      if (run.env?.pressureHpa != null) setPressureHpa(run.env.pressureHpa);
+      if (run.env?.rh != null) setRh(run.env.rh);
+      if (f != null && f > 0) setRpmFactor(+f.toFixed(2));
+    } catch (e) {
+      setReadError(errorMessage(e, "Das Protokoll konnte nicht ausgelesen werden."));
+    } finally {
+      setBusy(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  };
 
   const update = (i: number, patch: Partial<RowInput>) =>
     setRows((rs) => rs.map((r, k) => (k === i ? { ...r, ...patch } : r)));
@@ -84,15 +135,19 @@ export function DynoImportDialog({ initial, initialName, defaultRpmFactor, onSav
     [rows],
   );
 
+  // Eckwerte aus der bestätigten Tabelle – nicht aus der Extraktion. Was der
+  // Nutzer im Dialog sieht, ist auch das, was gespeichert wird.
   const peaks = useMemo(() => {
-    let ps = NaN, psRpm = NaN, nm = NaN, nmRpm = NaN, maxRpm = NaN;
+    let ps = NaN, psRpm = NaN, nm = NaN, nmRpm = NaN, maxRpm = NaN, psWheel = NaN, psDrag = NaN;
     for (const p of points) {
       if (!Number.isFinite(ps) || p.pEnginePs > ps) { ps = p.pEnginePs; psRpm = p.rpm; }
       const t = NM_PER_PS_RPM * p.pEnginePs / p.rpm;
       if (!Number.isFinite(nm) || t > nm) { nm = t; nmRpm = p.rpm; }
       if (!Number.isFinite(maxRpm) || p.rpm > maxRpm) maxRpm = p.rpm;
+      if (p.pWheelPs != null && (!Number.isFinite(psWheel) || p.pWheelPs > psWheel)) psWheel = p.pWheelPs;
+      if (p.pDragPs != null && (!Number.isFinite(psDrag) || p.pDragPs > psDrag)) psDrag = p.pDragPs;
     }
-    return { ps, psRpm, nm, nmRpm, maxRpm };
+    return { ps, psRpm, nm, nmRpm, maxRpm, psWheel, psDrag };
   }, [points]);
 
   const series: Series[] = useMemo(() => {
@@ -129,15 +184,16 @@ export function DynoImportDialog({ initial, initialName, defaultRpmFactor, onSav
     const run: DynoRun = {
       points,
       correctedBy: standard,
-      source: initial?.source ?? "manual",
+      source,
       ...(bench.trim() ? { bench: bench.trim() } : {}),
       ...(operator.trim() ? { operator: operator.trim() } : {}),
       ...(Number.isFinite(measuredAt) ? { measuredAt } : {}),
       ...(env ? { env } : {}),
       peaks: {
-        psNorm: peaks.ps, psRpm: peaks.psRpm,
-        nmNorm: peaks.nm, nmRpm: peaks.nmRpm,
-        maxRpm: peaks.maxRpm,
+        ...num1(peaks.ps, "psNorm"), ...num1(peaks.psRpm, "psRpm"),
+        ...num1(peaks.nm, "nmNorm"), ...num1(peaks.nmRpm, "nmRpm"),
+        ...num1(peaks.psWheel, "psWheel"), ...num1(peaks.psDrag, "psDrag"),
+        ...num1(peaks.maxRpm, "maxRpm"),
       },
     };
     onSave({ name: name.trim() || "Prüfstandslauf", rpmFactor, run });
@@ -151,6 +207,31 @@ export function DynoImportDialog({ initial, initialName, defaultRpmFactor, onSav
           Gemessene Leistung über Drehzahl – sie wird nicht aus GPS-Daten gerechnet, sondern
           unverändert übernommen. Zwei der drei Leistungsspalten genügen, die dritte wird ergänzt.
         </Note>
+
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <input ref={fileRef} type="file" accept="image/*,application/pdf" className="hidden"
+            onChange={(e) => readSheet(e.target.files?.[0])} />
+          <Button variant="secondary" disabled={busy} onClick={() => fileRef.current?.click()}>
+            {busy ? "Wird ausgelesen…" : "Foto/PDF auslesen…"}
+          </Button>
+          <span className="text-caption text-muted-foreground">
+            optional – füllt die Felder vor, du prüfst sie danach
+          </span>
+        </div>
+        {readError && (
+          <p className="mt-2 text-caption text-warning">
+            {readError} Die Werte lassen sich unten von Hand eintragen.
+          </p>
+        )}
+        {anchor && anchor.printedPs != null && (
+          <p className={`mt-2 text-caption ${anchor.suspicious ? "text-warning" : "text-muted-foreground"}`}>
+            Kurve auf den gedruckten Spitzenwert {anchor.printedPs.toFixed(1).replace(".", ",")} PS verankert
+            (abgelesen {anchor.readPs?.toFixed(1).replace(".", ",")} PS, Faktor{" "}
+            {anchor.scale.toFixed(3).replace(".", ",")}
+            {anchor.rpmShift !== 0 && `, Drehzahl um ${anchor.rpmShift.toFixed(0)} U/min verschoben`}).
+            {anchor.suspicious && ` Mehr als ${(ANCHOR_WARN * 100).toFixed(0)} % Abweichung – bitte die Wertetabelle gegen das Protokoll prüfen.`}
+          </p>
+        )}
 
         <Row cols={2}>
           <Field label="Name des Laufs"><TextInput value={name} onChange={(e) => setName(e.target.value)} /></Field>
