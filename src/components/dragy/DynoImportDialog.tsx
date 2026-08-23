@@ -6,6 +6,8 @@ import { CORRECTION_LABEL, type CorrectionStandard } from "@/lib/dragy/correctio
 import { formatSessionTime } from "@/lib/dragy/sessionTime";
 import type { DynoPoint, DynoRun } from "@/lib/dragy/types";
 import { extractDynoSheet, sheetToRun, ANCHOR_WARN, type AnchorInfo } from "@/lib/dragy/dynoExtract";
+import { DYNO_CSV_TEMPLATE, DYNO_CSV_PROMPT, parseDynoCsv } from "@/lib/dragy/dynoCsv";
+import { Collapsible } from "./ui";
 import { errorMessage } from "@/lib/dragy/errors";
 
 /**
@@ -99,6 +101,67 @@ export function DynoImportDialog({ initial, initialName, defaultRpmFactor, onSav
   const [busy, setBusy] = useState(false);
   const [readError, setReadError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const csvRef = useRef<HTMLInputElement>(null);
+  const [copied, setCopied] = useState(false);
+
+  /** Ergebnis einer Quelle in die Felder übernehmen – gemeinsam für Foto und CSV. */
+  const applySheet = (
+    run: ReturnType<typeof sheetToRun>["run"],
+    f: number | null,
+    a: AnchorInfo,
+    src: DynoRun["source"],
+    fallbackName?: string,
+  ) => {
+    setRows(rowsFromRun(run));
+    setAnchor(a);
+    setSource(src);
+    setStandard(run.correctedBy);
+    if (fallbackName) setName(fallbackName);
+    if (run.bench) setBench(run.bench);
+    if (run.operator) setOperator(run.operator);
+    if (run.measuredAt != null) setMeasured(localInputValue(run.measuredAt));
+    if (run.env?.tempC != null) setTempC(run.env.tempC);
+    if (run.env?.pressureHpa != null) setPressureHpa(run.env.pressureHpa);
+    if (run.env?.rh != null) setRh(run.env.rh);
+    if (f != null && f > 0) setRpmFactor(+f.toFixed(2));
+  };
+
+  /** Vorlage als Datei anbieten – Muster wie beim Backup-Export. */
+  const downloadTemplate = () => {
+    const blob = new Blob([DYNO_CSV_TEMPLATE], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "pruefstand-vorlage.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  /** Ausgefüllte Vorlage einlesen – füllt denselben Dialog vor, speichert nichts. */
+  const readCsv = async (file: File | undefined) => {
+    if (!file) return;
+    setReadError(null);
+    try {
+      const { sheet, name: csvName, rpmFactor: explicit } = parseDynoCsv(await file.text());
+      const { run, rpmFactor: derived, anchor: a } = sheetToRun(sheet);
+      if (run.points.length === 0) throw new Error("Die Wertetabelle enthält keine verwertbaren Zeilen.");
+      applySheet(run, explicit ?? derived, a, "manual", csvName);
+    } catch (e) {
+      setReadError(errorMessage(e, "Die CSV konnte nicht gelesen werden."));
+    } finally {
+      if (csvRef.current) csvRef.current.value = "";
+    }
+  };
+
+  const copyPrompt = async () => {
+    try {
+      await navigator.clipboard.writeText(DYNO_CSV_PROMPT);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setReadError("Kopieren wurde vom Browser verwehrt – bitte den Text von Hand markieren.");
+    }
+  };
 
   /** Foto/PDF auslesen lassen und die Felder vorbefüllen – nichts speichern. */
   const readSheet = async (file: File | undefined) => {
@@ -108,17 +171,7 @@ export function DynoImportDialog({ initial, initialName, defaultRpmFactor, onSav
       const sheet = await extractDynoSheet(file);
       const { run, rpmFactor: f, anchor: a } = sheetToRun(sheet);
       if (run.points.length === 0) throw new Error("Im Protokoll wurden keine Kurvenpunkte gefunden.");
-      setRows(rowsFromRun(run));
-      setAnchor(a);
-      setSource("vision");
-      setStandard(run.correctedBy);
-      if (run.bench) setBench(run.bench);
-      if (run.operator) setOperator(run.operator);
-      if (run.measuredAt != null) setMeasured(localInputValue(run.measuredAt));
-      if (run.env?.tempC != null) setTempC(run.env.tempC);
-      if (run.env?.pressureHpa != null) setPressureHpa(run.env.pressureHpa);
-      if (run.env?.rh != null) setRh(run.env.rh);
-      if (f != null && f > 0) setRpmFactor(+f.toFixed(2));
+      applySheet(run, f, a, "vision");
     } catch (e) {
       setReadError(errorMessage(e, "Das Protokoll konnte nicht ausgelesen werden."));
     } finally {
@@ -209,14 +262,38 @@ export function DynoImportDialog({ initial, initialName, defaultRpmFactor, onSav
         </Note>
 
         <div className="mt-2 flex flex-wrap items-center gap-2">
+          <input ref={csvRef} type="file" accept=".csv,text/csv,text/plain" className="hidden"
+            onChange={(e) => readCsv(e.target.files?.[0])} />
+          <Button variant="secondary" onClick={downloadTemplate}>CSV-Vorlage herunterladen</Button>
+          <Button variant="secondary" onClick={() => csvRef.current?.click()}>Ausgefüllte CSV laden…</Button>
           <input ref={fileRef} type="file" accept="image/*,application/pdf" className="hidden"
             onChange={(e) => readSheet(e.target.files?.[0])} />
-          <Button variant="secondary" disabled={busy} onClick={() => fileRef.current?.click()}>
-            {busy ? "Wird ausgelesen…" : "Foto/PDF auslesen…"}
+          <Button variant="ghost" disabled={busy} onClick={() => fileRef.current?.click()}>
+            {busy ? "Wird ausgelesen…" : "Foto direkt auslesen…"}
           </Button>
-          <span className="text-caption text-muted-foreground">
-            optional – füllt die Felder vor, du prüfst sie danach
-          </span>
+        </div>
+        <p className="mt-1 text-caption text-muted-foreground">
+          Alles optional – es füllt nur die Felder vor, geprüft und gespeichert wird hier.
+        </p>
+
+        <div className="mt-2">
+          <Collapsible title="Vorlage ausfüllen lassen (KI-Prompt)" persistKey="dragy.dyno.promptHelp">
+            <ol className="ml-4 list-decimal space-y-1 text-caption text-muted-foreground">
+              <li>Oben <b>CSV-Vorlage herunterladen</b>.</li>
+              <li>In Claude (oder einem anderen Modell) ein <b>Foto des Protokolls</b> und die
+                  <b> Vorlage</b> anhängen und den Prompt unten einfügen.</li>
+              <li>Die zurückgegebene CSV speichern und hier mit <b>Ausgefüllte CSV laden…</b> öffnen.</li>
+              <li>Werte gegen das Protokoll prüfen, dann speichern.</li>
+            </ol>
+            <div className="mt-2 flex items-center gap-2">
+              <Button variant="secondary" onClick={copyPrompt}>
+                {copied ? "Kopiert ✓" : "Prompt kopieren"}
+              </Button>
+            </div>
+            <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap rounded-md border border-border bg-elevated p-2 text-caption text-muted-foreground">
+              {DYNO_CSV_PROMPT}
+            </pre>
+          </Collapsible>
         </div>
         {readError && (
           <p className="mt-2 text-caption text-warning">
