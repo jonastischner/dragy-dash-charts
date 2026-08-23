@@ -34,6 +34,11 @@ Aus denselben gedruckten Zahlenpaaren (U/min bei km/h) ergibt sich auch der
 Drehzahlfaktor, ganz ohne Ablesen. Trägt man **Drehzahlfaktor** ausdrücklich ein,
 hat dieser Wert Vorrang.
 
+**Verankert wird nur die Leistung, nie die Drehzahl.** Die eingetragenen
+Drehzahlen bleiben exakt so stehen, wie sie in der CSV stehen – sie werden von
+einem Raster gewählt (Vorlage bzw. Prompt), nicht unabhängig von einer
+Pixel-Position abgelesen, und brauchen deshalb keine Korrektur.
+
 ## Format
 
 - Trennzeichen `;`, `,` oder Tab – wird automatisch erkannt
@@ -43,6 +48,9 @@ hat dieser Wert Vorrang.
 - **P-Motor** darf leer bleiben, wenn P-Rad und P-Schlepp da sind – die Summe wird gebildet
 - Meßdatum als `28.11.2024 9:36` oder `2024-11-28 09:36`
 - Leere Zeilen der Wertetabelle werden übersprungen
+- Die Vorlage deckt 2000–14000 U/min in 250er-Schritten ab –
+  reicht eine Kurve weiter, einfach im selben Muster weitere Zeilen anhängen
+  (in der Datei oder im Dialog über „+ Zeile"). Das ist ein Vorschlag, keine Grenze.
 
 ```csv
 # Prüfstandsprotokoll – Vorlage für die Dragy Leistungsanalyse
@@ -51,7 +59,13 @@ hat dieser Wert Vorrang.
 # Leer lassen, was nicht im Protokoll steht – nichts erfinden.
 #
 # Oberer Block: die im Protokoll GEDRUCKTEN Werte (Leistungsdaten/Umgebungsdaten).
-# Unterer Block: die aus dem DIAGRAMM abgelesene Kurve.
+# Unterer Block: die aus dem DIAGRAMM abgelesene Kurve. Die Tabelle geht bis
+# 14000 U/min – reicht deine Kurve weiter, hänge einfach weitere
+# Zeilen im selben Muster an (nächste Drehzahl, drei leere Felder). Endet die
+# Kurve früher, einfach die überzähligen Zeilen leer lassen oder löschen;
+# unausgefüllte Zeilen werden beim Import ohnehin ignoriert. Der Schritt von
+# 250 U/min ist ebenfalls nur ein Vorschlag – orientier dich an
+# den Rasterlinien des Diagramms, wenn die gröber oder feiner sind.
 
 Feld;Wert
 Name;Prüfstandslauf
@@ -102,6 +116,30 @@ U/min;P-Rad [PS];P-Schlepp [PS];P-Motor [PS]
 7500;;;
 7750;;;
 8000;;;
+8250;;;
+8500;;;
+8750;;;
+9000;;;
+9250;;;
+9500;;;
+9750;;;
+10000;;;
+10250;;;
+10500;;;
+10750;;;
+11000;;;
+11250;;;
+11500;;;
+11750;;;
+12000;;;
+12250;;;
+12500;;;
+12750;;;
+13000;;;
+13250;;;
+13500;;;
+13750;;;
+14000;;;
 ```
 
 ## Prompt
@@ -116,16 +154,20 @@ NUR die fertige CSV zurück – keine Erklärung davor oder danach.
    sie gedruckt sind. Lies sie NICHT aus dem Diagramm ab.
 
 2. Die untere Wertetabelle liest du dagegen aus dem DIAGRAMM ab: geh die
-   Drehzahlachse in Schritten von 250 U/min durch und lies für jede Kurve den
-   Wert an der Leistungsachse ab. Üblich sind drei Kurven: P-Rad, P-Schlepp und
-   P-Norm bzw. P-Motor. Zeilen außerhalb des gezeichneten Bereichs löschst du;
-   fehlende Drehzahlen ergänzt du im selben Raster.
+   Drehzahlachse in Schritten von etwa 250 U/min durch und lies für jede Kurve
+   den Wert an der Leistungsachse ab – orientiere dich an den Rasterlinien des
+   Diagramms, wenn die gröber oder feiner sind, Hauptsache gleichmäßig. Üblich
+   sind drei Kurven: P-Rad, P-Schlepp und P-Norm bzw. P-Motor. Zeilen außerhalb
+   des gezeichneten Bereichs löschst du. Reicht die Kurve über die letzte Zeile
+   der Vorlage hinaus (z. B. bei hochdrehenden Motoren), hänge weitere Zeilen im
+   selben Muster an statt sie wegzulassen – die Vorlage ist nur ein Vorschlag,
+   keine Grenze.
 
 3. Was du nicht sicher erkennst, lässt du leer. Nichts raten, nichts
    interpolieren, keine Werte erfinden.
 
-4. Feldnamen, Reihenfolge und das Semikolon als Trennzeichen nicht verändern.
-   Die #-Zeilen bleiben unverändert stehen.
+4. Feldnamen und das Semikolon als Trennzeichen nicht verändern. Die #-Zeilen
+   bleiben unverändert stehen.
 
 Warum 1 und 2 getrennt sind: die App skaliert die abgelesene Kurve anschließend
 auf die gedruckten Spitzenwerte. Die Form kommt aus dem Diagramm, der Betrag aus

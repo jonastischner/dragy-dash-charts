@@ -16,13 +16,39 @@ import type { DynoSheet } from "./dynoExtract";
 /** Schrittweite, in der der Prompt die Drehzahlachse abarbeiten lässt. */
 export const PROMPT_RPM_STEP = 250;
 
+/**
+ * Drehzahlbereich der heruntergeladenen Vorlage. Bewusst großzügig über
+ * typische Serienmotoren hinaus (deckt auch hochdrehende Motorräder und
+ * Rennmotoren ab) – leere Zeilen am Ende kosten beim Import nichts, sie werden
+ * beim Einlesen ohnehin übersprungen (siehe parseDynoCsv). Reicht eine Kurve
+ * noch weiter, lässt sich die Tabelle im Dialog per "+ Zeile" oder in der
+ * Datei selbst im selben Muster fortsetzen – die Vorlage ist ein Vorschlag,
+ * keine Grenze.
+ */
+export const TEMPLATE_RPM_MIN = 2000;
+export const TEMPLATE_RPM_MAX = 14000;
+
+function templateCurveRows(): string {
+  const rows: string[] = [];
+  for (let rpm = TEMPLATE_RPM_MIN; rpm <= TEMPLATE_RPM_MAX; rpm += PROMPT_RPM_STEP) {
+    rows.push(`${rpm};;;`);
+  }
+  return rows.join("\n");
+}
+
 export const DYNO_CSV_TEMPLATE = `# Prüfstandsprotokoll – Vorlage für die Dragy Leistungsanalyse
 # Zeilen mit # sind Kommentare und werden beim Import übersprungen.
 # Dezimaltrenner: Komma oder Punkt, beides wird gelesen.
 # Leer lassen, was nicht im Protokoll steht – nichts erfinden.
 #
 # Oberer Block: die im Protokoll GEDRUCKTEN Werte (Leistungsdaten/Umgebungsdaten).
-# Unterer Block: die aus dem DIAGRAMM abgelesene Kurve.
+# Unterer Block: die aus dem DIAGRAMM abgelesene Kurve. Die Tabelle geht bis
+# ${TEMPLATE_RPM_MAX} U/min – reicht deine Kurve weiter, hänge einfach weitere
+# Zeilen im selben Muster an (nächste Drehzahl, drei leere Felder). Endet die
+# Kurve früher, einfach die überzähligen Zeilen leer lassen oder löschen;
+# unausgefüllte Zeilen werden beim Import ohnehin ignoriert. Der Schritt von
+# ${PROMPT_RPM_STEP} U/min ist ebenfalls nur ein Vorschlag – orientier dich an
+# den Rasterlinien des Diagramms, wenn die gröber oder feiner sind.
 
 Feld;Wert
 Name;Prüfstandslauf
@@ -48,31 +74,7 @@ p_Luft [hPa];
 H_Luft [%];
 
 U/min;P-Rad [PS];P-Schlepp [PS];P-Motor [PS]
-2000;;;
-2250;;;
-2500;;;
-2750;;;
-3000;;;
-3250;;;
-3500;;;
-3750;;;
-4000;;;
-4250;;;
-4500;;;
-4750;;;
-5000;;;
-5250;;;
-5500;;;
-5750;;;
-6000;;;
-6250;;;
-6500;;;
-6750;;;
-7000;;;
-7250;;;
-7500;;;
-7750;;;
-8000;;;
+${templateCurveRows()}
 `;
 
 export const DYNO_CSV_PROMPT = `Du bekommst ein Foto oder einen Scan eines Leistungsprüfstands-Protokolls
@@ -84,16 +86,20 @@ NUR die fertige CSV zurück – keine Erklärung davor oder danach.
    sie gedruckt sind. Lies sie NICHT aus dem Diagramm ab.
 
 2. Die untere Wertetabelle liest du dagegen aus dem DIAGRAMM ab: geh die
-   Drehzahlachse in Schritten von ${PROMPT_RPM_STEP} U/min durch und lies für jede Kurve den
-   Wert an der Leistungsachse ab. Üblich sind drei Kurven: P-Rad, P-Schlepp und
-   P-Norm bzw. P-Motor. Zeilen außerhalb des gezeichneten Bereichs löschst du;
-   fehlende Drehzahlen ergänzt du im selben Raster.
+   Drehzahlachse in Schritten von etwa ${PROMPT_RPM_STEP} U/min durch und lies für jede Kurve
+   den Wert an der Leistungsachse ab – orientiere dich an den Rasterlinien des
+   Diagramms, wenn die gröber oder feiner sind, Hauptsache gleichmäßig. Üblich
+   sind drei Kurven: P-Rad, P-Schlepp und P-Norm bzw. P-Motor. Zeilen außerhalb
+   des gezeichneten Bereichs löschst du. Reicht die Kurve über die letzte Zeile
+   der Vorlage hinaus (z. B. bei hochdrehenden Motoren), hänge weitere Zeilen im
+   selben Muster an statt sie wegzulassen – die Vorlage ist nur ein Vorschlag,
+   keine Grenze.
 
 3. Was du nicht sicher erkennst, lässt du leer. Nichts raten, nichts
    interpolieren, keine Werte erfinden.
 
-4. Feldnamen, Reihenfolge und das Semikolon als Trennzeichen nicht verändern.
-   Die #-Zeilen bleiben unverändert stehen.
+4. Feldnamen und das Semikolon als Trennzeichen nicht verändern. Die #-Zeilen
+   bleiben unverändert stehen.
 
 Warum 1 und 2 getrennt sind: die App skaliert die abgelesene Kurve anschließend
 auf die gedruckten Spitzenwerte. Die Form kommt aus dem Diagramm, der Betrag aus

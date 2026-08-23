@@ -52,8 +52,6 @@ export function rpmFactorFromSheet(printed: DynoSheet["printed"]): number | null
 export interface AnchorInfo {
   /** Faktor, mit dem die abgelesene Motorkurve auf den gedruckten Spitzenwert gebracht wurde. */
   scale: number;
-  /** Verschiebung der Drehzahlachse in U/min, damit das Maximum auf der gedruckten Drehzahl liegt. */
-  rpmShift: number;
   /** Abgelesene Spitzenleistung vor der Verankerung. */
   readPs: number | null;
   /** Gedruckte Spitzenleistung, an der verankert wurde. */
@@ -68,29 +66,35 @@ export const ANCHOR_WARN = 0.05;
 /**
  * Kurve an den gedruckten Eckwerten verankern. Ohne gedruckte Werte bleibt die
  * abgelesene Kurve unverändert – dann ist sie eben nur so gut wie das Ablesen.
+ *
+ * Verankert wird NUR die Leistung, nicht die Drehzahl. Die Drehzahl je Zeile
+ * wird beim Ausfüllen von einem Raster gewählt (Vorlage bzw. Prompt: "in
+ * Schritten von etwa 250 U/min") und nicht unabhängig von einer Pixel-Position
+ * abgelesen – anders als die Leistung gibt es also keinen Ablesefehler, der
+ * eine Korrektur rechtfertigt. Eine frühere Fassung verschob zusätzlich die
+ * gesamte Drehzahlachse, damit der Spitzenwert exakt auf die gedruckte
+ * Drehzahl fällt – das ließ eingetragene runde Drehzahlen (2000, 2250, …) im
+ * Dialog krumm erscheinen (2015, 2265, …) und wurde deshalb entfernt.
  */
 export function anchorCurve(
   points: DynoPoint[],
   printed: DynoSheet["printed"],
 ): { points: DynoPoint[]; anchor: AnchorInfo } {
-  const none: AnchorInfo = { scale: 1, rpmShift: 0, readPs: null, printedPs: null, suspicious: false };
+  const none: AnchorInfo = { scale: 1, readPs: null, printedPs: null, suspicious: false };
   if (points.length === 0) return { points, anchor: none };
 
   let peak = points[0];
   for (const p of points) if (p.pEnginePs > peak.pEnginePs) peak = p;
 
   const printedPs = fin(printed?.psNorm) ?? fin(printed?.psEngine);
-  const printedRpm = fin(printed?.psRpm);
   if (printedPs == null || printedPs <= 0 || peak.pEnginePs <= 0) {
     return { points, anchor: { ...none, readPs: peak.pEnginePs, printedPs } };
   }
 
   const scale = printedPs / peak.pEnginePs;
-  // Die Drehzahlachse nur verschieben, wenn das Protokoll eine Drehzahl nennt.
-  const rpmShift = printedRpm != null ? printedRpm - peak.rpm : 0;
 
   const scaled = points.map((p) => ({
-    rpm: p.rpm + rpmShift,
+    rpm: p.rpm,
     // P-Rad und P-Schlepp mitskalieren: sie stammen aus demselben Diagramm und
     // hätten sonst eine andere Systematik als die Motorkurve.
     pWheelPs: p.pWheelPs == null ? null : +(p.pWheelPs * scale).toFixed(1),
@@ -101,7 +105,7 @@ export function anchorCurve(
   return {
     points: scaled,
     anchor: {
-      scale, rpmShift, readPs: peak.pEnginePs, printedPs,
+      scale, readPs: peak.pEnginePs, printedPs,
       suspicious: Math.abs(scale - 1) > ANCHOR_WARN,
     },
   };
