@@ -21,6 +21,17 @@ interface Props {
   yFormat?: (v: number) => string;
   /** Legende ausblenden – für Diagramme mit nur einer Serie, wo sie nichts zu schalten gibt. */
   showLegend?: boolean;
+  /**
+   * Null erzwingen statt der y-Achse die Daten folgen zu lassen.
+   *
+   * Für Leistung und Drehmoment richtig: auf einem Prüfstandsprotokoll beginnt
+   * die Achse bei null, sonst ließe sich die Größenordnung nicht mehr ablesen
+   * und 3 % Unterschied sähen nach viel aus. Für Geschwindigkeit oder Coastdown
+   * dagegen falsch – ein Lauf ab 60 km/h ließe die untere Hälfte leer.
+   *
+   * Standard true, damit eine übersehene Aufrufstelle sich wie bisher verhält.
+   */
+  yFromZero?: boolean;
 }
 
 /** Höchstens so viele Zeilen in der Cursor-Anzeige, danach nur noch ein Zähler. */
@@ -86,7 +97,7 @@ function peakOf(s: Series): number | null {
   return peak > -Infinity ? peak : null;
 }
 
-export function Chart({ series, bands = [], xLabel, yLabel, height = 280, onLegendToggle, xFormat, yFormat, showLegend = true }: Props) {
+export function Chart({ series, bands = [], xLabel, yLabel, height = 280, onLegendToggle, xFormat, yFormat, showLegend = true, yFromZero = true }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const [hover, setHover] = useState<{ x: number } | null>(null);
@@ -110,7 +121,7 @@ export function Chart({ series, bands = [], xLabel, yLabel, height = 280, onLege
   if (!Number.isFinite(xMin)) { xMin = 0; xMax = 1; yMin = 0; yMax = 1; }
   if (xMin === xMax) xMax = xMin + 1;
   if (yMin === yMax) yMax = yMin + 1;
-  yMin = Math.min(yMin, 0);
+  if (yFromZero) yMin = Math.min(yMin, 0);
 
   // padB so bemessen, dass Marken (Grundlinie H-20) und Achsentitel (H-4)
   // sich nicht überlappen – vorher lagen beide 8 px auseinander und liefen ineinander.

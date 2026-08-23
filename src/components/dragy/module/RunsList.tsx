@@ -198,7 +198,7 @@ function SessionDetail({ module, session, segments, usedColors, vehicle, onRenam
 
       <div className="mt-2">
         <span className="mb-1 block text-caption font-semibold text-muted-foreground">Geschwindigkeitsverlauf</span>
-        <Chart series={speedSeries} bands={bands} xLabel="t (s)" yLabel="km/h" xFormat={(v) => v.toFixed(1)} yFormat={(v) => v.toFixed(0)} showLegend={false} />
+        <Chart series={speedSeries} bands={bands} xLabel="t (s)" yLabel="km/h" xFormat={(v) => v.toFixed(1)} yFormat={(v) => v.toFixed(0)} showLegend={false} yFromZero={false} />
       </div>
 
       <h4 className="mt-4 text-body font-semibold text-foreground">Ergebnisse</h4>
@@ -428,6 +428,7 @@ function SegmentEditor({ module, seg, session, vehicle, maxT, onChange, onDelete
           xFormat={(v) => v.toFixed(isPower ? 0 : 1)}
           yFormat={(v) => v.toFixed(0)}
           showLegend={false}
+          yFromZero={isPower}
         />
       </div>
 
@@ -504,7 +505,7 @@ function CoastdownPanel({ session, seg, vehicle, onChange }: {
                 series={[{ label: "km/h", color: "#38bdf8", points: session.records.map((r) => ({ x: r.t, y: r.speedKmh })) }]}
                 bands={[{ xStart: range.startT, xEnd: range.endT, color: "#f59e0b", label: "Coastdown" }]}
                 height={160} xLabel="t (s)" yLabel="km/h" xFormat={(v) => v.toFixed(1)} yFormat={(v) => v.toFixed(0)}
-                showLegend={false}
+                showLegend={false} yFromZero={false}
               />
             </div>
             {fit && (
@@ -806,7 +807,7 @@ export function TrackOverview({ session, segments }: { session: Session; segment
         </table>
       </div>
       <div className="mt-2">
-        <Chart series={series} height={220} xLabel="Distanz (m)" yLabel="km/h" xFormat={(v) => v.toFixed(0)} yFormat={(v) => v.toFixed(0)} />
+        <Chart series={series} height={220} xLabel="Distanz (m)" yLabel="km/h" xFormat={(v) => v.toFixed(0)} yFormat={(v) => v.toFixed(0)} yFromZero={false} />
       </div>
     </div>
   );
