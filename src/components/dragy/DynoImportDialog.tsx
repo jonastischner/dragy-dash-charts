@@ -304,8 +304,7 @@ export function DynoImportDialog({ initial, initialName, defaultRpmFactor, onSav
           <p className={`mt-2 text-caption ${anchor.suspicious ? "text-warning" : "text-muted-foreground"}`}>
             Kurve auf den gedruckten Spitzenwert {anchor.printedPs.toFixed(1).replace(".", ",")} PS verankert
             (abgelesen {anchor.readPs?.toFixed(1).replace(".", ",")} PS, Faktor{" "}
-            {anchor.scale.toFixed(3).replace(".", ",")}
-            {anchor.rpmShift !== 0 && `, Drehzahl um ${anchor.rpmShift.toFixed(0)} U/min verschoben`}).
+            {anchor.scale.toFixed(3).replace(".", ",")}). Die Drehzahlen bleiben wie eingetragen.
             {anchor.suspicious && ` Mehr als ${(ANCHOR_WARN * 100).toFixed(0)} % Abweichung – bitte die Wertetabelle gegen das Protokoll prüfen.`}
           </p>
         )}
