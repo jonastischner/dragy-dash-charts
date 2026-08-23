@@ -221,7 +221,8 @@ export async function uploadEventPdf(eventId: string, file: File): Promise<strin
   return path;
 }
 
-async function invokeEventFunction<T>(name: string, body: Record<string, unknown>): Promise<T> {
+/** Edge Function aufrufen und die Serverfehlermeldung durchreichen statt sie zu verschlucken. */
+export async function invokeEdgeFunction<T>(name: string, body: Record<string, unknown>): Promise<T> {
   const { data, error } = await supabase.functions.invoke<T>(name, { body });
   if (error) {
     const context = (error as { context?: { text?: () => Promise<string> } }).context;
@@ -247,7 +248,7 @@ async function invokeEventFunction<T>(name: string, body: Record<string, unknown
 }
 
 export async function extractEventPdf(storagePath: string): Promise<ExtractionResult> {
-  return invokeEventFunction<ExtractionResult>("extract-event-pdf", { storagePath });
+  return invokeEdgeFunction<ExtractionResult>("extract-event-pdf", { storagePath });
 }
 
 // Teil 3: Sportity-Link als Komfort-Import. Lädt (serverseitig) die
@@ -259,7 +260,7 @@ export async function importFromSportityLink(
   eventId: string,
   sportityUrl: string,
 ): Promise<string> {
-  const { storagePath } = await invokeEventFunction<{ storagePath: string }>(
+  const { storagePath } = await invokeEdgeFunction<{ storagePath: string }>(
     "import-sportity-link",
     {
       eventId,

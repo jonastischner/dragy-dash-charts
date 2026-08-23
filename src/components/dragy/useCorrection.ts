@@ -4,7 +4,7 @@ import {
   type CorrectionResult,
   type CorrectionStandard,
 } from "@/lib/dragy/correction";
-import type { Session } from "@/lib/dragy/types";
+import type { Segment, Session } from "@/lib/dragy/types";
 
 // Gemeinsamer Zugriff auf die experimentelle Normkorrektur. Die gewählte Norm
 // ist eine reine Anzeige-Einstellung (localStorage, wie die übrigen Prefs) und
@@ -30,4 +30,20 @@ export function sessionCorrection(
 export function useSessionCorrection(session: Session): CorrectionResult {
   const [standard] = useCorrectionStandard();
   return sessionCorrection(standard, session);
+}
+
+/**
+ * Korrekturfaktor für einen einzelnen Lauf. Eine importierte Prüfstandskurve
+ * ist im Protokoll bereits normkorrigiert – sie ein zweites Mal zu korrigieren
+ * wäre schlicht falsch. Überall dort verwenden, wo bisher direkt mit
+ * correction.alpha multipliziert wurde.
+ */
+export function segmentAlpha(segment: Segment, correction: CorrectionResult): number {
+  if (segment.dyno && segment.dyno.correctedBy !== "none") return 1;
+  return correction.alpha;
+}
+
+/** Wird für diesen Lauf tatsächlich korrigiert? Siehe segmentAlpha(). */
+export function segmentCorrected(segment: Segment, correction: CorrectionResult): boolean {
+  return correction.applied && !(segment.dyno && segment.dyno.correctedBy !== "none");
 }

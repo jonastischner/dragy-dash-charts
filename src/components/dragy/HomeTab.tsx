@@ -2,10 +2,10 @@ import { useMemo } from "react";
 import { Gauge, Timer, Mountain, Flag, ChevronRight, Settings2, Compass, CalendarDays } from "lucide-react";
 import { Section, EmptyState, Note } from "./ui";
 import { useAppStore } from "@/lib/dragy/store";
-import { computeSegment, splitTime, runDistance, W_TO_PS } from "@/lib/dragy/physics";
+import { segmentSamples, splitTime, runDistance, W_TO_PS } from "@/lib/dragy/physics";
 import type { ModuleId } from "@/lib/dragy/types";
 import { MODULE_DESC, MODULE_IDS, MODULE_LABEL, MODULE_METRIC, sessionModule } from "@/lib/dragy/modules";
-import { sessionCorrection, useCorrectionStandard } from "./useCorrection";
+import { segmentAlpha, segmentCorrected, sessionCorrection, useCorrectionStandard } from "./useCorrection";
 
 const MODULE_ICON: Record<ModuleId, typeof Gauge> = {
   power: Gauge,
@@ -43,9 +43,11 @@ export function HomeTab({ onOpenModule, onOpenSim, onOpenTrip, onOpenEvents, onO
           // Faktor je Session – normiert Läufe bei unterschiedlichem Wetter auf
           // gemeinsame Bedingungen, damit die Bestmarke vergleichbar ist.
           const corr = sessionCorrection(standard, s);
-          for (const smp of computeSegment(s, g, vehicle)) {
-            const p = smp.pEngineW * W_TO_PS * corr.alpha;
-            if (Number.isFinite(p) && (!Number.isFinite(ps) || p > ps)) { ps = p; bestApplied = corr.applied; }
+          const alpha = segmentAlpha(g, corr);
+          const applied = segmentCorrected(g, corr);
+          for (const smp of segmentSamples(s, g, vehicle)) {
+            const p = smp.pEngineW * W_TO_PS * alpha;
+            if (Number.isFinite(p) && (!Number.isFinite(ps) || p > ps)) { ps = p; bestApplied = applied; }
           }
         }
         if (Number.isFinite(ps)) best = `${ps.toFixed(0)} PS${bestApplied ? " korr." : ""}`;

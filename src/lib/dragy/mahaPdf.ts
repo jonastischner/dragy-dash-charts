@@ -3,8 +3,8 @@
  * Datenblöcke. Reine Vektor-Ausgabe über jsPDF – offline und druckscharf.
  */
 import { jsPDF } from "jspdf";
-import { computeSegment, W_TO_PS } from "./physics";
-import type { Segment, Session, Vehicle } from "./types";
+import { segmentSamples, W_TO_PS } from "./physics";
+import type { DynoRun, Segment, Session, Vehicle } from "./types";
 import { sessionTimestamp } from "./sessionTime";
 import { correctionFactor, CORRECTION_LABEL, type CorrectionResult, type CorrectionStandard } from "./correction";
 
@@ -43,7 +43,7 @@ export interface RunPdfData {
 }
 
 function buildCurves(d: RunPdfData, alpha = 1): Curve[] {
-  const samples = computeSegment(d.session, d.segment, d.vehicle)
+  const samples = segmentSamples(d.session, d.segment, d.vehicle)
     .filter((s) => Number.isFinite(s.rpm) && s.rpm > 0 && Number.isFinite(s.pEngineW));
   if (samples.length === 0) return [];
 
@@ -114,9 +114,12 @@ function peaks(curves: Curve[], d: RunPdfData) {
 }
 
 /** Fußnote je nach Korrekturzustand – sie darf nie "normiert" behaupten, wenn alpha = 1 blieb. */
-function footnote(standard: CorrectionStandard, corr: CorrectionResult): string {
+function footnote(standard: CorrectionStandard, corr: CorrectionResult, dyno?: DynoRun): string {
   const base = "GPS-basierte Messung (kein Rollenprüfstand). Motorleistung/-drehmoment sind Schätzungen aus Radleistung + Schleppkurve";
   if (standard === "none") return `${base}; keine Normkorrektur nach EWG 80/1269.`;
+  if (dyno && dyno.correctedBy !== "none") {
+    return `Gemessen auf ${dyno.bench ?? "einem Leistungsprüfstand"}; die Werte sind im Protokoll bereits nach ${CORRECTION_LABEL[dyno.correctedBy]} korrigiert und werden hier nicht erneut umgerechnet.`;
+  }
   if (!corr.applied) {
     return `${base}. ${CORRECTION_LABEL[standard]} gewählt, mangels Umgebungsdaten (${corr.missing.join(", ")}) aber nicht angewandt – die Werte sind unkorrigiert.`;
   }
@@ -132,7 +135,13 @@ function drawPolyline(doc: jsPDF, pts: Array<[number, number]>) {
 /** Zeichnet eine komplette Protokollseite in ein bestehendes Dokument. */
 /** Korrektur dieses Laufs – alpha gilt je Session, bei Sammel-Exporten also je Seite. */
 function runCorrection(d: RunPdfData, standard: CorrectionStandard): CorrectionResult {
-  return correctionFactor(standard, d.session.tempC, d.session.pressureHpa, d.session.rh);
+  const corr = correctionFactor(standard, d.session.tempC, d.session.pressureHpa, d.session.rh);
+  // Eine importierte Prüfstandskurve ist im Protokoll schon normkorrigiert –
+  // ein zweites Mal zu korrigieren wäre falsch.
+  if (d.segment.dyno && d.segment.dyno.correctedBy !== "none") {
+    return { ...corr, alpha: 1, applied: false };
+  }
+  return corr;
 }
 
 function drawPage(doc: jsPDF, d: RunPdfData, info: PdfHeaderInfo, standard: CorrectionStandard) {
@@ -356,7 +365,7 @@ function drawPage(doc: jsPDF, d: RunPdfData, info: PdfHeaderInfo, standard: Corr
   const notes = [d.session.notes, d.segment.notes].filter(Boolean).join(" · ");
   if (notes) doc.text(doc.splitTextToSize(`Notizen: ${notes}`, W - 2 * M).slice(0, 2), M, fy + 4);
   doc.text(
-    footnote(standard, corr),
+    footnote(standard, corr, d.segment.dyno),
     M, H - M, { maxWidth: W - 2 * M },
   );
 }

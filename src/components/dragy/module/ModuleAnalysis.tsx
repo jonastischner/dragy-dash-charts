@@ -1,9 +1,9 @@
 import { useMemo } from "react";
 import { Section, Field, Select, Note, Row, usePersistedState } from "../ui";
-import { computeSegment, splitTime, distanceRun, runDistance, W_TO_PS, ACCEL_SPLITS } from "@/lib/dragy/physics";
+import { segmentSamples, splitTime, distanceRun, runDistance, W_TO_PS, ACCEL_SPLITS } from "@/lib/dragy/physics";
 import type { ModuleId, Segment, Session, Vehicle } from "@/lib/dragy/types";
 import { isPowerModule } from "@/lib/dragy/modules";
-import { sessionCorrection, useCorrectionStandard } from "../useCorrection";
+import { segmentAlpha, segmentCorrected, sessionCorrection, useCorrectionStandard } from "../useCorrection";
 import { CORRECTION_LABEL } from "@/lib/dragy/correction";
 import { CorrectionSelect } from "../CorrectionSelect";
 
@@ -27,7 +27,7 @@ function PowerAnalysis({ sessions, segments, vehicle }: Ctx) {
   const corrected = standard !== "none";
 
   const rows = useMemo(() => segsOf(sessions, segments).map(({ session, seg }) => {
-    const samples = computeSegment(session, seg, vehicle);
+    const samples = segmentSamples(session, seg, vehicle);
     let ps = NaN, psRpm = NaN, nm = NaN, nmRpm = NaN;
     for (const s of samples) {
       const p = s.pEngineW * W_TO_PS;
@@ -39,11 +39,18 @@ function PowerAnalysis({ sessions, segments, vehicle }: Ctx) {
     // unterschiedliche alpha – genau das macht sie erst vergleichbar.
     // Ohne hinterlegte Umgebungsdaten bleibt applied=false und alpha=1: der Lauf
     // wird bewusst nicht korrigiert, statt einen Faktor zu erfinden.
+    // Ein importierter Prüfstandslauf bringt die Korrektur schon mit und wird
+    // deshalb nicht ein zweites Mal korrigiert.
     const corr = sessionCorrection(standard, session);
+    const alpha = segmentAlpha(seg, corr);
+    const applied = segmentCorrected(seg, corr);
+    // Warum nicht korrigiert wurde, muss unterscheidbar bleiben: fehlende
+    // Umgebungsdaten sind etwas anderes als eine schon korrigierte Messung.
+    const preCorrected = !!seg.dyno && seg.dyno.correctedBy !== "none";
     return {
       key: `${session.id}:${seg.id}`, session, seg, ps, psRpm, nm, nmRpm,
-      alpha: corr.alpha, inRange: corr.inRange, applied: corr.applied, missing: corr.missing,
-      psCorr: ps * corr.alpha, nmCorr: nm * corr.alpha,
+      alpha, inRange: corr.inRange, applied, missing: corr.missing, preCorrected,
+      psCorr: ps * alpha, nmCorr: nm * alpha,
     };
   }).filter((r) => Number.isFinite(r.ps))
     .sort((a, b) => (corrected ? b.psCorr - a.psCorr : b.ps - a.ps)),
@@ -54,7 +61,8 @@ function PowerAnalysis({ sessions, segments, vehicle }: Ctx) {
   }
 
   const ref = rows.find((r) => r.key === refKey);
-  const uncorrected = rows.filter((r) => !r.applied).length;
+  const uncorrected = rows.filter((r) => !r.applied && !r.preCorrected).length;
+  const preCorrected = rows.filter((r) => r.preCorrected).length;
   const fmtDelta = (val: number, base: number, unit: string) => {
     if (!Number.isFinite(val) || !Number.isFinite(base) || base === 0) return "—";
     const abs = val - base, pct = (abs / base) * 100, sign = abs > 0 ? "+" : "";
@@ -75,6 +83,13 @@ function PowerAnalysis({ sessions, segments, vehicle }: Ctx) {
               {" "}
               <b>{uncorrected} von {rows.length} Läufen</b> haben keine Umgebungsdaten hinterlegt und
               bleiben unkorrigiert – sie stehen mit ihrem Messwert in der Liste.
+            </>
+          )}
+          {preCorrected > 0 && (
+            <>
+              {" "}
+              <b>{preCorrected} {preCorrected === 1 ? "Lauf ist" : "Läufe sind"}</b> vom Prüfstand
+              übernommen und im Protokoll bereits korrigiert – dort wird nicht erneut umgerechnet.
             </>
           )}
         </Note>
@@ -117,7 +132,9 @@ function PowerAnalysis({ sessions, segments, vehicle }: Ctx) {
                 {corrected && (
                   !r.applied ? (
                     <td className="py-1 pr-2 text-right tabular-nums text-muted-foreground"
-                        title={`Nicht korrigiert – ${r.missing.join(", ")} nicht hinterlegt`}>—</td>
+                        title={r.preCorrected
+                          ? "Prüfstandsmessung – im Protokoll bereits korrigiert"
+                          : `Nicht korrigiert – ${r.missing.join(", ")} nicht hinterlegt`}>—</td>
                   ) : (
                     <td className={`py-1 pr-2 text-right tabular-nums ${r.inRange ? "text-muted-foreground" : "text-warning"}`}
                         title={r.inRange ? undefined : "Außerhalb des nach EWG 80/1269 zulässigen Bereichs"}>

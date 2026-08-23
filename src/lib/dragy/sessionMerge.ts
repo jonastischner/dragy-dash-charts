@@ -6,7 +6,7 @@
 // gesetzt und der Bereich als Lauf markiert.
 
 import { uid } from "./db";
-import type { Record as R, RunCategory, Segment, Session } from "./types";
+import type { DynoRun, Record as R, RunCategory, Segment, Session } from "./types";
 
 /**
  * Lücke zwischen zwei angehängten Läufen in Sekunden. Bewusst nicht 0: im
@@ -60,5 +60,46 @@ export function appendRunToSession(
   return {
     session: { ...session, records: [...session.records, ...shifted] },
     segment,
+  };
+}
+
+/**
+ * Dasselbe für eine gemessene Prüfstandskurve. Sie bringt keine Records mit –
+ * das Segment bekommt nur einen freien Abschnitt auf der Zeitachse der Session,
+ * damit es sich nicht mit den GPS-Läufen überlappt. session.records bleibt
+ * unangetastet, deshalb ein eigener Weg statt appendRunToSession().
+ */
+export function appendDynoRunToSession(
+  session: Session,
+  dyno: DynoRun,
+  opts: Omit<AppendRunOptions, "startedAt"> & {
+    /** Bereits vorhandene Läufe der Session, damit sich die Abschnitte nicht überlappen. */
+    existing?: Pick<Segment, "endT">[];
+  },
+): Segment {
+  if (dyno.points.length === 0) throw new Error("Keine Messpunkte in der Kurve");
+
+  const lastT = session.records.length ? session.records[session.records.length - 1].t : 0;
+  // Eine reine Prüfstands-Session hat keine Records; dann bestimmt das Ende des
+  // letzten Laufs, wo der nächste anfängt.
+  const lastSegEnd = (opts.existing ?? []).reduce((m, g) => Math.max(m, g.endT), 0);
+  const occupied = Math.max(lastT, lastSegEnd);
+  const base = occupied > 0 ? occupied + RUN_GAP_S : 0;
+  // Eine Sekunde je Stützpunkt: die Zeitachse ist bei einer Prüfstandskurve
+  // ohne Bedeutung, sie muss nur monoton sein und sich nicht überschneiden.
+  const endT = base + Math.max(dyno.points.length - 1, 1);
+
+  return {
+    id: uid(),
+    sessionId: session.id,
+    name: opts.name,
+    startT: base,
+    endT,
+    rpmFactor: opts.rpmFactor,
+    color: opts.color,
+    visible: true,
+    dyno,
+    ...(opts.category ? { category: opts.category } : {}),
+    ...(dyno.measuredAt != null ? { recordedAt: dyno.measuredAt } : {}),
   };
 }

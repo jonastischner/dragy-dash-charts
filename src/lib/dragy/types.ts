@@ -1,3 +1,5 @@
+import type { CorrectionStandard } from "./correction";
+
 export interface DragPoint { rpm: number; ps: number }
 
 export interface GearPreset {
@@ -77,6 +79,49 @@ export interface Vehicle {
   updatedAt?: number;
 }
 
+/**
+ * Ein Punkt einer auf dem Prüfstand gemessenen Kurve. Anders als bei den
+ * GPS-Läufen ist die Leistung hier ein Messwert und wird nicht aus der
+ * Beschleunigung abgeleitet.
+ */
+export interface DynoPoint {
+  rpm: number;
+  pWheelPs: number | null;   // P-Rad
+  pDragPs: number | null;    // P-Schlepp
+  pEnginePs: number;         // P-Mot = P-Rad + P-Schlepp
+}
+
+/**
+ * Eine gemessene Prüfstandskurve (z.B. aus einem MAHA-LPS-Protokoll), die als
+ * Lauf importiert wurde.
+ */
+export interface DynoRun {
+  /** Stützpunkte, nach Drehzahl aufsteigend. */
+  points: DynoPoint[];
+  /**
+   * Norm, nach der das Protokoll bereits korrigiert hat ("none" = Rohwerte).
+   * Verhindert, dass die App ein zweites Mal korrigiert.
+   */
+  correctedBy: CorrectionStandard;
+  bench?: string;      // z.B. "MAHA LPS3000 4x4"
+  operator?: string;   // Prüfer
+  measuredAt?: number; // Meßdatum als Epoch-ms
+  /**
+   * Umgebungsdaten des Protokolls. Bewusst hier und nicht in Session.tempC &
+   * Co.: dort gesetzte Werte lösen die eigene Normkorrektur der App aus, das
+   * Protokoll ist aber schon korrigiert. Reine Dokumentation.
+   */
+  env?: { tempC?: number; pressureHpa?: number; rh?: number };
+  /** Gedruckte Eckdaten des Protokolls – Ankerwerte und Anzeige. */
+  peaks?: {
+    psNorm?: number; psRpm?: number;
+    nmNorm?: number; nmRpm?: number;
+    psWheel?: number; psDrag?: number;
+    maxRpm?: number;
+  };
+  source: "vision" | "manual";
+}
+
 export interface Record { t: number; speedKmh: number; heightM: number }
 
 export interface ManualRow { speedKmh: number; t: number | null }
@@ -139,6 +184,12 @@ export interface Segment {
    * Quelldatei wäre sonst unwiederbringlich weg.
    */
   recordedAt?: number;
+  /**
+   * Gemessene Prüfstandskurve statt aus GPS-Daten gerechneter Werte. Ist sie
+   * gesetzt, liefert segmentSamples() diese Kurve unverändert aus – die
+   * Session braucht dafür keine Records.
+   */
+  dyno?: DynoRun;
 
   updatedAt?: number;
 }

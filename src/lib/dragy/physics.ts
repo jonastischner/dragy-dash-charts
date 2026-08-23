@@ -1,7 +1,10 @@
-import type { Record, Vehicle, Segment, Session, DragPoint } from "./types";
+import type { Record, Vehicle, Segment, Session, DragPoint, DynoRun } from "./types";
 
 export const G = 9.81;
 export const W_TO_PS = 1 / 735.499;
+/** Drehmoment aus Leistung und Drehzahl: M[Nm] = 7023.8 * P[PS] / n. */
+export const NM_PER_PS_RPM = 7023.8;
+
 
 // Standard-Umgebungsbedingungen für Sessions ohne eigene Angaben. Sie gehen nur
 // in die Luftdichte (Luftwiderstand) ein – eine Normkorrektur findet ohne
@@ -234,8 +237,8 @@ export function computeSegment(
     const pEngine = pWheel + pDragW;
     const pWheelPs = pWheel * W_TO_PS;
     const pEnginePs = pEngine * W_TO_PS;
-    const tqWheel = rpm >= 50 ? 7023.8 * pWheelPs / rpm : NaN;
-    const tqEngine = rpm >= 50 ? 7023.8 * pEnginePs / rpm : NaN;
+    const tqWheel = rpm >= 50 ? NM_PER_PS_RPM * pWheelPs / rpm : NaN;
+    const tqEngine = rpm >= 50 ? NM_PER_PS_RPM * pEnginePs / rpm : NaN;
     out.push({
       t: times[i], vMs: v, a: a[i], rpm,
       pWheelW: pWheel, pDragW, pEngineW: pEngine,
@@ -244,6 +247,62 @@ export function computeSegment(
     });
   }
   return out;
+}
+
+/**
+ * Eine gemessene Prüfstandskurve in dieselbe Form bringen, die computeSegment()
+ * aus GPS-Daten erzeugt. Damit sehen alle Auswertungen (Diagramme, Spitzenwerte,
+ * Vergleich, PDF) eine Prüfstandsmessung wie einen gerechneten Lauf.
+ *
+ * Was hier NICHT passiert: aus der Kurve einen Geschwindigkeitsverlauf
+ * zurückzurechnen. Die Leistung ist der Messwert und bleibt unangetastet.
+ */
+export function dynoSamples(run: DynoRun, segment: Segment): SegmentSample[] {
+  const pts = [...run.points]
+    .filter((p) => Number.isFinite(p.rpm) && p.rpm > 0 && Number.isFinite(p.pEnginePs))
+    .sort((a, b) => a.rpm - b.rpm);
+  if (pts.length === 0) return [];
+
+  const factor = segment.rpmFactor > 0 ? segment.rpmFactor : NaN;
+  // Zeitachse rein synthetisch: ein Prüfstandslauf hat keine sinnvolle Zeit,
+  // die Auswerter erwarten aber eine monoton steigende Achse innerhalb des
+  // Segments.
+  const span = Math.max(segment.endT - segment.startT, 0);
+  const dt = pts.length > 1 ? span / (pts.length - 1) : 0;
+
+  return pts.map((p, i) => {
+    const pDragPs = p.pDragPs ?? (p.pWheelPs != null ? p.pEnginePs - p.pWheelPs : NaN);
+    const pWheelPs = p.pWheelPs ?? (p.pDragPs != null ? p.pEnginePs - p.pDragPs : NaN);
+    const speedKmh = p.rpm / factor;
+    return {
+      t: segment.startT + i * dt,
+      vMs: speedKmh / 3.6,
+      // Konstant positiv: der PDF-Export schneidet einen Lauf am letzten Punkt
+      // mit a > 0.15 ab, um die Ausrollphase zu entfernen. Eine
+      // Prüfstandskurve hat keine – mit a = 0 würde sie abgeschnitten.
+      a: 1,
+      rpm: p.rpm,
+      pWheelW: pWheelPs / W_TO_PS,
+      pDragW: pDragPs / W_TO_PS,
+      pEngineW: p.pEnginePs / W_TO_PS,
+      torqueWheelNm: NM_PER_PS_RPM * pWheelPs / p.rpm,
+      torqueEngineNm: NM_PER_PS_RPM * p.pEnginePs / p.rpm,
+      speedKmh,
+    };
+  });
+}
+
+/**
+ * Auswertung eines Laufs – egal ob aus GPS-Daten gerechnet oder auf dem
+ * Prüfstand gemessen. Alle Verbraucher sollen hierüber gehen, nicht direkt
+ * über computeSegment().
+ */
+export function segmentSamples(
+  session: Session,
+  segment: Segment,
+  vehicle: Vehicle,
+): SegmentSample[] {
+  return segment.dyno ? dynoSamples(segment.dyno, segment) : computeSegment(session, segment, vehicle);
 }
 
 // Coastdown: fit a_decel = g*Crr + k*v^2 where k = 0.5*rho*CdA/m
