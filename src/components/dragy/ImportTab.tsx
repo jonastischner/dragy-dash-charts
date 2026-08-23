@@ -3,12 +3,13 @@ import { Section, Field, TextInput, NumInput, Select, Button, Note, Row, EmptySt
 import { useAppStore, nextUnusedColor } from "@/lib/dragy/store";
 import { parseUbx } from "@/lib/dragy/ubx";
 import { parseTableFile } from "@/lib/dragy/tabular";
-import { compareSessionsDesc, nameImportedSession } from "@/lib/dragy/sessionTime";
-import { appendRunToSession } from "@/lib/dragy/sessionMerge";
+import { compareSessionsDesc, formatSessionTime, nameImportedSession } from "@/lib/dragy/sessionTime";
+import { appendDynoRunToSession, appendRunToSession } from "@/lib/dragy/sessionMerge";
 import { sessionModule } from "@/lib/dragy/modules";
 import { uid } from "@/lib/dragy/db";
 import { errorMessage } from "@/lib/dragy/errors";
 import { STD_ENV } from "@/lib/dragy/physics";
+import { DynoImportDialog, type DynoDraft } from "./DynoImportDialog";
 import type { Session, Segment, ManualRow, Record as R, ModuleId } from "@/lib/dragy/types";
 
 /**
@@ -35,6 +36,7 @@ export function ImportTab({ module = "power", onOpenVehicles }: { module?: Modul
   const [rh, setRh] = useState<number | undefined>(undefined);
   const [log, setLog] = useState<string[]>([]);
   const [manualOpen, setManualOpen] = useState(false);
+  const [dynoOpen, setDynoOpen] = useState(false);
   const [target, setTarget] = useState<ImportTarget>("perFile");
   const [targetSessionId, setTargetSessionId] = useState<string>("");
 
@@ -137,6 +139,39 @@ export function ImportTab({ module = "power", onOpenVehicles }: { module?: Modul
     setLog(msgs);
   };
 
+  /**
+   * Einen gemessenen Prüfstandslauf ablegen: entweder an die gewählte Session
+   * anhängen oder eine neue anlegen. Die Session bleibt ohne Records – die
+   * Kurve steckt im Lauf.
+   */
+  const saveDynoRun = async (draft: DynoDraft) => {
+    const ownIds = new Set(state.sessions.filter((s) => s.vehicleId === activeVehicle.id).map((s) => s.id));
+    const usedColors = state.segments.filter((g) => ownIds.has(g.sessionId)).map((g) => g.color);
+
+    const existingSession = target === "append"
+      ? state.sessions.find((s) => s.id === targetSessionId) ?? null
+      : null;
+    const measuredAt = draft.run.measuredAt;
+    const session: Session = existingSession ?? {
+      id: uid(), vehicleId: activeVehicle.id,
+      name: measuredAt != null ? formatSessionTime(measuredAt) : "Prüfstandsmessung",
+      records: [], tempC: undefined, pressureHpa: undefined, rh: undefined,
+      manual: false, createdAt: Date.now(), module,
+      ...(measuredAt != null ? { recordedAt: measuredAt } : {}),
+    };
+    const existing = state.segments.filter((g) => g.sessionId === session.id);
+    const segment = appendDynoRunToSession(session, draft.run, {
+      name: draft.name,
+      color: nextUnusedColor(usedColors),
+      rpmFactor: draft.rpmFactor,
+      existing,
+    });
+    if (!existingSession) await saveSession(session);
+    await saveSegment(segment);
+    setDynoOpen(false);
+    setLog([`Prüfstandslauf „${draft.name}" mit ${draft.run.points.length} Messpunkten in Session „${session.name}" gespeichert.`]);
+  };
+
   return (
     <div>
       <Section title="Umgebungsdaten (für Luftdichte)">
@@ -197,6 +232,7 @@ export function ImportTab({ module = "power", onOpenVehicles }: { module?: Modul
             Dateien wählen…
           </Button>
           <Button variant="secondary" onClick={() => setManualOpen(true)}>Manuell eingeben…</Button>
+          <Button variant="secondary" onClick={() => setDynoOpen(true)}>Prüfstandsprotokoll…</Button>
 
         </div>
         {log.length > 0 && (
@@ -205,6 +241,14 @@ export function ImportTab({ module = "power", onOpenVehicles }: { module?: Modul
           </ul>
         )}
       </Section>
+
+      {dynoOpen && (
+        <DynoImportDialog
+          defaultRpmFactor={activeVehicle.rpmFactorDefault}
+          onCancel={() => setDynoOpen(false)}
+          onSave={saveDynoRun}
+        />
+      )}
 
       {manualOpen && (
         <ManualEditor

@@ -7,7 +7,7 @@ import { segmentSamples, W_TO_PS, ACCEL_SPLITS, crossingTime, splitTime } from "
 import { Chart, type Series } from "./Chart";
 import type { ModuleId } from "@/lib/dragy/types";
 import { isPowerModule, sessionModule } from "@/lib/dragy/modules";
-import { sessionCorrection, useCorrectionStandard } from "./useCorrection";
+import { segmentAlpha, sessionCorrection, useCorrectionStandard } from "./useCorrection";
 import { compareNames } from "@/lib/dragy/sort";
 import { compareSessionsDesc } from "@/lib/dragy/sessionTime";
 import { CORRECTION_LABEL } from "@/lib/dragy/correction";
@@ -99,7 +99,7 @@ export function CompareTab({ module = "power", onOpenVehicles }: { module?: Modu
     }
     const samples = segmentSamples(session, g, activeVehicle);
     // Faktor je Session – nur auf die Motorgrößen, Radwerte bleiben Messwerte.
-    const alpha = isEngineMode ? sessionCorrection(standard, session).alpha : 1;
+    const alpha = isEngineMode ? segmentAlpha(g, sessionCorrection(standard, session)) : 1;
     const points = samples
       .map((s) => {
         let y: number = NaN;

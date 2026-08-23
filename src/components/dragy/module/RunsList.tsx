@@ -7,14 +7,15 @@ import {
 } from "@/lib/dragy/physics";
 import { computeRpmFactor, resolveAllGears } from "@/lib/dragy/gear";
 import { uid } from "@/lib/dragy/db";
-import type { ModuleId, Session, Segment, Vehicle } from "@/lib/dragy/types";
+import type { DynoRun, ModuleId, Session, Segment, Vehicle } from "@/lib/dragy/types";
 import { MODULE_IDS, MODULE_LABEL, isPowerModule, isTrackModule, sessionModule } from "@/lib/dragy/modules";
 import { compareSessionsDesc, formatSessionTime } from "@/lib/dragy/sessionTime";
 import { sortedByName } from "@/lib/dragy/sort";
 import { Chart, type Series } from "../Chart";
 import { PdfExportDialog } from "../PdfExportDialog";
 import { CorrectionNote } from "../CorrectionNote";
-import { useSessionCorrection } from "../useCorrection";
+import { segmentAlpha, segmentCorrected, useSessionCorrection } from "../useCorrection";
+import { CORRECTION_LABEL } from "@/lib/dragy/correction";
 
 /** Aufnahmezeit als Zusatzzeile – leer, wenn der Session-Name sie bereits ist. */
 function recordedLabel(s: Session): string | null {
@@ -61,6 +62,10 @@ export function RunsList({ module, onOpenGarage }: { module: ModuleId; onOpenGar
           const segs = sortedByName(state.segments.filter((g) => g.sessionId === s.id));
           const isOpen = expanded === s.id;
           const dur = s.records.length ? s.records[s.records.length - 1].t : 0;
+          // Eine reine Prüfstands-Session hat keine GPS-Punkte; „0,0 s · 0 Punkte"
+          // wäre dort keine Information, sondern nur verwirrend.
+          const dynoRuns = segs.filter((g) => g.dyno).length;
+          const onlyDyno = s.records.length === 0 && dynoRuns > 0 && dynoRuns === segs.length;
           return (
             <li key={s.id} className="rounded-md border border-border bg-muted">
               <button className="flex w-full items-center justify-between p-3 text-left" onClick={() => setExpanded(isOpen ? null : s.id)}>
@@ -72,7 +77,9 @@ export function RunsList({ module, onOpenGarage }: { module: ModuleId; onOpenGar
                     {/* Aufnahmezeit nur zeigen, wenn sie nicht ohnehin schon der Name ist –
                         etwa bei umbenannten Sessions („Nordschleife Runde 3"). */}
                     {recordedLabel(s) && <>{recordedLabel(s)} · </>}
-                    {dur.toFixed(1)} s · {s.records.length} Punkte · {segs.length} Lauf/Läufe
+                    {onlyDyno
+                      ? <>Prüfstand · {segs.length} {segs.length === 1 ? "Lauf" : "Läufe"}</>
+                      : <>{dur.toFixed(1)} s · {s.records.length} Punkte · {segs.length} {segs.length === 1 ? "Lauf" : "Läufe"}</>}
                   </div>
                 </div>
                 <span className="text-muted-foreground">{isOpen ? "▾" : "▸"}</span>
@@ -118,6 +125,11 @@ function SessionDetail({ module, session, segments, usedColors, vehicle, onRenam
   }], [session.records]);
 
   const bands = segments.map((g) => ({ xStart: g.startT, xEnd: g.endT, color: g.color, label: g.name }));
+  // Eine reine Prüfstands-Session bringt keine GPS-Spur mit: Geschwindigkeits-
+  // verlauf, Auto-Erkennung und "+ Lauf" hätten hier nichts, worauf sie sich
+  // beziehen könnten.
+  const hasRecords = session.records.length > 0;
+  const onlyDyno = !hasRecords && segments.length > 0 && segments.every((g) => g.dyno);
 
   const addSegment = async () => {
     const i = segments.length;
@@ -161,7 +173,11 @@ function SessionDetail({ module, session, segments, usedColors, vehicle, onRenam
           <NumInput allowEmpty aria-label="Luftdruck (hPa)" placeholder={`${STD_ENV.pressureHpa} hPa`} value={session.pressureHpa ?? ""} onChange={(e) => onEnvUpdate({ pressureHpa: e.target.value === "" ? undefined : +e.target.value })} />
           <NumInput allowEmpty aria-label="Relative Luftfeuchte (%)" placeholder={`${STD_ENV.rh} %`} value={session.rh ?? ""} onChange={(e) => onEnvUpdate({ rh: e.target.value === "" ? undefined : +e.target.value })} />
         </Row>
-        <span className="mt-1 block text-caption text-muted-foreground">°C · hPa · % rF — leer = nicht gemessen</span>
+        <span className="mt-1 block text-caption text-muted-foreground">
+          {onlyDyno
+            ? "°C · hPa · % rF — für Prüfstandsläufe ohne Wirkung: deren Werte sind im Protokoll bereits korrigiert."
+            : "°C · hPa · % rF — leer = nicht gemessen"}
+        </span>
       </div>
 
       <div className="mt-2">
@@ -196,10 +212,12 @@ function SessionDetail({ module, session, segments, usedColors, vehicle, onRenam
         </div>
       </details>
 
-      <div className="mt-2">
-        <span className="mb-1 block text-caption font-semibold text-muted-foreground">Geschwindigkeitsverlauf</span>
-        <Chart series={speedSeries} bands={bands} xLabel="t (s)" yLabel="km/h" xFormat={(v) => v.toFixed(1)} yFormat={(v) => v.toFixed(0)} showLegend={false} yFromZero={false} />
-      </div>
+      {hasRecords && (
+        <div className="mt-2">
+          <span className="mb-1 block text-caption font-semibold text-muted-foreground">Geschwindigkeitsverlauf</span>
+          <Chart series={speedSeries} bands={bands} xLabel="t (s)" yLabel="km/h" xFormat={(v) => v.toFixed(1)} yFormat={(v) => v.toFixed(0)} showLegend={false} yFromZero={false} />
+        </div>
+      )}
 
       <h4 className="mt-4 text-body font-semibold text-foreground">Ergebnisse</h4>
       {/* Der Korrektur-Hinweis steht einmal für die ganze Gruppe. Vorher hing er
@@ -217,6 +235,7 @@ function SessionDetail({ module, session, segments, usedColors, vehicle, onRenam
       <h4 className="mt-4 text-body font-semibold text-foreground">Läufe</h4>
       {/* Ohne open-Attribut bleibt das <details> unkontrolliert und damit
           zuklappbar; ein festes open={…} würde bei jedem Re-Render aufspringen. */}
+      {hasRecords && (
       <details className="mt-1 rounded-md border border-border bg-card/50" {...(segments.length === 0 ? { open: true } : {})}>
         <summary className="cursor-pointer select-none px-3 py-2 text-caption font-semibold text-muted-foreground">
           Auto-Erkennung (Vorschlag, danach prüfen)
@@ -231,6 +250,7 @@ function SessionDetail({ module, session, segments, usedColors, vehicle, onRenam
           <Button className="mt-2" variant="secondary" onClick={doAutoDetect}>Läufe erkennen</Button>
         </div>
       </details>
+      )}
 
       <div className="mt-2">
         <ul className="space-y-2">
@@ -243,9 +263,11 @@ function SessionDetail({ module, session, segments, usedColors, vehicle, onRenam
             />
           ))}
         </ul>
-        <div className="mt-2">
-          <Button variant="secondary" onClick={addSegment}>+ Lauf</Button>
-        </div>
+        {hasRecords && (
+          <div className="mt-2">
+            <Button variant="secondary" onClick={addSegment}>+ Lauf</Button>
+          </div>
+        )}
       </div>
 
       {/* Ganz ans Ende, weg von den häufig benutzten Bedienelementen. */}
@@ -299,25 +321,31 @@ function SegmentEditor({ module, seg, session, vehicle, maxT, onChange, onDelete
       ? selectedGear
       : null;
   const isPower = isPowerModule(module);
+  // Ein importierter Prüfstandslauf hat keine GPS-Spur: Start/Ende, Gangwahl,
+  // Auto-Erkennung und Coastdown haben für ihn keine Bedeutung.
+  const dyno = seg.dyno;
   const [pdfOpen, setPdfOpen] = useState(false);
   // Eingeklappt per Default: eine Session mit fünf Läufen war sonst kaum noch
   // überschaubar. Sichtbarkeit, Farbe und Name bleiben immer erreichbar.
   const [open, setOpen] = useState(false);
   const correction = useSessionCorrection(session);
+  // Eine importierte Prüfstandskurve ist bereits normkorrigiert.
+  const alpha = segmentAlpha(seg, correction);
+  const corrected = segmentCorrected(seg, correction);
 
   const miniSeries: Series[] = useMemo(() => {
     if (isPower) {
       const samples = segmentSamples(session, seg, vehicle);
       const points = samples
-        .map((s) => ({ x: s.rpm, y: s.pEngineW * W_TO_PS * correction.alpha }))
+        .map((s) => ({ x: s.rpm, y: s.pEngineW * W_TO_PS * alpha }))
         .filter((p) => Number.isFinite(p.x) && Number.isFinite(p.y));
-      return [{ label: correction.applied ? `${seg.name} (korr.)` : seg.name, color: seg.color, points }];
+      return [{ label: corrected ? `${seg.name} (korr.)` : seg.name, color: seg.color, points }];
     }
     const points = session.records
       .filter((r) => r.t >= seg.startT && r.t <= seg.endT)
       .map((r) => ({ x: r.t - seg.startT, y: r.speedKmh }));
     return [{ label: seg.name, color: seg.color, points }];
-  }, [session, seg, vehicle, isPower, correction.alpha, correction.applied]);
+  }, [session, seg, vehicle, isPower, alpha, corrected]);
 
   // Kurzfassung für die eingeklappte Karte – speist sich aus derselben Serie,
   // die das Diagramm ohnehin braucht, kostet also keine zusätzliche Rechnung.
@@ -355,18 +383,23 @@ function SegmentEditor({ module, seg, session, vehicle, maxT, onChange, onDelete
 
       {!open && (
         <div className="mt-1 text-caption text-muted-foreground">
-          {seg.startT.toFixed(1)}–{seg.endT.toFixed(1)} s{peakLabel && <> · {peakLabel}</>}
-          {gearMismatch && <span className="ml-1 text-warning">· Gang/rpmFactor weichen ab</span>}
+          {dyno
+            ? <>Prüfstand · {dyno.points.length} Messpunkte</>
+            : <>{seg.startT.toFixed(1)}–{seg.endT.toFixed(1)} s</>}
+          {peakLabel && <> · {peakLabel}</>}
+          {!dyno && gearMismatch && <span className="ml-1 text-warning">· Gang/rpmFactor weichen ab</span>}
         </div>
       )}
 
       {open && (
       <>
-      <Row className="mt-2">
-        <Field label="Start t (s)"><NumInput step="0.1" value={seg.startT} onChange={(e) => onChange({ startT: Math.max(0, +e.target.value) })} /></Field>
-        <Field label="Ende t (s)"><NumInput step="0.1" value={seg.endT} onChange={(e) => onChange({ endT: Math.min(maxT, +e.target.value) })} /></Field>
+      {dyno && <DynoRunInfo run={dyno} seg={seg} />}
 
-        {isPower && hasAny && (
+      <Row className="mt-2">
+        {!dyno && <Field label="Start t (s)"><NumInput step="0.1" value={seg.startT} onChange={(e) => onChange({ startT: Math.max(0, +e.target.value) })} /></Field>}
+        {!dyno && <Field label="Ende t (s)"><NumInput step="0.1" value={seg.endT} onChange={(e) => onChange({ endT: Math.min(maxT, +e.target.value) })} /></Field>}
+
+        {isPower && !dyno && hasAny && (
           <Field label="Gemessener Gang" hint="Setzt rpmFactor aus Fahrzeug-Getriebe/Preset">
             <Select
               value={seg.gearPresetId ?? ""}
@@ -393,13 +426,13 @@ function SegmentEditor({ module, seg, session, vehicle, maxT, onChange, onDelete
         )}
 
         {isPower && (
-          <Field label="rpmFactor (U/min pro km/h)" hint="Manuell überschreibbar">
+          <Field label="rpmFactor (U/min pro km/h)" hint={dyno ? "Nur für die Geschwindigkeitsangabe – die Leistung ist gemessen" : "Manuell überschreibbar"}>
             <NumInput step="0.01" value={seg.rpmFactor} onChange={(e) => onChange({ rpmFactor: +e.target.value, gearPresetId: undefined })} />
           </Field>
         )}
       </Row>
 
-      {gearMismatch && (
+      {!dyno && gearMismatch && (
         <p className="mt-2 text-caption text-warning">
           „{gearMismatch.label}" ergibt {gearMismatch.rpmFactor.toFixed(2).replace(".", ",")} U/min pro km/h –
           gerechnet wird mit {seg.rpmFactor.toFixed(2).replace(".", ",")}. Vermutlich wurde die
@@ -418,7 +451,8 @@ function SegmentEditor({ module, seg, session, vehicle, maxT, onChange, onDelete
           Gang/rpmFactor skalieren die x-Achse – das Diagramm ist die Rückmeldung darauf. */}
       <div className="mt-2">
         <div className="mb-1 text-caption font-semibold text-muted-foreground">
-          {isPower ? "Leistung (PS) über Drehzahl" : "Geschwindigkeit (km/h) über Zeit"}
+          {dyno ? "Gemessene Leistung (PS) über Drehzahl"
+            : isPower ? "Leistung (PS) über Drehzahl" : "Geschwindigkeit (km/h) über Zeit"}
         </div>
         <Chart
           series={miniSeries}
@@ -438,7 +472,7 @@ function SegmentEditor({ module, seg, session, vehicle, maxT, onChange, onDelete
         </Field>
       </div>
 
-      {isPower && <CoastdownPanel session={session} seg={seg} vehicle={vehicle} onChange={onChange} />}
+      {isPower && !dyno && <CoastdownPanel session={session} seg={seg} vehicle={vehicle} onChange={onChange} />}
 
       {isPower && (
         <div className="mt-2 flex justify-end">
@@ -451,6 +485,36 @@ function SegmentEditor({ module, seg, session, vehicle, maxT, onChange, onDelete
       </>
       )}
     </li>
+  );
+}
+
+/** Kopfdaten des Protokolls am Lauf – belegt, woher die Zahlen stammen. */
+function DynoRunInfo({ run, seg }: { run: DynoRun; seg: Segment }) {
+  const de = (n: number | undefined, d = 1) =>
+    n == null || !Number.isFinite(n) ? "—" : n.toFixed(d).replace(".", ",");
+  const env = run.env;
+  return (
+    <div className="mt-2 rounded-md border border-border bg-elevated p-2 text-caption text-muted-foreground">
+      <div className="font-semibold text-foreground">
+        Prüfstandsmessung{run.bench ? ` · ${run.bench}` : ""}
+      </div>
+      <div className="mt-1 tabular-nums">
+        {run.measuredAt != null && <>{formatSessionTime(run.measuredAt)} · </>}
+        {run.points.length} Messpunkte
+        {run.operator && <> · Prüfer {run.operator}</>}
+        {" · "}{de(seg.rpmFactor, 2)} U/min pro km/h
+      </div>
+      {env && (env.tempC != null || env.pressureHpa != null || env.rh != null) && (
+        <div className="mt-1 tabular-nums">
+          Umgebung laut Protokoll: {de(env.tempC)} °C · {de(env.pressureHpa)} hPa · {de(env.rh)} %
+        </div>
+      )}
+      <div className="mt-1">
+        {run.correctedBy === "none"
+          ? "Protokoll unkorrigiert – die Normkorrektur der App greift hier nicht, weil keine eigenen Umgebungsdaten vorliegen."
+          : `Bereits nach ${CORRECTION_LABEL[run.correctedBy]} korrigiert – wird nicht erneut umgerechnet.`}
+      </div>
+    </div>
   );
 }
 
@@ -545,11 +609,12 @@ function PeakOverview({ session, segments, vehicle }: { session: Session; segmen
       if (Number.isFinite(nm) && (!Number.isFinite(best.nm) || nm > best.nm)) { best.nm = nm; best.nmRpm = s.rpm; }
     }
     // alpha ist ein reiner Skalar – die Drehzahl zum Spitzenwert bleibt gleich.
+    const a = segmentAlpha(g, correction);
     return {
       id: g.id, name: g.name, color: g.color, ...best,
-      psCorr: best.ps * correction.alpha, nmCorr: best.nm * correction.alpha,
+      psCorr: best.ps * a, nmCorr: best.nm * a,
     };
-  }), [session, segments, vehicle, correction.alpha]);
+  }), [session, segments, vehicle, correction]);
 
   if (rows.length === 0) return null;
 
@@ -648,20 +713,22 @@ function SessionCurves({ session, segments, vehicle }: { session: Session; segme
         })
         .filter((p) => Number.isFinite(p.x) && Number.isFinite(p.y));
       const visible = !hidden[g.id];
+      // Je Lauf entscheiden: ein Prüfstandslauf bringt die Korrektur schon mit.
+      const gApplies = applies && segmentCorrected(g, correction);
       out.push({
-        label: applies ? `${g.name} (korr.)` : g.name,
+        label: gApplies ? `${g.name} (korr.)` : g.name,
         color: g.color,
-        points: applies ? raw.map((p) => ({ x: p.x, y: p.y * correction.alpha })) : raw,
+        points: gApplies ? raw.map((p) => ({ x: p.x, y: p.y * segmentAlpha(g, correction) })) : raw,
         visible,
       });
       ids.push(g.id);
-      if (applies && showRaw) {
+      if (gApplies && showRaw) {
         out.push({ label: `${g.name} (gemessen)`, color: g.color, points: raw, visible, dashed: true });
         ids.push(g.id);
       }
     }
     return { series: out, seriesSegmentIds: ids };
-  }, [segments, session, vehicle, mode, hidden, applies, showRaw, correction.alpha]);
+  }, [segments, session, vehicle, mode, hidden, applies, showRaw, correction]);
 
   if (segments.length === 0) return null;
 

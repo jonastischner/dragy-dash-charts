@@ -1,7 +1,21 @@
-import { useState, useEffect, useCallback, type ReactNode, type InputHTMLAttributes, type ButtonHTMLAttributes, type TextareaHTMLAttributes } from "react";
+import { useState, useEffect, useCallback, useRef, type ReactNode, type InputHTMLAttributes, type ButtonHTMLAttributes, type TextareaHTMLAttributes } from "react";
 import { ChevronRight, Trash2, Plus, AlertCircle, Loader2 } from "lucide-react";
 
 // Persistente User-Preferences (Panel-Zustände, Auswahl in Diagrammen …)
+//
+// Denselben Schlüssel dürfen mehrere Komponenten gleichzeitig benutzen – etwa
+// die Normkorrektur, die in der Auswertung, im PDF-Dialog und unter „Mehr"
+// bedienbar ist. Ohne die Abonnenten-Liste hier hielte jede Instanz ihren
+// eigenen useState: das Schreiben landete zwar im localStorage, die anderen
+// Instanzen erfuhren davon aber erst nach einem Reload.
+const prefSubscribers = new Map<string, Set<(v: unknown) => void>>();
+
+function notifyPref(storageKey: string, value: unknown, self: (v: unknown) => void) {
+  const subs = prefSubscribers.get(storageKey);
+  if (!subs) return;
+  for (const fn of subs) if (fn !== self) fn(value);
+}
+
 export function usePersistedState<T>(key: string, initial: T) {
   const storageKey = `dragy.pref.${key}`;
   const [value, setValue] = useState<T>(initial);
@@ -15,12 +29,36 @@ export function usePersistedState<T>(key: string, initial: T) {
     setLoaded(true);
   }, [storageKey]);
 
+  // Aktueller Wert als Ref, damit update() die Funktionsform auflösen kann,
+  // ohne Seiteneffekte in den setState-Updater zu legen (React darf den
+  // mehrfach ausführen).
+  const valueRef = useRef(value);
+  valueRef.current = value;
+
+  // Stabile Identität des eigenen Abos – nur so lässt sich die schreibende
+  // Instanz von der Benachrichtigung ausnehmen.
+  const sink = useRef<((v: unknown) => void) | null>(null);
+  if (sink.current === null) sink.current = (v: unknown) => setValue(v as T);
+
+  useEffect(() => {
+    const fn = sink.current!;
+    let subs = prefSubscribers.get(storageKey);
+    if (!subs) { subs = new Set(); prefSubscribers.set(storageKey, subs); }
+    subs.add(fn);
+    return () => {
+      subs.delete(fn);
+      if (subs.size === 0) prefSubscribers.delete(storageKey);
+    };
+  }, [storageKey]);
+
   const update = useCallback((next: T | ((prev: T) => T)) => {
-    setValue((prev) => {
-      const resolved = typeof next === "function" ? (next as (p: T) => T)(prev) : next;
-      try { localStorage.setItem(storageKey, JSON.stringify(resolved)); } catch { /* ignore */ }
-      return resolved;
-    });
+    const resolved = typeof next === "function"
+      ? (next as (p: T) => T)(valueRef.current)
+      : next;
+    try { localStorage.setItem(storageKey, JSON.stringify(resolved)); } catch { /* ignore */ }
+    valueRef.current = resolved;
+    setValue(resolved);
+    notifyPref(storageKey, resolved, sink.current!);
   }, [storageKey]);
 
   return [value, update, loaded] as const;
