@@ -132,6 +132,13 @@ export interface Segment {
   category?: RunCategory; // Standard: "power"
   calibration?: { crr: number; cdA: number };
   notes?: string;
+  /**
+   * Aufnahmezeit dieses Laufs als Epoch-ms. Gesetzt, wenn der Lauf aus einer
+   * eigenen Datei an eine bestehende Session angehängt wurde: beim Anhängen
+   * wird die Zeitachse auf die der Session umgerechnet, die absolute Zeit der
+   * Quelldatei wäre sonst unwiederbringlich weg.
+   */
+  recordedAt?: number;
 
   updatedAt?: number;
 }

@@ -1,16 +1,31 @@
 import { useRef, useState } from "react";
-import { Section, Field, TextInput, NumInput, Button, Note, Row, EmptyState, usePersistedState } from "./ui";
-import { useAppStore } from "@/lib/dragy/store";
+import { Section, Field, TextInput, NumInput, Select, Button, Note, Row, EmptyState } from "./ui";
+import { useAppStore, nextUnusedColor } from "@/lib/dragy/store";
 import { parseUbx } from "@/lib/dragy/ubx";
 import { parseTableFile } from "@/lib/dragy/tabular";
-import { nameImportedSession } from "@/lib/dragy/sessionTime";
+import { compareSessionsDesc, nameImportedSession } from "@/lib/dragy/sessionTime";
+import { appendRunToSession } from "@/lib/dragy/sessionMerge";
+import { sessionModule } from "@/lib/dragy/modules";
 import { uid } from "@/lib/dragy/db";
+import { errorMessage } from "@/lib/dragy/errors";
 import { STD_ENV } from "@/lib/dragy/physics";
-import type { Session, ManualRow, Record as R, ModuleId } from "@/lib/dragy/types";
+import type { Session, Segment, ManualRow, Record as R, ModuleId } from "@/lib/dragy/types";
+
+/**
+ * Wohin die gewählten Dateien wandern. Wer vor jeder Messung das Gerät neu
+ * startet, bekommt pro Lauf eine Datei – fachlich sind das Läufe einer
+ * Ausfahrt, keine getrennten Sessions.
+ */
+type ImportTarget = "perFile" | "oneSession" | "append";
+const TARGET_LABEL: Record<ImportTarget, string> = {
+  perFile: "Je Datei eine eigene Session",
+  oneSession: "Alle Dateien als eine neue Session",
+  append: "An bestehende Session anhängen",
+};
 
 
 export function ImportTab({ module = "power", onOpenVehicles }: { module?: ModuleId; onOpenVehicles?: () => void } = {}) {
-  const { state, saveSession } = useAppStore();
+  const { state, saveSession, saveSegment } = useAppStore();
   const activeVehicle = state.vehicles.find((v) => v.id === state.activeVehicleId);
   const inputRef = useRef<HTMLInputElement>(null);
   // Leer = nicht angegeben. Für die Luftdichte greifen dann die Standardwerte
@@ -20,44 +35,104 @@ export function ImportTab({ module = "power", onOpenVehicles }: { module?: Modul
   const [rh, setRh] = useState<number | undefined>(undefined);
   const [log, setLog] = useState<string[]>([]);
   const [manualOpen, setManualOpen] = useState(false);
+  const [target, setTarget] = useState<ImportTarget>("perFile");
+  const [targetSessionId, setTargetSessionId] = useState<string>("");
 
   if (!activeVehicle) return <Section title="Import"><EmptyState title="Kein aktives Fahrzeug" description="Import benötigt ein aktives Fahrzeug." actionLabel="Fahrzeug anlegen" onAction={onOpenVehicles} /></Section>;
 
 
+  // Sessions des aktiven Fahrzeugs in diesem Modul – Ziel für "anhängen".
+  const appendable = [...state.sessions]
+    .filter((s) => s.vehicleId === activeVehicle.id && sessionModule(s) === module && !s.manual)
+    .sort(compareSessionsDesc);
+
+  /** Eine Datei einlesen. Wirft bei zu wenigen Punkten. */
+  const readFile = async (f: File): Promise<{ records: R[]; startedAt: number | null; extra: string }> => {
+    const isTable = /\.(csv|txt|tsv|xlsx|xlsm|xls)$/i.test(f.name);
+    if (isTable) {
+      const res = await parseTableFile(f);
+      if (res.records.length < 3) throw new Error("zu wenige Datenzeilen gefunden");
+      // Tabellen-Exporte tragen keine absolute Zeit, nur eine relative Zeitachse.
+      return { records: res.records, startedAt: null, extra: ` – ${res.info}` };
+    }
+    const res = parseUbx(await f.arrayBuffer());
+    if (res.records.length < 3) throw new Error("keine gültigen NAV-PVT Datensätze gefunden");
+    return { records: res.records, startedAt: res.startedAt, extra: "" };
+  };
+
   const importFiles = async (files: FileList | null) => {
-    if (!files) return;
+    if (!files || files.length === 0) return;
+    const list = Array.from(files);
     const msgs: string[] = [];
-    for (const f of Array.from(files)) {
-      try {
-        const isTable = /\.(csv|txt|tsv|xlsx|xlsm|xls)$/i.test(f.name);
-        let records: R[];
-        let extra = "";
-        // Tabellen-Exporte tragen keine absolute Zeit, nur eine relative
-        // Zeitachse – dort bleibt startedAt null und der Dateiname greift.
-        let startedAt: number | null = null;
-        if (isTable) {
-          const res = await parseTableFile(f);
-          records = res.records;
-          extra = ` – ${res.info}`;
-          if (records.length < 3) { msgs.push(`${f.name}: zu wenige Datenzeilen gefunden`); continue; }
-        } else {
-          const res = parseUbx(await f.arrayBuffer());
-          records = res.records;
-          startedAt = res.startedAt;
-          if (records.length < 3) { msgs.push(`${f.name}: keine gültigen NAV-PVT Datensätze gefunden`); continue; }
+
+    // Farben modulweit eindeutig halten, auch über mehrere Dateien hinweg.
+    const ownIds = new Set(state.sessions.filter((s) => s.vehicleId === activeVehicle.id).map((s) => s.id));
+    const usedColors = state.segments.filter((g) => ownIds.has(g.sessionId)).map((g) => g.color);
+
+    if (target === "perFile") {
+      for (const f of list) {
+        try {
+          const { records, startedAt, extra } = await readFile(f);
+          const { recordedAt, name } = nameImportedSession(f.name, startedAt);
+          await saveSession({
+            id: uid(), vehicleId: activeVehicle.id, name,
+            records, tempC, pressureHpa, rh, manual: false, createdAt: Date.now(), module,
+            ...(recordedAt != null ? { recordedAt } : {}),
+          });
+          const when = recordedAt != null ? `„${name}"` : `${name} (keine Aufnahmezeit in der Datei)`;
+          msgs.push(`${f.name}: ${records.length} Punkte importiert (${records[records.length - 1].t.toFixed(1)} s) als ${when}${extra}`);
+        } catch (e) {
+          msgs.push(`${f.name}: Fehler – ${errorMessage(e, "Import fehlgeschlagen")}`);
         }
-        const { recordedAt, name } = nameImportedSession(f.name, startedAt);
-        const s: Session = {
-          id: uid(), vehicleId: activeVehicle.id, name,
-          records, tempC, pressureHpa, rh, manual: false, createdAt: Date.now(), module,
-          ...(recordedAt != null ? { recordedAt } : {}),
-        };
-        await saveSession(s);
-        const when = recordedAt != null ? `„${name}"` : `${name} (keine Aufnahmezeit in der Datei)`;
-        msgs.push(`${f.name}: ${records.length} Punkte importiert (${records[records.length - 1].t.toFixed(1)} s) als ${when}${extra}`);
-      } catch (e: any) {
-        msgs.push(`${f.name}: Fehler – ${e.message ?? e}`);
       }
+      setLog(msgs);
+      return;
+    }
+
+    // Sammelmodus: jede Datei wird ein Lauf derselben Session.
+    let session: Session | null = null;
+    if (target === "append") {
+      session = state.sessions.find((s) => s.id === targetSessionId) ?? null;
+      if (!session) { setLog(["Keine Ziel-Session gewählt."]); return; }
+    }
+
+    const segments: Segment[] = [];
+    let runNo = target === "append"
+      ? state.segments.filter((g) => g.sessionId === targetSessionId).length
+      : 0;
+
+    for (const f of list) {
+      try {
+        const { records, startedAt, extra } = await readFile(f);
+        if (!session) {
+          // Erste Datei einer neuen Sammel-Session: sie gibt Name und Datum vor.
+          const { recordedAt, name } = nameImportedSession(f.name, startedAt);
+          session = {
+            id: uid(), vehicleId: activeVehicle.id, name,
+            records: [], tempC, pressureHpa, rh, manual: false, createdAt: Date.now(), module,
+            ...(recordedAt != null ? { recordedAt } : {}),
+          };
+        }
+        runNo += 1;
+        const res = appendRunToSession(session, records, {
+          name: `Lauf ${runNo}`,
+          color: nextUnusedColor([...usedColors, ...segments.map((g) => g.color)]),
+          rpmFactor: activeVehicle.rpmFactorDefault,
+          startedAt,
+        });
+        session = res.session;
+        segments.push(res.segment);
+        msgs.push(`${f.name}: ${records.length} Punkte als „Lauf ${runNo}"${extra}`);
+      } catch (e) {
+        msgs.push(`${f.name}: Fehler – ${errorMessage(e, "Import fehlgeschlagen")}`);
+      }
+    }
+
+    if (session && segments.length > 0) {
+      await saveSession(session);
+      for (const g of segments) await saveSegment(g);
+      msgs.push(`→ ${segments.length} Lauf/Läufe in Session „${session.name}"`);
+      if (target === "oneSession") setTarget("perFile");
     }
     setLog(msgs);
   };
@@ -73,12 +148,54 @@ export function ImportTab({ module = "power", onOpenVehicles }: { module?: Modul
       </Section>
 
       <Section title="Läufe importieren (.data / .ubx / .csv / Excel)">
-        <p className="text-caption text-muted-foreground">Aktives Fahrzeug: <b>{activeVehicle.name}</b>. Mehrfachauswahl möglich – eine Datei = eine Session.</p>
+        <p className="text-caption text-muted-foreground">Aktives Fahrzeug: <b>{activeVehicle.name}</b>. Mehrfachauswahl möglich.</p>
         <Note>Neben Dragy-Rohdaten werden Tabellen-Exporte (z.B. P-Gear, Racebox) als CSV/TSV oder Excel gelesen. Erkannt werden Spalten für Geschwindigkeit (km/h oder mph), Zeit, Strecke und Höhe; fehlt eine Zeitspalte, wird die Abtastrate aus Strecke und Geschwindigkeit abgeleitet.</Note>
+
+        <div className="mt-2">
+          <Field
+            label="Ziel"
+            hint={
+              target === "perFile"
+                ? "Wie bisher: jede Datei wird eine eigene Session, Läufe darin erkennst du danach selbst."
+                : "Jede Datei wird ein eigener Lauf und umfasst zunächst die ganze Datei – Grenzen lassen sich danach am Lauf anpassen. Die Zeitachsen werden hintereinandergelegt, die Aufnahmezeit je Lauf bleibt erhalten."
+            }
+          >
+            <Select value={target} onChange={(e) => setTarget(e.target.value as ImportTarget)}>
+              {(Object.keys(TARGET_LABEL) as ImportTarget[]).map((t) => (
+                <option key={t} value={t} disabled={t === "append" && appendable.length === 0}>
+                  {TARGET_LABEL[t]}
+                </option>
+              ))}
+            </Select>
+          </Field>
+        </div>
+
+        {target === "append" && (
+          <div className="mt-2">
+            <Field label="Ziel-Session">
+              <Select value={targetSessionId} onChange={(e) => setTargetSessionId(e.target.value)}>
+                <option value="">– Session wählen –</option>
+                {appendable.map((s) => {
+                  const n = state.segments.filter((g) => g.sessionId === s.id).length;
+                  return (
+                    <option key={s.id} value={s.id}>
+                      {s.name} ({n} {n === 1 ? "Lauf" : "Läufe"})
+                    </option>
+                  );
+                })}
+              </Select>
+            </Field>
+          </div>
+        )}
         <input ref={inputRef} type="file" accept=".data,.ubx,.csv,.tsv,.txt,.xlsx,.xlsm,.xls,application/octet-stream" multiple className="hidden"
           onChange={(e) => importFiles(e.target.files)} />
         <div className="mt-2 flex gap-2">
-          <Button onClick={() => inputRef.current?.click()}>Dateien wählen…</Button>
+          <Button
+            onClick={() => inputRef.current?.click()}
+            disabled={target === "append" && !targetSessionId}
+          >
+            Dateien wählen…
+          </Button>
           <Button variant="secondary" onClick={() => setManualOpen(true)}>Manuell eingeben…</Button>
 
         </div>
