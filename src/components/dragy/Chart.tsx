@@ -27,6 +27,39 @@ interface Props {
 const MAX_READOUT_ROWS = 5;
 
 /**
+ * Runder Achsenschritt aus {1, 2, 5}·10^k. Bewusst ohne 2,5: bei ganzzahliger
+ * Formatierung („6183") ergäben halbe Schritte doppelte Beschriftungen.
+ */
+function niceStep(range: number, target: number): number {
+  if (!(range > 0) || target < 1) return 1;
+  const raw = range / target;
+  const mag = Math.pow(10, Math.floor(Math.log10(raw)));
+  const norm = raw / mag;
+  return (norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 5 ? 5 : 10) * mag;
+}
+
+/**
+ * Achsengrenzen auf runde Vielfache erweitern und die Marken dazwischen setzen –
+ * so stehen dort 2000/4000/6000 statt 2256/3565/4874. Die Grenzen richten sich
+ * dabei nach den tatsächlich angezeigten Extremwerten, nur eben nach außen auf
+ * den nächsten runden Wert gezogen.
+ */
+function niceAxis(min: number, max: number, target: number): { lo: number; hi: number; ticks: number[] } {
+  const step = niceStep(max - min, target);
+  const lo = Math.floor(min / step) * step;
+  let hi = Math.ceil(max / step) * step;
+  if (hi <= lo) hi = lo + step;
+  // Über den Index rechnen statt aufzuaddieren, damit sich keine Fehler
+  // summieren – und auf die Stellenzahl des Schritts runden, weil auch ein
+  // einzelnes Produkt daneben liegt (3 · 0,2 = 0,6000000000000001).
+  const decimals = Math.max(0, -Math.floor(Math.log10(step)));
+  const n = Math.round((hi - lo) / step);
+  const ticks: number[] = [];
+  for (let i = 0; i <= n; i++) ticks.push(+(lo + i * step).toFixed(decimals));
+  return { lo, hi, ticks };
+}
+
+/**
  * Interpolierter y-Wert einer Serie an der x-Position – eine Quelle für den
  * gezeichneten Punkt und die angezeigte Zahl. Vorher stand dieselbe Funktion
  * zweimal im Modul; laufen die auseinander, zeigt der Cursor etwas anderes an,
@@ -77,13 +110,23 @@ export function Chart({ series, bands = [], xLabel, yLabel, height = 280, onLege
   if (!Number.isFinite(xMin)) { xMin = 0; xMax = 1; yMin = 0; yMax = 1; }
   if (xMin === xMax) xMax = xMin + 1;
   if (yMin === yMax) yMax = yMin + 1;
-  const yPad = (yMax - yMin) * 0.08;
-  yMin = Math.min(yMin, 0); yMax += yPad;
+  yMin = Math.min(yMin, 0);
 
   // padB so bemessen, dass Marken (Grundlinie H-20) und Achsentitel (H-4)
   // sich nicht überlappen – vorher lagen beide 8 px auseinander und liefen ineinander.
-  const padL = 44, padR = 12, padT = 10, padB = 34;
+  // padL so breit, dass der gedrehte Achsentitel (Glyphenband bei x 2..15) und
+  // die Marken (ab x 18, bis "10000" ≈ 36 px) nebeneinander passen – vorher
+  // lief der Titel quer durch die Beschriftungen.
+  const padL = 56, padR = 12, padT = 10, padB = 34;
   const W = size.w, H = size.h;
+
+  // Anzahl der Marken an die verfügbare Fläche koppeln: auf dem Handy werden
+  // acht Beschriftungen zur Zahlenwand, auf dem Desktop sind vier zu grob.
+  // Der Zuschlag nach oben ersetzt die frühere feste 8-%-Reserve.
+  const xAxis = niceAxis(xMin, xMax, W < 500 ? 4 : 7);
+  const yAxis = niceAxis(yMin, yMax, H < 200 ? 3 : 6);
+  xMin = xAxis.lo; xMax = xAxis.hi;
+  yMin = yAxis.lo; yMax = yAxis.hi;
   const plotW = W - padL - padR, plotH = H - padT - padB;
   const toPx = (x: number) => padL + ((x - xMin) / (xMax - xMin)) * plotW;
   const toPy = (y: number) => padT + (1 - (y - yMin) / (yMax - yMin)) * plotH;
@@ -114,22 +157,30 @@ export function Chart({ series, bands = [], xLabel, yLabel, height = 280, onLege
     }
     // grid
     ctx.strokeStyle = colBorder; ctx.fillStyle = colMuted; ctx.font = "13px Inter, system-ui"; ctx.lineWidth = 1;
-    const nx = 5, ny = 5;
-    for (let i = 0; i <= nx; i++) {
-      const x = padL + (i / nx) * plotW;
+    // Doppelte Beschriftungen unterdrücken: gibt der Aufrufer einen groben
+    // Formatierer (toFixed(0)) für eine kleine Spanne, hießen sonst zwei
+    // benachbarte Marken gleich.
+    let lastX = "";
+    xAxis.ticks.forEach((v, i) => {
+      const x = toPx(v);
       ctx.beginPath(); ctx.moveTo(x, padT); ctx.lineTo(x, padT + plotH); ctx.stroke();
-      const v = xMin + (i / nx) * (xMax - xMin);
-      const txt = xFormat ? xFormat(v) : v.toFixed(1);
+      const txt = xFormat ? xFormat(v) : String(v);
+      if (txt === lastX) return;
+      lastX = txt;
       // Erste Marke linksbündig, letzte rechtsbündig – sonst läuft sie über den
       // Plotrand hinaus und kollidiert mit dem Achsentitel.
       const tw = ctx.measureText(txt).width;
-      ctx.fillText(txt, i === 0 ? x : i === nx ? x - tw : x - tw / 2, H - 20);
-    }
-    for (let i = 0; i <= ny; i++) {
-      const y = padT + (i / ny) * plotH;
+      const last = i === xAxis.ticks.length - 1;
+      ctx.fillText(txt, i === 0 ? x : last ? x - tw : x - tw / 2, H - 20);
+    });
+    let lastY = "";
+    for (const v of yAxis.ticks) {
+      const y = toPy(v);
       ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(padL + plotW, y); ctx.stroke();
-      const v = yMax - (i / ny) * (yMax - yMin);
-      ctx.fillText(yFormat ? yFormat(v) : v.toFixed(0), 4, y + 3);
+      const txt = yFormat ? yFormat(v) : String(v);
+      if (txt === lastY) continue;
+      lastY = txt;
+      ctx.fillText(txt, 18, y + 3);
     }
     // series
     for (const s of visSeries) {
