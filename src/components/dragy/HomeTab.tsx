@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Gauge, Timer, Mountain, Flag, ChevronRight, Settings2, Compass, CalendarDays } from "lucide-react";
+import { Gauge, Timer, Mountain, Flag, ChevronRight, Settings2, Compass, CalendarDays, Layers } from "lucide-react";
 import { Section, EmptyState, Note } from "./ui";
 import { useAppStore } from "@/lib/dragy/store";
 import { segmentSamples, splitTime, runDistance, W_TO_PS } from "@/lib/dragy/physics";
@@ -14,11 +14,12 @@ const MODULE_ICON: Record<ModuleId, typeof Gauge> = {
   circuit: Flag,
 };
 
-export function HomeTab({ onOpenModule, onOpenSim, onOpenTrip, onOpenEvents, onOpenGarage }: {
+export function HomeTab({ onOpenModule, onOpenSim, onOpenTrip, onOpenEvents, onOpenGarageCompare, onOpenGarage }: {
   onOpenModule: (m: ModuleId) => void;
   onOpenSim: () => void;
   onOpenTrip: () => void;
   onOpenEvents: () => void;
+  onOpenGarageCompare: () => void;
   onOpenGarage: () => void;
 }) {
   const { state } = useAppStore();
@@ -169,6 +170,23 @@ export function HomeTab({ onOpenModule, onOpenSim, onOpenTrip, onOpenEvents, onO
                   <ChevronRight className="h-4 w-4 flex-none text-muted-foreground" />
                 </span>
                 <span className="mt-1 block text-caption text-muted-foreground">Rallyes zentral anlegen: Zeitplan und WP-Plan verwalten (Login erforderlich).</span>
+              </span>
+            </button>
+          </li>
+          <li className="sm:col-span-2">
+            <button
+              onClick={onOpenGarageCompare}
+              className="flex w-full items-start gap-3 rounded-md border border-border bg-card p-4 text-left transition-colors hover:border-ring"
+            >
+              <span className="flex h-11 w-11 flex-none items-center justify-center rounded-md bg-secondary text-foreground">
+                <Layers className="h-5 w-5" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="flex items-center justify-between gap-2">
+                  <span className="text-body font-semibold text-foreground">Fahrzeugvergleich</span>
+                  <ChevronRight className="h-4 w-4 flex-none text-muted-foreground" />
+                </span>
+                <span className="mt-1 block text-caption text-muted-foreground">Leistungs- und Drehmomentkurven verschiedener Fahrzeuge übereinanderlegen – unabhängig vom aktiven Fahrzeug.</span>
               </span>
             </button>
           </li>
