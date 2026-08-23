@@ -21,9 +21,83 @@ interface Props {
   yFormat?: (v: number) => string;
   /** Legende ausblenden – für Diagramme mit nur einer Serie, wo sie nichts zu schalten gibt. */
   showLegend?: boolean;
+  /**
+   * Null erzwingen statt der y-Achse die Daten folgen zu lassen.
+   *
+   * Für Leistung und Drehmoment richtig: auf einem Prüfstandsprotokoll beginnt
+   * die Achse bei null, sonst ließe sich die Größenordnung nicht mehr ablesen
+   * und 3 % Unterschied sähen nach viel aus. Für Geschwindigkeit oder Coastdown
+   * dagegen falsch – ein Lauf ab 60 km/h ließe die untere Hälfte leer.
+   *
+   * Standard true, damit eine übersehene Aufrufstelle sich wie bisher verhält.
+   */
+  yFromZero?: boolean;
 }
 
-export function Chart({ series, bands = [], xLabel, yLabel, height = 280, onLegendToggle, xFormat, yFormat, showLegend = true }: Props) {
+/** Höchstens so viele Zeilen in der Cursor-Anzeige, danach nur noch ein Zähler. */
+const MAX_READOUT_ROWS = 5;
+
+/**
+ * Runder Achsenschritt aus {1, 2, 5}·10^k. Bewusst ohne 2,5: bei ganzzahliger
+ * Formatierung („6183") ergäben halbe Schritte doppelte Beschriftungen.
+ */
+function niceStep(range: number, target: number): number {
+  if (!(range > 0) || target < 1) return 1;
+  const raw = range / target;
+  const mag = Math.pow(10, Math.floor(Math.log10(raw)));
+  const norm = raw / mag;
+  return (norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 5 ? 5 : 10) * mag;
+}
+
+/**
+ * Achsengrenzen auf runde Vielfache erweitern und die Marken dazwischen setzen –
+ * so stehen dort 2000/4000/6000 statt 2256/3565/4874. Die Grenzen richten sich
+ * dabei nach den tatsächlich angezeigten Extremwerten, nur eben nach außen auf
+ * den nächsten runden Wert gezogen.
+ */
+function niceAxis(min: number, max: number, target: number): { lo: number; hi: number; ticks: number[] } {
+  const step = niceStep(max - min, target);
+  const lo = Math.floor(min / step) * step;
+  let hi = Math.ceil(max / step) * step;
+  if (hi <= lo) hi = lo + step;
+  // Über den Index rechnen statt aufzuaddieren, damit sich keine Fehler
+  // summieren – und auf die Stellenzahl des Schritts runden, weil auch ein
+  // einzelnes Produkt daneben liegt (3 · 0,2 = 0,6000000000000001).
+  const decimals = Math.max(0, -Math.floor(Math.log10(step)));
+  const n = Math.round((hi - lo) / step);
+  const ticks: number[] = [];
+  for (let i = 0; i <= n; i++) ticks.push(+(lo + i * step).toFixed(decimals));
+  return { lo, hi, ticks };
+}
+
+/**
+ * Interpolierter y-Wert einer Serie an der x-Position – eine Quelle für den
+ * gezeichneten Punkt und die angezeigte Zahl. Vorher stand dieselbe Funktion
+ * zweimal im Modul; laufen die auseinander, zeigt der Cursor etwas anderes an,
+ * als er markiert.
+ */
+function interpAt(s: Series, xVal: number): number | null {
+  const ps = s.points;
+  for (let k = 0; k < ps.length - 1; k++) {
+    const a = ps[k], b = ps[k + 1];
+    if (!Number.isFinite(a.x) || !Number.isFinite(a.y) || !Number.isFinite(b.x) || !Number.isFinite(b.y)) continue;
+    const lo = Math.min(a.x, b.x), hi = Math.max(a.x, b.x);
+    if (xVal < lo || xVal > hi) continue;
+    if (b.x === a.x) continue; // vertikaler Sprung überspringen
+    const t = (xVal - a.x) / (b.x - a.x);
+    return a.y + t * (b.y - a.y);
+  }
+  return null;
+}
+
+/** Höchster y-Wert einer Serie – die Ruheanzeige, solange kein Cursor gesetzt ist. */
+function peakOf(s: Series): number | null {
+  let peak = -Infinity;
+  for (const p of s.points) if (Number.isFinite(p.y) && p.y > peak) peak = p.y;
+  return peak > -Infinity ? peak : null;
+}
+
+export function Chart({ series, bands = [], xLabel, yLabel, height = 280, onLegendToggle, xFormat, yFormat, showLegend = true, yFromZero = true }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const [hover, setHover] = useState<{ x: number } | null>(null);
@@ -47,11 +121,23 @@ export function Chart({ series, bands = [], xLabel, yLabel, height = 280, onLege
   if (!Number.isFinite(xMin)) { xMin = 0; xMax = 1; yMin = 0; yMax = 1; }
   if (xMin === xMax) xMax = xMin + 1;
   if (yMin === yMax) yMax = yMin + 1;
-  const yPad = (yMax - yMin) * 0.08;
-  yMin = Math.min(yMin, 0); yMax += yPad;
+  if (yFromZero) yMin = Math.min(yMin, 0);
 
-  const padL = 44, padR = 12, padT = 10, padB = 30;
+  // padB so bemessen, dass Marken (Grundlinie H-20) und Achsentitel (H-4)
+  // sich nicht überlappen – vorher lagen beide 8 px auseinander und liefen ineinander.
+  // padL so breit, dass der gedrehte Achsentitel (Glyphenband bei x 2..15) und
+  // die Marken (ab x 18, bis "10000" ≈ 36 px) nebeneinander passen – vorher
+  // lief der Titel quer durch die Beschriftungen.
+  const padL = 56, padR = 12, padT = 10, padB = 34;
   const W = size.w, H = size.h;
+
+  // Anzahl der Marken an die verfügbare Fläche koppeln: auf dem Handy werden
+  // acht Beschriftungen zur Zahlenwand, auf dem Desktop sind vier zu grob.
+  // Der Zuschlag nach oben ersetzt die frühere feste 8-%-Reserve.
+  const xAxis = niceAxis(xMin, xMax, W < 500 ? 4 : 7);
+  const yAxis = niceAxis(yMin, yMax, H < 200 ? 3 : 6);
+  xMin = xAxis.lo; xMax = xAxis.hi;
+  yMin = yAxis.lo; yMax = yAxis.hi;
   const plotW = W - padL - padR, plotH = H - padT - padB;
   const toPx = (x: number) => padL + ((x - xMin) / (xMax - xMin)) * plotW;
   const toPy = (y: number) => padT + (1 - (y - yMin) / (yMax - yMin)) * plotH;
@@ -82,18 +168,30 @@ export function Chart({ series, bands = [], xLabel, yLabel, height = 280, onLege
     }
     // grid
     ctx.strokeStyle = colBorder; ctx.fillStyle = colMuted; ctx.font = "13px Inter, system-ui"; ctx.lineWidth = 1;
-    const nx = 5, ny = 5;
-    for (let i = 0; i <= nx; i++) {
-      const x = padL + (i / nx) * plotW;
+    // Doppelte Beschriftungen unterdrücken: gibt der Aufrufer einen groben
+    // Formatierer (toFixed(0)) für eine kleine Spanne, hießen sonst zwei
+    // benachbarte Marken gleich.
+    let lastX = "";
+    xAxis.ticks.forEach((v, i) => {
+      const x = toPx(v);
       ctx.beginPath(); ctx.moveTo(x, padT); ctx.lineTo(x, padT + plotH); ctx.stroke();
-      const v = xMin + (i / nx) * (xMax - xMin);
-      ctx.fillText(xFormat ? xFormat(v) : v.toFixed(1), x - 12, H - 10);
-    }
-    for (let i = 0; i <= ny; i++) {
-      const y = padT + (i / ny) * plotH;
+      const txt = xFormat ? xFormat(v) : String(v);
+      if (txt === lastX) return;
+      lastX = txt;
+      // Erste Marke linksbündig, letzte rechtsbündig – sonst läuft sie über den
+      // Plotrand hinaus und kollidiert mit dem Achsentitel.
+      const tw = ctx.measureText(txt).width;
+      const last = i === xAxis.ticks.length - 1;
+      ctx.fillText(txt, i === 0 ? x : last ? x - tw : x - tw / 2, H - 20);
+    });
+    let lastY = "";
+    for (const v of yAxis.ticks) {
+      const y = toPy(v);
       ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(padL + plotW, y); ctx.stroke();
-      const v = yMax - (i / ny) * (yMax - yMin);
-      ctx.fillText(yFormat ? yFormat(v) : v.toFixed(0), 4, y + 3);
+      const txt = yFormat ? yFormat(v) : String(v);
+      if (txt === lastY) continue;
+      lastY = txt;
+      ctx.fillText(txt, 18, y + 3);
     }
     // series
     for (const s of visSeries) {
@@ -111,23 +209,10 @@ export function Chart({ series, bands = [], xLabel, yLabel, height = 280, onLege
     ctx.setLineDash([]);
     // axis labels
     ctx.fillStyle = colText; ctx.font = "13px Inter, system-ui";
-    if (xLabel) ctx.fillText(xLabel, W - padR - ctx.measureText(xLabel).width, H - 2);
+    if (xLabel) ctx.fillText(xLabel, W - padR - ctx.measureText(xLabel).width, H - 4);
     if (yLabel) { ctx.save(); ctx.translate(12, padT + 4); ctx.rotate(-Math.PI / 2); ctx.fillText(yLabel, -plotH + 4, 0); ctx.restore(); }
 
-    // hover crosshair — interpoliere y an der exakten x-Position pro Serie
-    const interpAt = (s: Series, xVal: number): number | null => {
-      const ps = s.points;
-      for (let k = 0; k < ps.length - 1; k++) {
-        const a = ps[k], b = ps[k + 1];
-        if (!Number.isFinite(a.x) || !Number.isFinite(a.y) || !Number.isFinite(b.x) || !Number.isFinite(b.y)) continue;
-        const lo = Math.min(a.x, b.x), hi = Math.max(a.x, b.x);
-        if (xVal < lo || xVal > hi) continue;
-        if (b.x === a.x) continue; // vertikaler Sprung überspringen
-        const t = (xVal - a.x) / (b.x - a.x);
-        return a.y + t * (b.y - a.y);
-      }
-      return null;
-    };
+    // hover crosshair — interpoliert an der exakten x-Position pro Serie
     if (hover) {
       const hx = hover.x;
       ctx.strokeStyle = colMuted; ctx.setLineDash([4, 4]);
@@ -148,37 +233,80 @@ export function Chart({ series, bands = [], xLabel, yLabel, height = 280, onLege
     const x = e.clientX - rect.left;
     if (x >= padL && x <= padL + plotW) setHover({ x });
   };
-  const onLeave = () => setHover(null);
+  // Bewusst kein Löschen beim Verlassen: beim Touch feuert pointerleave schon
+  // beim Fingerheben, und genau dann will man die Werte lesen – der Finger hat
+  // die Stelle bis dahin verdeckt. Der Cursor bleibt also stehen, bis er neu
+  // gesetzt oder über das × zurückgenommen wird.
 
-  // hover text — gleiche Interpolation
-  const interpAtOuter = (s: Series, xVal: number): number | null => {
-    const ps = s.points;
-    for (let k = 0; k < ps.length - 1; k++) {
-      const a = ps[k], b = ps[k + 1];
-      if (!Number.isFinite(a.x) || !Number.isFinite(a.y) || !Number.isFinite(b.x) || !Number.isFinite(b.y)) continue;
-      const lo = Math.min(a.x, b.x), hi = Math.max(a.x, b.x);
-      if (xVal < lo || xVal > hi) continue;
-      if (b.x === a.x) continue;
-      const t = (xVal - a.x) / (b.x - a.x);
-      return a.y + t * (b.y - a.y);
-    }
-    return null;
-  };
-  let hoverText = "";
-  if (hover) {
-    const xVal = xMin + ((hover.x - padL) / plotW) * (xMax - xMin);
-    const parts = [xLabel ? `${xLabel}: ${xFormat ? xFormat(xVal) : xVal.toFixed(1)}` : (xFormat ? xFormat(xVal) : xVal.toFixed(1))];
-    for (const s of visSeries) {
-      const y = interpAtOuter(s, xVal);
-      if (y != null && Number.isFinite(y)) parts.push(`${s.label}: ${yFormat ? yFormat(y) : y.toFixed(1)}`);
-    }
-    hoverText = parts.join(" · ");
-  }
+  const cursorX = hover ? xMin + ((hover.x - padL) / plotW) * (xMax - xMin) : null;
+  const fmtY = (v: number) => (yFormat ? yFormat(v) : v.toFixed(1));
+
+  // Eine Zeile je sichtbarer Serie – auch ohne Wert an dieser Stelle, damit die
+  // Höhe des Panels beim Hovern konstant bleibt und der Chart nicht springt.
+  const readoutRows = visSeries
+    .map((s) => ({
+      label: s.label,
+      color: s.color,
+      value: cursorX != null ? interpAt(s, cursorX) : peakOf(s),
+    }))
+    .sort((a, b) => (b.value ?? -Infinity) - (a.value ?? -Infinity));
+  const leader = readoutRows[0]?.value ?? null;
+  const shownRows = readoutRows.slice(0, MAX_READOUT_ROWS);
+  const restCount = readoutRows.length - shownRows.length;
 
   return (
     <div ref={wrapRef} className="w-full">
-      <canvas ref={canvasRef} onPointerMove={onMove} onPointerDown={onMove} onPointerLeave={onLeave} className="touch-none rounded-md" />
-      <div className="mt-1 min-h-[1.25rem] text-caption text-muted-foreground">{hoverText}</div>
+      {readoutRows.length > 0 && (
+        <div className="mb-1 rounded-md border border-border bg-elevated px-2 py-1.5">
+          <div className="flex items-baseline justify-between gap-2">
+            <span className="flex-none text-caption font-medium text-foreground">
+              {cursorX != null
+                ? `${xLabel ? `${xLabel}: ` : ""}${xFormat ? xFormat(cursorX) : cursorX.toFixed(1)}`
+                : "Maximum"}
+            </span>
+            {/* Einheit einmal im Kopf statt in jeder Zeile – der Achsentitel kann
+                lang sein ("Radleistung (PS)") und würde die Zahlen erdrücken. */}
+            {yLabel && (
+              <span className="min-w-0 flex-1 truncate text-right text-caption text-muted-foreground" title={yLabel}>
+                {yLabel}
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={() => setHover(null)}
+              aria-label="Cursor zurücksetzen"
+              tabIndex={cursorX != null ? 0 : -1}
+              aria-hidden={cursorX == null}
+              className={`-my-1 flex h-8 w-8 flex-none items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground ${cursorX != null ? "" : "invisible"}`}
+            >
+              ×
+            </button>
+          </div>
+          <div className="mt-0.5 space-y-0.5">
+            {shownRows.map((r, i) => {
+              // Nach Wert absteigend sortiert – der Rückstand bezieht sich immer
+              // auf die an dieser Stelle führende Kurve.
+              const delta = i > 0 && r.value != null && leader != null ? r.value - leader : null;
+              return (
+                <div key={`${r.label}-${i}`} className="flex items-center gap-2 text-caption">
+                  <span className="h-2 w-3 flex-none rounded-sm" style={{ backgroundColor: r.color }} />
+                  <span className="min-w-0 flex-1 truncate text-muted-foreground" title={r.label}>{r.label}</span>
+                  <span className="flex-none tabular-nums text-foreground">
+                    {r.value != null ? fmtY(r.value) : "—"}
+                  </span>
+                  <span className="w-14 flex-none text-right tabular-nums text-muted-foreground">
+                    {delta != null && Math.abs(delta) >= 0.05 ? `−${fmtY(Math.abs(delta))}` : ""}
+                  </span>
+                </div>
+              );
+            })}
+            {restCount > 0 && (
+              <div className="pl-5 text-caption text-muted-foreground">+{restCount} weitere</div>
+            )}
+          </div>
+        </div>
+      )}
+      <canvas ref={canvasRef} onPointerMove={onMove} onPointerDown={onMove} className="touch-none rounded-md" />
       {showLegend && series.length > 0 && (
         <div className="mt-1 flex flex-wrap gap-2">
           {series.map((s, i) => (

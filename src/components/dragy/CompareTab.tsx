@@ -248,6 +248,7 @@ export function CompareTab({ module = "power", onOpenVehicles }: { module?: Modu
               series={series}
               xLabel={isAccel ? (effAlignKmh > 0 ? `s ab ${effAlignKmh} km/h` : "t (s)") : "U/min"}
               yLabel={isAccel ? "km/h" : MODE_LABEL[mode]}
+              yFromZero={!isAccel}
               xFormat={(v) => (isAccel ? v.toFixed(2) : v.toFixed(0))}
               yFormat={(v) => v.toFixed(0)}
               onLegendToggle={toggle}

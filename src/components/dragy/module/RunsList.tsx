@@ -137,7 +137,7 @@ function SessionDetail({ module, session, segments, usedColors, vehicle, onRenam
     const assigned: string[] = [];
     for (let i = 0; i < found.length; i++) {
       const seg: Segment = {
-        id: uid(), sessionId: session.id, name: `Auto ${segments.length + i + 1}`,
+        id: uid(), sessionId: session.id, name: `Lauf ${segments.length + i + 1}`,
         startT: found[i].startT, endT: found[i].endT,
         rpmFactor: vehicle.rpmFactorDefault,
         color: nextUnusedColor([...usedColors, ...assigned]), visible: true,
@@ -198,7 +198,7 @@ function SessionDetail({ module, session, segments, usedColors, vehicle, onRenam
 
       <div className="mt-2">
         <span className="mb-1 block text-caption font-semibold text-muted-foreground">Geschwindigkeitsverlauf</span>
-        <Chart series={speedSeries} bands={bands} xLabel="t (s)" yLabel="km/h" xFormat={(v) => v.toFixed(1)} yFormat={(v) => v.toFixed(0)} showLegend={false} />
+        <Chart series={speedSeries} bands={bands} xLabel="t (s)" yLabel="km/h" xFormat={(v) => v.toFixed(1)} yFormat={(v) => v.toFixed(0)} showLegend={false} yFromZero={false} />
       </div>
 
       <h4 className="mt-4 text-body font-semibold text-foreground">Ergebnisse</h4>
@@ -300,6 +300,9 @@ function SegmentEditor({ module, seg, session, vehicle, maxT, onChange, onDelete
       : null;
   const isPower = isPowerModule(module);
   const [pdfOpen, setPdfOpen] = useState(false);
+  // Eingeklappt per Default: eine Session mit fünf Läufen war sonst kaum noch
+  // überschaubar. Sichtbarkeit, Farbe und Name bleiben immer erreichbar.
+  const [open, setOpen] = useState(false);
   const correction = useSessionCorrection(session);
 
   const miniSeries: Series[] = useMemo(() => {
@@ -316,6 +319,17 @@ function SegmentEditor({ module, seg, session, vehicle, maxT, onChange, onDelete
     return [{ label: seg.name, color: seg.color, points }];
   }, [session, seg, vehicle, isPower, correction.alpha, correction.applied]);
 
+  // Kurzfassung für die eingeklappte Karte – speist sich aus derselben Serie,
+  // die das Diagramm ohnehin braucht, kostet also keine zusätzliche Rechnung.
+  const peakLabel = useMemo(() => {
+    const ys = miniSeries[0]?.points.map((p) => p.y).filter(Number.isFinite) ?? [];
+    if (ys.length === 0) return null;
+    const peak = Math.max(...ys);
+    return isPower
+      ? `${peak.toFixed(0)} PS${correction.applied ? " korr." : ""}`
+      : `max ${peak.toFixed(0)} km/h`;
+  }, [miniSeries, isPower, correction.applied]);
+
   return (
     <li className="rounded-md border border-border bg-card p-3">
       <div className="flex items-center gap-2">
@@ -327,8 +341,27 @@ function SegmentEditor({ module, seg, session, vehicle, maxT, onChange, onDelete
           <input type="color" value={seg.color} onChange={(e) => onChange({ color: e.target.value })} className="absolute inset-0 h-full w-full cursor-pointer opacity-0" aria-label="Farbe wählen" />
         </label>
         <TextInput className="flex-1" value={seg.name} onChange={(e) => onChange({ name: e.target.value })} />
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          aria-expanded={open}
+          aria-label={open ? `${seg.name} einklappen` : `${seg.name} aufklappen`}
+          className="flex h-11 w-9 flex-none items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
+        >
+          {open ? "▾" : "▸"}
+        </button>
         <Button variant="danger" onClick={onDelete}>×</Button>
       </div>
+
+      {!open && (
+        <div className="mt-1 text-caption text-muted-foreground">
+          {seg.startT.toFixed(1)}–{seg.endT.toFixed(1)} s{peakLabel && <> · {peakLabel}</>}
+          {gearMismatch && <span className="ml-1 text-warning">· Gang/rpmFactor weichen ab</span>}
+        </div>
+      )}
+
+      {open && (
+      <>
       <Row className="mt-2">
         <Field label="Start t (s)"><NumInput step="0.1" value={seg.startT} onChange={(e) => onChange({ startT: Math.max(0, +e.target.value) })} /></Field>
         <Field label="Ende t (s)"><NumInput step="0.1" value={seg.endT} onChange={(e) => onChange({ endT: Math.min(maxT, +e.target.value) })} /></Field>
@@ -395,6 +428,7 @@ function SegmentEditor({ module, seg, session, vehicle, maxT, onChange, onDelete
           xFormat={(v) => v.toFixed(isPower ? 0 : 1)}
           yFormat={(v) => v.toFixed(0)}
           showLegend={false}
+          yFromZero={isPower}
         />
       </div>
 
@@ -414,7 +448,8 @@ function SegmentEditor({ module, seg, session, vehicle, maxT, onChange, onDelete
       {pdfOpen && (
         <PdfExportDialog runs={[{ session, segment: seg, vehicle }]} onClose={() => setPdfOpen(false)} />
       )}
-
+      </>
+      )}
     </li>
   );
 }
@@ -470,7 +505,7 @@ function CoastdownPanel({ session, seg, vehicle, onChange }: {
                 series={[{ label: "km/h", color: "#38bdf8", points: session.records.map((r) => ({ x: r.t, y: r.speedKmh })) }]}
                 bands={[{ xStart: range.startT, xEnd: range.endT, color: "#f59e0b", label: "Coastdown" }]}
                 height={160} xLabel="t (s)" yLabel="km/h" xFormat={(v) => v.toFixed(1)} yFormat={(v) => v.toFixed(0)}
-                showLegend={false}
+                showLegend={false} yFromZero={false}
               />
             </div>
             {fit && (
@@ -772,7 +807,7 @@ export function TrackOverview({ session, segments }: { session: Session; segment
         </table>
       </div>
       <div className="mt-2">
-        <Chart series={series} height={220} xLabel="Distanz (m)" yLabel="km/h" xFormat={(v) => v.toFixed(0)} yFormat={(v) => v.toFixed(0)} />
+        <Chart series={series} height={220} xLabel="Distanz (m)" yLabel="km/h" xFormat={(v) => v.toFixed(0)} yFormat={(v) => v.toFixed(0)} yFromZero={false} />
       </div>
     </div>
   );
