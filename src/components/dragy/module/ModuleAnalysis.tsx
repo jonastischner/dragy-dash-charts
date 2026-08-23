@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { Section, Field, Select, Note, Row, usePersistedState } from "../ui";
-import { computeSegment, splitTime, distanceRun, runDistance, W_TO_PS, ACCEL_SPLITS } from "@/lib/dragy/physics";
+import { segmentSamples, splitTime, distanceRun, runDistance, W_TO_PS, ACCEL_SPLITS } from "@/lib/dragy/physics";
 import type { ModuleId, Segment, Session, Vehicle } from "@/lib/dragy/types";
 import { isPowerModule } from "@/lib/dragy/modules";
 import { sessionCorrection, useCorrectionStandard } from "../useCorrection";
@@ -27,7 +27,7 @@ function PowerAnalysis({ sessions, segments, vehicle }: Ctx) {
   const corrected = standard !== "none";
 
   const rows = useMemo(() => segsOf(sessions, segments).map(({ session, seg }) => {
-    const samples = computeSegment(session, seg, vehicle);
+    const samples = segmentSamples(session, seg, vehicle);
     let ps = NaN, psRpm = NaN, nm = NaN, nmRpm = NaN;
     for (const s of samples) {
       const p = s.pEngineW * W_TO_PS;

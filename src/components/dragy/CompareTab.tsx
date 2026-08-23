@@ -3,7 +3,7 @@ import { Section, Note, EmptyState, Button, Field, NumInput, usePersistedState }
 import { PdfExportDialog } from "./PdfExportDialog";
 import type { RunPdfData } from "@/lib/dragy/mahaPdf";
 import { useAppStore } from "@/lib/dragy/store";
-import { computeSegment, W_TO_PS, ACCEL_SPLITS, crossingTime, splitTime } from "@/lib/dragy/physics";
+import { segmentSamples, W_TO_PS, ACCEL_SPLITS, crossingTime, splitTime } from "@/lib/dragy/physics";
 import { Chart, type Series } from "./Chart";
 import type { ModuleId } from "@/lib/dragy/types";
 import { isPowerModule, sessionModule } from "@/lib/dragy/modules";
@@ -97,7 +97,7 @@ export function CompareTab({ module = "power", onOpenVehicles }: { module?: Modu
         .map((r) => ({ x: r.t - t0, y: r.speedKmh }));
       return { label, color: g.color, points, visible: g.visible };
     }
-    const samples = computeSegment(session, g, activeVehicle);
+    const samples = segmentSamples(session, g, activeVehicle);
     // Faktor je Session – nur auf die Motorgrößen, Radwerte bleiben Messwerte.
     const alpha = isEngineMode ? sessionCorrection(standard, session).alpha : 1;
     const points = samples
@@ -139,7 +139,7 @@ export function CompareTab({ module = "power", onOpenVehicles }: { module?: Modu
     .filter((g) => g.visible !== false)
     .map((g) => {
       const session = state.sessions.find((s) => s.id === g.sessionId)!;
-      const samples = computeSegment(session, g, activeVehicle);
+      const samples = segmentSamples(session, g, activeVehicle);
       const rec = session.records.filter((r) => r.t >= g.startT && r.t <= g.endT);
       let pW = 0, pWRpm = NaN, pE = 0, pERpm = NaN, tW = 0, tWRpm = NaN, tE = 0, tERpm = NaN;
       for (const s of samples) {

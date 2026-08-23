@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Section, Field, TextInput, TextArea, NumInput, Select, Button, Note, Row, EmptyState, usePersistedState } from "../ui";
 import { useAppStore, nextUnusedColor } from "@/lib/dragy/store";
 import {
-  autoDetectSegments, computeSegment, splitTime, distanceRun, runDistance,
+  autoDetectSegments, segmentSamples, splitTime, distanceRun, runDistance,
   coastdownFit, autoDetectCoastdown, STD_ENV, W_TO_PS, ACCEL_SPLITS,
 } from "@/lib/dragy/physics";
 import { computeRpmFactor, resolveAllGears } from "@/lib/dragy/gear";
@@ -307,7 +307,7 @@ function SegmentEditor({ module, seg, session, vehicle, maxT, onChange, onDelete
 
   const miniSeries: Series[] = useMemo(() => {
     if (isPower) {
-      const samples = computeSegment(session, seg, vehicle);
+      const samples = segmentSamples(session, seg, vehicle);
       const points = samples
         .map((s) => ({ x: s.rpm, y: s.pEngineW * W_TO_PS * correction.alpha }))
         .filter((p) => Number.isFinite(p.x) && Number.isFinite(p.y));
@@ -536,7 +536,7 @@ function PeakOverview({ session, segments, vehicle }: { session: Session; segmen
   const corrected = correction.applied;
 
   const rows = useMemo(() => segments.map((g) => {
-    const samples = computeSegment(session, g, vehicle);
+    const samples = segmentSamples(session, g, vehicle);
     const best = { ps: NaN, psRpm: NaN, nm: NaN, nmRpm: NaN };
     for (const s of samples) {
       const ps = s.pEngineW * W_TO_PS;
@@ -638,7 +638,7 @@ function SessionCurves({ session, segments, vehicle }: { session: Session; segme
     const out: Series[] = [];
     const ids: string[] = [];
     for (const g of segments) {
-      const samples = computeSegment(session, g, vehicle);
+      const samples = segmentSamples(session, g, vehicle);
       const raw = samples
         .map((s) => {
           const y = mode === "pEngine" ? s.pEngineW * W_TO_PS

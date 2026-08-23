@@ -3,7 +3,7 @@
  * Datenblöcke. Reine Vektor-Ausgabe über jsPDF – offline und druckscharf.
  */
 import { jsPDF } from "jspdf";
-import { computeSegment, W_TO_PS } from "./physics";
+import { segmentSamples, W_TO_PS } from "./physics";
 import type { Segment, Session, Vehicle } from "./types";
 import { sessionTimestamp } from "./sessionTime";
 import { correctionFactor, CORRECTION_LABEL, type CorrectionResult, type CorrectionStandard } from "./correction";
@@ -43,7 +43,7 @@ export interface RunPdfData {
 }
 
 function buildCurves(d: RunPdfData, alpha = 1): Curve[] {
-  const samples = computeSegment(d.session, d.segment, d.vehicle)
+  const samples = segmentSamples(d.session, d.segment, d.vehicle)
     .filter((s) => Number.isFinite(s.rpm) && s.rpm > 0 && Number.isFinite(s.pEngineW));
   if (samples.length === 0) return [];
 

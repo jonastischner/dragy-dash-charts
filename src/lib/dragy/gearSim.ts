@@ -4,7 +4,7 @@
 
 import type { GearRatio, Segment, Session, Vehicle } from "./types";
 import { computeRpmFactor, normalizeDrive } from "./gear";
-import { computeSegment, interpLinear, sessionAirDensity, W_TO_PS } from "./physics";
+import { segmentSamples, interpLinear, sessionAirDensity, W_TO_PS } from "./physics";
 import { sessionModule } from "./modules";
 
 /** Ein simulierbares Setup – kann gespeichert oder nur temporär („Testsetup“) sein. */
@@ -130,7 +130,7 @@ export function bestPowerCurve(
   for (const s of sessions) {
     if (s.vehicleId !== vehicle.id || sessionModule(s) !== "power") continue;
     for (const g of segments.filter((x) => x.sessionId === s.id)) {
-      const samples = computeSegment(s, g, vehicle);
+      const samples = segmentSamples(s, g, vehicle);
       if (samples.length < 5) continue;
       const bins = new Map<number, { sum: number; n: number }>();
       let peakPs = 0;
