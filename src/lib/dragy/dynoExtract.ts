@@ -170,6 +170,19 @@ export function sheetToRun(sheet: DynoSheet): {
  */
 export async function extractDynoSheet(file: File): Promise<DynoSheet> {
   const { invokeEdgeFunction } = await import("./events");
+  const { supabase } = await import("@/integrations/supabase/client");
+
+  // Vorab prüfen statt den Nutzer in einen 401 des Gateways laufen zu lassen:
+  // verify_jwt greift, bevor die Function überhaupt startet, ihre eigene
+  // Meldung käme also nie an. Die App ist local-first und ohne Anmeldung
+  // benutzbar – nur dieses eine Extra braucht ein Konto.
+  const { data } = await supabase.auth.getUser();
+  if (!data.user) {
+    throw new Error(
+      "Zum Auslesen eines Protokolls musst du angemeldet sein (die Auswertung läuft auf dem Server).",
+    );
+  }
+
   const buf = new Uint8Array(await file.arrayBuffer());
   // In Blöcken kodieren, sonst sprengt ein großes Foto das Call-Stack-Limit.
   let binary = "";

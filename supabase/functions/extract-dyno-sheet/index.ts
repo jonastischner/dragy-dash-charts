@@ -11,6 +11,7 @@
 // Bewusst ungepinnt: Deno löst dies beim Deploy gegen die aktuelle
 // npm-"latest"-Version auf – dieselbe Begründung wie in extract-event-pdf.
 import Anthropic from "npm:@anthropic-ai/sdk";
+import { createClient } from "npm:@supabase/supabase-js@2.110.8";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -105,6 +106,24 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // Anmeldung verlangen: die Function ruft die kostenpflichtige Anthropic-API
+    // auf. Ohne Prüfung könnte jeder, der die URL kennt, das Kontingent des
+    // Projekts verbrauchen. Die Eingabe von Hand im Dialog bleibt davon
+    // unberührt und funktioniert auch ausgeloggt.
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      return jsonError(401, "Zum Auslesen eines Protokolls bitte einloggen. Die Werte lassen sich auch ohne Anmeldung von Hand eintragen.");
+    }
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_ANON_KEY")!,
+      { global: { headers: { Authorization: authHeader } } },
+    );
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+    if (userError || !userData.user) {
+      return jsonError(401, "Zum Auslesen eines Protokolls bitte einloggen. Die Werte lassen sich auch ohne Anmeldung von Hand eintragen.");
+    }
+
     let body: { fileBase64?: unknown; mediaType?: unknown };
     try {
       body = await req.json();
