@@ -149,22 +149,33 @@ function parseStandard(raw: string): CorrectionStandard | undefined {
 }
 
 /**
- * Meßdatum aus der Vorlage. Akzeptiert ISO (2024-11-28 09:36) und die deutsche
- * Schreibweise (28.11.2024 9:36), wie sie im Protokoll steht.
+ * Meßdatum aus der Vorlage. Akzeptiert ISO (2024-11-28 09:36), die deutsche
+ * Schreibweise (28.11.2024 9:36) und Tag-Monat-Jahr mit Bindestrich
+ * (05-12-2024 / 12:30:42), wie sie z.B. niederländische Prüfstandssoftware
+ * druckt. Die Uhrzeit darf durch Leerzeichen, Komma oder Schrägstrich vom
+ * Datum getrennt sein; Sekunden werden akzeptiert, aber verworfen – die App
+ * kennt nur Minutenauflösung.
  */
 function parseMeasuredAt(raw: string): string | undefined {
   const s = raw.trim();
   if (!s) return undefined;
-  const de = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})(?:[\s,]+(\d{1,2}):(\d{2}))?/);
+  const timeAfter = /(?:[\s,/]+(\d{1,2}):(\d{2})(?::\d{2})?)?/.source;
+  const de = s.match(new RegExp(`^(\\d{1,2})\\.(\\d{1,2})\\.(\\d{4})${timeAfter}`));
   if (de) {
     const [, d, m, y, hh = "0", mm = "0"] = de;
     const p2 = (n: string) => n.padStart(2, "0");
     return `${y}-${p2(m)}-${p2(d)}T${p2(hh)}:${p2(mm)}:00`;
   }
-  const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T\s](\d{1,2}):(\d{2}))?/);
+  const iso = s.match(new RegExp(`^(\\d{4})-(\\d{2})-(\\d{2})${timeAfter}`));
   if (iso) {
     const [, y, m, d, hh = "0", mm = "0"] = iso;
     return `${y}-${m}-${d}T${hh.padStart(2, "0")}:${mm}:00`;
+  }
+  const dmyDash = s.match(new RegExp(`^(\\d{1,2})-(\\d{1,2})-(\\d{4})${timeAfter}`));
+  if (dmyDash) {
+    const [, d, m, y, hh = "0", mm = "0"] = dmyDash;
+    const p2 = (n: string) => n.padStart(2, "0");
+    return `${y}-${p2(m)}-${p2(d)}T${p2(hh)}:${p2(mm)}:00`;
   }
   return undefined;
 }
