@@ -72,6 +72,8 @@ export interface AnchorInfo {
   readPs: number | null;
   /** Gedruckte Spitzenleistung, an der verankert bzw. gegengeprüft wurde. */
   printedPs: number | null;
+  /** Welches gedruckte Feld das war – für die Anzeige im Dialog. */
+  printedField: "P_Norm" | "P_Mot" | null;
   /** Auffällig große Abweichung – dann lohnt ein Blick auf Tabelle vs. Protokoll. */
   suspicious: boolean;
 }
@@ -99,22 +101,39 @@ export function anchorCurve(
   printed: DynoSheet["printed"],
   applyScale: boolean,
 ): { points: DynoPoint[]; anchor: AnchorInfo } {
-  const none: AnchorInfo = { scale: 1, applied: false, readPs: null, printedPs: null, suspicious: false };
+  const none: AnchorInfo = { scale: 1, applied: false, readPs: null, printedPs: null, printedField: null, suspicious: false };
   if (points.length === 0) return { points, anchor: none };
 
   let peak = points[0];
   for (const p of points) if (p.pEnginePs > peak.pEnginePs) peak = p;
 
-  const printedPs = fin(printed?.psNorm) ?? fin(printed?.psEngine);
-  if (printedPs == null || printedPs <= 0 || peak.pEnginePs <= 0) {
-    return { points, anchor: { ...none, readPs: peak.pEnginePs, printedPs } };
+  // P_Norm (bereits normkorrigiert) und P_Mot (roh, vor der Korrektur) sind
+  // zwei unterschiedliche physikalische Größen, keine genauere/ungenauere
+  // Fassung derselben Zahl – ihr Verhältnis IST der Korrekturfaktor, oft
+  // mehrere Prozent. Je nach Prüfstandssoftware zeigt das Diagramm (und damit
+  // die eingetragene bzw. abgelesene Kurve) mal die eine, mal die andere.
+  // Verankert bzw. verglichen wird deshalb mit dem Feld, dem die Kurve
+  // tatsächlich näher kommt – sonst würde die normale Normkorrektur selbst
+  // fälschlich als Ablesefehler oder Rundungsdifferenz interpretiert.
+  const candidates: number[] = [];
+  const psNorm = fin(printed?.psNorm);
+  const psEngine = fin(printed?.psEngine);
+  if (psNorm != null && psNorm > 0) candidates.push(psNorm);
+  if (psEngine != null && psEngine > 0) candidates.push(psEngine);
+
+  if (candidates.length === 0 || peak.pEnginePs <= 0) {
+    return { points, anchor: { ...none, readPs: peak.pEnginePs, printedPs: psNorm ?? psEngine ?? null } };
   }
+
+  const printedPs = candidates.reduce((best, c) =>
+    Math.abs(c - peak.pEnginePs) < Math.abs(best - peak.pEnginePs) ? c : best);
+  const printedField: "P_Norm" | "P_Mot" = printedPs === psNorm ? "P_Norm" : "P_Mot";
 
   const scale = printedPs / peak.pEnginePs;
   const suspicious = Math.abs(scale - 1) > ANCHOR_WARN;
 
   if (!applyScale) {
-    return { points, anchor: { scale, applied: false, readPs: peak.pEnginePs, printedPs, suspicious } };
+    return { points, anchor: { scale, applied: false, readPs: peak.pEnginePs, printedPs, printedField, suspicious } };
   }
 
   const scaled = points.map((p) => ({
@@ -126,7 +145,7 @@ export function anchorCurve(
     pEnginePs: +(p.pEnginePs * scale).toFixed(1),
   }));
 
-  return { points: scaled, anchor: { scale, applied: true, readPs: peak.pEnginePs, printedPs, suspicious } };
+  return { points: scaled, anchor: { scale, applied: true, readPs: peak.pEnginePs, printedPs, printedField, suspicious } };
 }
 
 /**
