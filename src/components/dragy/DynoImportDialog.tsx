@@ -109,12 +109,11 @@ export function DynoImportDialog({ initial, initialName, defaultRpmFactor, onSav
     run: ReturnType<typeof sheetToRun>["run"],
     f: number | null,
     a: AnchorInfo,
-    src: DynoRun["source"],
     fallbackName?: string,
   ) => {
     setRows(rowsFromRun(run));
     setAnchor(a);
-    setSource(src);
+    setSource(run.source);
     setStandard(run.correctedBy);
     if (fallbackName) setName(fallbackName);
     if (run.bench) setBench(run.bench);
@@ -143,9 +142,9 @@ export function DynoImportDialog({ initial, initialName, defaultRpmFactor, onSav
     setReadError(null);
     try {
       const { sheet, name: csvName, rpmFactor: explicit } = parseDynoCsv(await file.text());
-      const { run, rpmFactor: derived, anchor: a } = sheetToRun(sheet);
+      const { run, rpmFactor: derived, anchor: a } = sheetToRun(sheet, "manual");
       if (run.points.length === 0) throw new Error("Die Wertetabelle enthält keine verwertbaren Zeilen.");
-      applySheet(run, explicit ?? derived, a, "manual", csvName);
+      applySheet(run, explicit ?? derived, a, csvName);
     } catch (e) {
       setReadError(errorMessage(e, "Die CSV konnte nicht gelesen werden."));
     } finally {
@@ -169,9 +168,9 @@ export function DynoImportDialog({ initial, initialName, defaultRpmFactor, onSav
     setBusy(true); setReadError(null);
     try {
       const sheet = await extractDynoSheet(file);
-      const { run, rpmFactor: f, anchor: a } = sheetToRun(sheet);
+      const { run, rpmFactor: f, anchor: a } = sheetToRun(sheet, "vision");
       if (run.points.length === 0) throw new Error("Im Protokoll wurden keine Kurvenpunkte gefunden.");
-      applySheet(run, f, a, "vision");
+      applySheet(run, f, a);
     } catch (e) {
       setReadError(errorMessage(e, "Das Protokoll konnte nicht ausgelesen werden."));
     } finally {
@@ -361,17 +360,34 @@ export function DynoImportDialog({ initial, initialName, defaultRpmFactor, onSav
         {anchor && anchor.printedPs != null && anchor.scale !== 1 && (
           <div className="mt-2">
             <Note>
-              {anchor.suspicious && (
-                <b>Mehr als {(ANCHOR_WARN * 100).toFixed(0)} % Abweichung, Ablesefehler wahrscheinlich –
-                  bitte die Tabelle gegen das Protokoll prüfen. </b>
+              {anchor.applied ? (
+                <>
+                  {anchor.suspicious && (
+                    <b>Mehr als {(ANCHOR_WARN * 100).toFixed(0)} % Abweichung, Ablesefehler wahrscheinlich –
+                      bitte die Tabelle gegen das Protokoll prüfen. </b>
+                  )}
+                  Alle Werte oben wurden um den Faktor {anchor.scale.toFixed(3).replace(".", ",")} skaliert
+                  ({anchor.scale > 1 ? "hoch" : "runter"}gerechnet), nicht nur die Spitze: die abgelesene
+                  Kurve erreicht ihr eigenes Maximum mit {anchor.readPs?.toFixed(1).replace(".", ",")} PS,
+                  das Protokoll druckt aber {anchor.printedPs.toFixed(1).replace(".", ",")} PS. Das
+                  Foto-Ablesen ist ungenauer als der gedruckte Text, deshalb wird hier auf den gedruckten
+                  Wert korrigiert.
+                </>
+              ) : (
+                <>
+                  Deine Tabelle erreicht ihr eigenes Maximum mit {anchor.readPs?.toFixed(1).replace(".", ",")}{" "}
+                  PS, das Protokoll druckt {anchor.printedPs.toFixed(1).replace(".", ",")} PS (
+                  {((anchor.scale - 1) * 100).toFixed(1).replace(".", ",").replace("-", "−")} %). Deine
+                  eingetragenen Werte werden unverändert übernommen, hier wird nicht automatisch
+                  skaliert – bei CSV/Handeingabe ist deine Tabelle die maßgebliche Quelle, nicht der
+                  gedruckte Wert. Meist reine Drehzahlraster-Rundung: der echte Scheitelpunkt der Kurve
+                  liegt oft zwischen zwei eingetragenen Zeilen.
+                  {anchor.suspicious && (
+                    <b> Die Abweichung ist aber recht groß – lohnt sich, die Tabelle nochmal gegen das
+                      Protokoll zu prüfen (Zeile für Zeile, nicht nur die Spitze).</b>
+                  )}
+                </>
               )}
-              Alle Werte oben wurden um den Faktor {anchor.scale.toFixed(3).replace(".", ",")} skaliert
-              ({anchor.scale > 1 ? "hoch" : "runter"}gerechnet), nicht nur die Spitze: deine Tabelle
-              erreicht ihr eigenes Maximum mit {anchor.readPs?.toFixed(1).replace(".", ",")} PS, das
-              Protokoll druckt aber {anchor.printedPs.toFixed(1).replace(".", ",")} PS. Das ist bei einem
-              festen Drehzahlraster normal – der echte Scheitelpunkt der Kurve liegt oft zwischen zwei
-              eingetragenen Zeilen. Willst du stattdessen exakt deine eingetippten Zahlen sehen: in der
-              CSV-Datei das Feld „P_Norm [PS]" leeren und hier erneut laden.
             </Note>
           </div>
         )}

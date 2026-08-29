@@ -23,12 +23,22 @@ direkt eintippen.
 
 Der obere Block sind die im Protokoll **gedruckten** Zahlen, der untere die aus
 dem **Diagramm abgelesene** Kurve. Das Ablesen aus einem Foto ist ungenau, der
-gedruckte Leistungsdaten-Block dagegen nicht. Beim Import zieht die App die
-abgelesene Kurve deshalb auf die gedruckten Spitzenwerte: die **Form** stammt aus
-dem Diagramm, der **Betrag** aus dem Text.
+gedruckte Leistungsdaten-Block dagegen nicht.
 
-Der Skalierungsfaktor wird im Dialog angezeigt. Liegt er mehr als 5 % neben 1,
-war das Ablesen unzuverlässig und die Tabelle gehört gegengelesen.
+**Nur beim direkten Foto-Import** („Foto direkt auslesen…“) wird das
+ausgenutzt: die abgelesene Kurve wird auf die gedruckten Spitzenwerte gezogen,
+die **Form** stammt aus dem Diagramm, der **Betrag** aus dem Text – dort landet
+das KI-Ergebnis ungeprüft im Dialog, eine Korrektur ist also gerechtfertigt.
+
+**Beim CSV-Import gilt die Tabelle dagegen als maßgeblich und wird nicht
+automatisch skaliert** – egal ob sie von Hand oder aus einem Export
+eingetragen wurde, oder ob eine KI sie zuvor aus einem Foto befüllt hat: bis
+sie hochgeladen wird, hat sie bereits einen Kontrollschritt außerhalb der App
+durchlaufen (Schritt 4 oben). Weicht die Tabelle trotzdem vom gedruckten
+Spitzenwert ab (meist reine Drehzahlraster-Rundung: der echte Scheitelpunkt
+liegt oft zwischen zwei eingetragenen Zeilen), zeigt der Dialog das nur als
+Hinweis – ab mehr als 5 % Abweichung deutlicher, damit sich ein Blick auf die
+Tabelle lohnt, aber ohne die eingetragenen Werte zu verändern.
 
 Aus denselben gedruckten Zahlenpaaren (U/min bei km/h) ergibt sich auch der
 Drehzahlfaktor, ganz ohne Ablesen. Trägt man **Drehzahlfaktor** ausdrücklich ein,
@@ -169,10 +179,13 @@ NUR die fertige CSV zurück – keine Erklärung davor oder danach.
 4. Feldnamen und das Semikolon als Trennzeichen nicht verändern. Die #-Zeilen
    bleiben unverändert stehen.
 
-Warum 1 und 2 getrennt sind: die App skaliert die abgelesene Kurve anschließend
-auf die gedruckten Spitzenwerte. Die Form kommt aus dem Diagramm, der Betrag aus
-dem Text. Die gedruckten Werte müssen deshalb stimmen – auch dann, wenn das
-Ablesen der Kurve ungenau war.
+Warum 1 und 2 getrennt sind: deine Wertetabelle gilt beim Import als maßgeblich
+und wird unverändert übernommen, nicht die gedruckten Werte. Die App vergleicht
+nach dem Laden nur zur Kontrolle, ob deine Tabellen-Spitze zum gedruckten
+Spitzenwert passt, und weist bei größerer Abweichung darauf hin – ändert die
+Tabelle aber nicht. Beide Blöcke sollten deshalb möglichst genau sein: die
+gedruckten Werte, weil sie unabhängig gespeichert werden und dieser Kontrolle
+dienen, die Kurve, weil sie unverändert in die Auswertung übernommen wird.
 ```
 
 ---
