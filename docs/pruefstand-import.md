@@ -22,32 +22,29 @@ direkt eintippen.
 ## Warum die Vorlage zweigeteilt ist
 
 Der obere Block sind die im Protokoll **gedruckten** Zahlen, der untere die aus
-dem **Diagramm abgelesene** Kurve. Das Ablesen aus einem Foto ist ungenau, der
-gedruckte Leistungsdaten-Block dagegen nicht.
+dem **Diagramm abgelesene bzw. eingetragene** Kurve. Die gedruckten
+Spitzenwerte (P_Norm, M_Norm) sind bereits normkorrigiert – exakt dieselbe
+Größe wie die Kurve selbst, kein unabhängiger, "genauerer" Wert. Die Kurve
+deswegen zu skalieren wäre falsch: es würde jeden eingetragenen Wert
+verändern, nicht nur die Spitze.
 
-**Nur beim direkten Foto-Import** („Foto direkt auslesen…“) wird das
-ausgenutzt: die abgelesene Kurve wird auf die gedruckten Spitzenwerte gezogen,
-die **Form** stammt aus dem Diagramm, der **Betrag** aus dem Text – dort landet
-das KI-Ergebnis ungeprüft im Dialog, eine Korrektur ist also gerechtfertigt.
+Der eigentliche Grund, warum die Tabellen-Spitze selten exakt den gedruckten
+Wert trifft: das Protokoll nennt die Spitze an ihrer **exakten** Drehzahl
+(z. B. 8320 U/min), während die Tabelle nur ein festes Raster abdeckt
+(z. B. alle 250 U/min: …, 8250, 8500, …) – die Spitze liegt fast immer
+zwischen zwei eingetragenen Zeilen und fehlt der Kurve deshalb schlicht als
+Stützpunkt. Kein Ablesefehler, keine Ungenauigkeit.
 
-**Beim CSV-Import gilt die Tabelle dagegen als maßgeblich und wird nicht
-automatisch skaliert** – egal ob sie von Hand oder aus einem Export
-eingetragen wurde, oder ob eine KI sie zuvor aus einem Foto befüllt hat: bis
-sie hochgeladen wird, hat sie bereits einen Kontrollschritt außerhalb der App
-durchlaufen (Schritt 4 oben). Weicht die Tabelle trotzdem vom gedruckten
-Spitzenwert ab (meist reine Drehzahlraster-Rundung: der echte Scheitelpunkt
-liegt oft zwischen zwei eingetragenen Zeilen), zeigt der Dialog das nur als
-Hinweis – ab mehr als 5 % Abweichung deutlicher, damit sich ein Blick auf die
-Tabelle lohnt, aber ohne die eingetragenen Werte zu verändern.
+**Der Import ergänzt deshalb die gedruckten Spitzenwerte als eigene,
+zusätzliche Zeilen an ihrer exakten Drehzahl** – aus P_Norm direkt, aus
+M_Norm über M = 7023,8·PS/n in eine Leistung umgerechnet. Alle anderen Werte
+bleiben exakt so stehen, wie sie eingetragen bzw. abgelesen wurden; nichts
+wird skaliert oder verschoben. Das gilt gleichermaßen für CSV/Handeingabe und
+für den direkten Foto-Import.
 
 Aus denselben gedruckten Zahlenpaaren (U/min bei km/h) ergibt sich auch der
 Drehzahlfaktor, ganz ohne Ablesen. Trägt man **Drehzahlfaktor** ausdrücklich ein,
 hat dieser Wert Vorrang.
-
-**Verankert wird nur die Leistung, nie die Drehzahl.** Die eingetragenen
-Drehzahlen bleiben exakt so stehen, wie sie in der CSV stehen – sie werden von
-einem Raster gewählt (Vorlage bzw. Prompt), nicht unabhängig von einer
-Pixel-Position abgelesen, und brauchen deshalb keine Korrektur.
 
 ## Format
 
@@ -179,13 +176,14 @@ NUR die fertige CSV zurück – keine Erklärung davor oder danach.
 4. Feldnamen und das Semikolon als Trennzeichen nicht verändern. Die #-Zeilen
    bleiben unverändert stehen.
 
-Warum 1 und 2 getrennt sind: deine Wertetabelle gilt beim Import als maßgeblich
-und wird unverändert übernommen, nicht die gedruckten Werte. Die App vergleicht
-nach dem Laden nur zur Kontrolle, ob deine Tabellen-Spitze zum gedruckten
-Spitzenwert passt, und weist bei größerer Abweichung darauf hin – ändert die
-Tabelle aber nicht. Beide Blöcke sollten deshalb möglichst genau sein: die
-gedruckten Werte, weil sie unabhängig gespeichert werden und dieser Kontrolle
-dienen, die Kurve, weil sie unverändert in die Auswertung übernommen wird.
+Warum 1 und 2 getrennt sind: deine Wertetabelle wird unverändert übernommen,
+nichts wird skaliert oder verschoben. Die gedruckten Spitzenwerte (P_Norm,
+M_Norm) nennen aber ihre EXAKTE Drehzahl, die auf deinem festen Raster
+(250 U/min) fast nie getroffen wird – die App ergänzt sie deshalb als
+eigene, zusätzliche Zeile an genau dieser Drehzahl, statt die restliche Kurve
+danach zu verbiegen. Beide Blöcke sollten deshalb möglichst genau sein: die
+gedruckten Werte, weil sie so als exakte Stützpunkte einfließen, die Kurve,
+weil sie unverändert in die Auswertung übernommen wird.
 ```
 
 ---

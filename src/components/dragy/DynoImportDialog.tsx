@@ -5,7 +5,7 @@ import { NM_PER_PS_RPM } from "@/lib/dragy/physics";
 import { CORRECTION_LABEL, type CorrectionStandard } from "@/lib/dragy/correction";
 import { formatSessionTime } from "@/lib/dragy/sessionTime";
 import type { DynoPoint, DynoRun } from "@/lib/dragy/types";
-import { extractDynoSheet, sheetToRun, ANCHOR_WARN, type AnchorInfo } from "@/lib/dragy/dynoExtract";
+import { extractDynoSheet, sheetToRun, type AnchorInfo } from "@/lib/dragy/dynoExtract";
 import { DYNO_CSV_TEMPLATE, DYNO_CSV_PROMPT, parseDynoCsv } from "@/lib/dragy/dynoCsv";
 import { Collapsible } from "./ui";
 import { errorMessage } from "@/lib/dragy/errors";
@@ -357,38 +357,19 @@ export function DynoImportDialog({ initial, initialName, defaultRpmFactor, onSav
           </div>
         )}
 
-        {anchor && anchor.printedPs != null && anchor.scale !== 1 && (
+        {anchor && anchor.added.length > 0 && (
           <div className="mt-2">
             <Note>
-              {anchor.applied ? (
-                <>
-                  {anchor.suspicious && (
-                    <b>Mehr als {(ANCHOR_WARN * 100).toFixed(0)} % Abweichung, Ablesefehler wahrscheinlich –
-                      bitte die Tabelle gegen das Protokoll prüfen. </b>
-                  )}
-                  Alle Werte oben wurden um den Faktor {anchor.scale.toFixed(3).replace(".", ",")} skaliert
-                  ({anchor.scale > 1 ? "hoch" : "runter"}gerechnet), nicht nur die Spitze: die abgelesene
-                  Kurve erreicht ihr eigenes Maximum mit {anchor.readPs?.toFixed(1).replace(".", ",")} PS,
-                  das Protokoll druckt bei {anchor.printedField ?? "P_Norm"} aber{" "}
-                  {anchor.printedPs.toFixed(1).replace(".", ",")} PS. Das Foto-Ablesen ist ungenauer als der
-                  gedruckte Text, deshalb wird hier auf den gedruckten Wert korrigiert.
-                </>
-              ) : (
-                <>
-                  Deine Tabelle erreicht ihr eigenes Maximum mit {anchor.readPs?.toFixed(1).replace(".", ",")}{" "}
-                  PS, das Protokoll druckt bei {anchor.printedField ?? "P_Norm"}{" "}
-                  {anchor.printedPs.toFixed(1).replace(".", ",")} PS (
-                  {((anchor.scale - 1) * 100).toFixed(1).replace(".", ",").replace("-", "−")} %). Deine
-                  eingetragenen Werte werden unverändert übernommen, hier wird nicht automatisch
-                  skaliert – bei CSV/Handeingabe ist deine Tabelle die maßgebliche Quelle, nicht der
-                  gedruckte Wert. Kann Drehzahlraster-Rundung sein (der echte Scheitelpunkt liegt oft
-                  zwischen zwei eingetragenen Zeilen) oder eine kleine Ablesedifferenz.
-                  {anchor.suspicious && (
-                    <b> Die Abweichung ist aber recht groß – lohnt sich, die Tabelle nochmal gegen das
-                      Protokoll zu prüfen (Zeile für Zeile, nicht nur die Spitze).</b>
-                  )}
-                </>
-              )}
+              {anchor.added.length === 1 ? "Zusätzliche Zeile" : "Zusätzliche Zeilen"} unten in der Tabelle
+              ergänzt, {anchor.added.length === 1 ? "sie fehlte" : "sie fehlten"} auf dem eingetragenen
+              Drehzahlraster:{" "}
+              {anchor.added.map((a, i) => (
+                <span key={i}>
+                  {i > 0 && ", "}
+                  {a.rpm} U/min ({a.field === "P_Norm" ? "gedruckte Leistungsspitze" : "aus gedrucktem Drehmoment M_Norm berechnet"}, {a.ps.toFixed(1).replace(".", ",")} PS)
+                </span>
+              ))}
+              . Alle anderen Werte bleiben exakt wie eingetragen – nichts wurde skaliert oder verschoben.
             </Note>
           </div>
         )}

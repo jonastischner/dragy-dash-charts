@@ -101,13 +101,14 @@ NUR die fertige CSV zurück – keine Erklärung davor oder danach.
 4. Feldnamen und das Semikolon als Trennzeichen nicht verändern. Die #-Zeilen
    bleiben unverändert stehen.
 
-Warum 1 und 2 getrennt sind: deine Wertetabelle gilt beim Import als maßgeblich
-und wird unverändert übernommen, nicht die gedruckten Werte. Die App vergleicht
-nach dem Laden nur zur Kontrolle, ob deine Tabellen-Spitze zum gedruckten
-Spitzenwert passt, und weist bei größerer Abweichung darauf hin – ändert die
-Tabelle aber nicht. Beide Blöcke sollten deshalb möglichst genau sein: die
-gedruckten Werte, weil sie unabhängig gespeichert werden und dieser Kontrolle
-dienen, die Kurve, weil sie unverändert in die Auswertung übernommen wird.`;
+Warum 1 und 2 getrennt sind: deine Wertetabelle wird unverändert übernommen,
+nichts wird skaliert oder verschoben. Die gedruckten Spitzenwerte (P_Norm,
+M_Norm) nennen aber ihre EXAKTE Drehzahl, die auf deinem festen Raster
+(${PROMPT_RPM_STEP} U/min) fast nie getroffen wird – die App ergänzt sie deshalb als
+eigene, zusätzliche Zeile an genau dieser Drehzahl, statt die restliche Kurve
+danach zu verbiegen. Beide Blöcke sollten deshalb möglichst genau sein: die
+gedruckten Werte, weil sie so als exakte Stützpunkte einfließen, die Kurve,
+weil sie unverändert in die Auswertung übernommen wird.`;
 
 /**
  * Kopfzeile der Wertetabelle: erste Zelle nennt NUR die Drehzahl.
