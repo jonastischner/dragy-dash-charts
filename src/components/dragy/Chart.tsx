@@ -277,7 +277,7 @@ export function Chart({ series, bands = [], xLabel, yLabel, height = 280, onLege
   const content = (
     <>
       {readoutRows.length > 0 && (
-        <div className="mb-1 rounded-md border border-border bg-elevated px-2 py-1.5">
+        <div className={`mb-1 rounded-md border border-border bg-elevated px-2 py-1.5 ${fullscreen ? "shrink-0" : ""}`}>
           <div className="flex items-baseline justify-between gap-2">
             <span className="flex-none text-caption font-medium text-foreground">
               {cursorX != null
@@ -310,7 +310,10 @@ export function Chart({ series, bands = [], xLabel, yLabel, height = 280, onLege
               ×
             </button>
           </div>
-          <div className="mt-0.5 space-y-0.5">
+          {/* Im Querformat ist der Bildschirm nur ~390 px hoch – fünf Wertezeilen
+              plus Kopf belegen davon schon fast die Hälfte. Deshalb auch hier
+              deckeln statt das Diagramm zusammenzudrücken. */}
+          <div className={`mt-0.5 space-y-0.5 ${fullscreen ? "max-h-[18vh] overflow-y-auto" : ""}`}>
             {shownRows.map((r, i) => {
               // Nach Wert absteigend sortiert – der Rückstand bezieht sich immer
               // auf die an dieser Stelle führende Kurve.
@@ -337,8 +340,12 @@ export function Chart({ series, bands = [], xLabel, yLabel, height = 280, onLege
       <div ref={plotRef} className={fullscreen ? "w-full min-h-0 flex-1" : "w-full"} style={fullscreen ? undefined : { height }}>
         <canvas ref={canvasRef} onPointerMove={onMove} onPointerDown={onMove} className="h-full w-full touch-none rounded-md" />
       </div>
+      {/* Im Vollbild darf die Legende nicht mitwachsen: als Flex-Item hat sie
+          min-height:auto, würde sich also nicht verkleinern und bei vielen
+          Läufen die ganze Höhe belegen – das Diagramm (flex-1) bliebe mit 0 px
+          übrig. Deshalb hier deckeln und stattdessen scrollen lassen. */}
       {showLegend && series.length > 0 && (
-        <div className="mt-1 flex flex-wrap gap-2">
+        <div className={`mt-1 flex flex-wrap gap-2 ${fullscreen ? "max-h-[22vh] shrink-0 overflow-y-auto" : ""}`}>
           {series.map((s, i) => (
             <button key={i} type="button" onClick={() => onLegendToggle?.(i)}
               aria-pressed={s.visible !== false}
