@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { Maximize2, Minimize2 } from "lucide-react";
 
 export interface Series {
   label: string;
@@ -99,16 +100,35 @@ function peakOf(s: Series): number | null {
 
 export function Chart({ series, bands = [], xLabel, yLabel, height = 280, onLegendToggle, xFormat, yFormat, showLegend = true, yFromZero = true }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const wrapRef = useRef<HTMLDivElement>(null);
+  const plotRef = useRef<HTMLDivElement>(null);
   const [hover, setHover] = useState<{ x: number } | null>(null);
   const [size, setSize] = useState({ w: 320, h: height });
+  const [fullscreen, setFullscreen] = useState(false);
 
+  // Größe direkt vom Plot-Container lesen statt vom height-Prop abzuleiten:
+  // im Vollbild füllt derselbe Container per Flexbox die verfügbare Höhe
+  // (auch nach Drehen des Telefons), im Normalmodus entspricht sie exakt
+  // dem height-Prop, weil der Container dort eine feste Höhe bekommt.
   useEffect(() => {
-    const el = wrapRef.current; if (!el) return;
-    const ro = new ResizeObserver(() => setSize({ w: el.clientWidth, h: height }));
+    const el = plotRef.current; if (!el) return;
+    const ro = new ResizeObserver(() => setSize({ w: el.clientWidth, h: el.clientHeight }));
     ro.observe(el);
     return () => ro.disconnect();
-  }, [height]);
+  }, []);
+
+  // Vollbild wieder verlassen: per Escape, und Hintergrund währenddessen
+  // nicht scrollen lassen – gleiches Muster wie beim PDF-Export-Dialog.
+  useEffect(() => {
+    if (!fullscreen) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setFullscreen(false); };
+    document.addEventListener("keydown", onKey);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [fullscreen]);
 
   const visSeries = series.filter((s) => s.visible !== false);
   const allPts = visSeries.flatMap((s) => s.points);
@@ -254,8 +274,8 @@ export function Chart({ series, bands = [], xLabel, yLabel, height = 280, onLege
   const shownRows = readoutRows.slice(0, MAX_READOUT_ROWS);
   const restCount = readoutRows.length - shownRows.length;
 
-  return (
-    <div ref={wrapRef} className="w-full">
+  const content = (
+    <>
       {readoutRows.length > 0 && (
         <div className="mb-1 rounded-md border border-border bg-elevated px-2 py-1.5">
           <div className="flex items-baseline justify-between gap-2">
@@ -271,6 +291,14 @@ export function Chart({ series, bands = [], xLabel, yLabel, height = 280, onLege
                 {yLabel}
               </span>
             )}
+            <button
+              type="button"
+              onClick={() => setFullscreen((f) => !f)}
+              aria-label={fullscreen ? "Vollbild schließen" : "Diagramm im Vollbild anzeigen"}
+              className="-my-1 flex h-8 w-8 flex-none items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground"
+            >
+              {fullscreen ? <Minimize2 className="h-4 w-4" aria-hidden="true" /> : <Maximize2 className="h-4 w-4" aria-hidden="true" />}
+            </button>
             <button
               type="button"
               onClick={() => setHover(null)}
@@ -306,7 +334,9 @@ export function Chart({ series, bands = [], xLabel, yLabel, height = 280, onLege
           </div>
         </div>
       )}
-      <canvas ref={canvasRef} onPointerMove={onMove} onPointerDown={onMove} className="touch-none rounded-md" />
+      <div ref={plotRef} className={fullscreen ? "w-full min-h-0 flex-1" : "w-full"} style={fullscreen ? undefined : { height }}>
+        <canvas ref={canvasRef} onPointerMove={onMove} onPointerDown={onMove} className="h-full w-full touch-none rounded-md" />
+      </div>
       {showLegend && series.length > 0 && (
         <div className="mt-1 flex flex-wrap gap-2">
           {series.map((s, i) => (
@@ -320,6 +350,25 @@ export function Chart({ series, bands = [], xLabel, yLabel, height = 280, onLege
           ))}
         </div>
       )}
-    </div>
+    </>
   );
+
+  if (fullscreen) {
+    return (
+      <div
+        className="fixed inset-0 z-50 flex flex-col bg-background p-3"
+        style={{
+          paddingTop: "calc(0.75rem + env(safe-area-inset-top))",
+          paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))",
+        }}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Diagramm, Vollbild"
+      >
+        {content}
+      </div>
+    );
+  }
+
+  return <div className="w-full">{content}</div>;
 }
