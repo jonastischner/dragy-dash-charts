@@ -15,6 +15,7 @@ export function PdfExportDialog({ runs, onClose }: { runs: RunPdfData[]; onClose
   const vehicleId = runs[0]?.vehicle.id ?? "";
   const [info, setInfo] = useState<PdfHeaderInfo>({});
   const [standard] = useCorrectionStandard();
+  const [comparePage, setComparePage] = useState(true);
 
   useEffect(() => {
     if (!vehicleId) return;
@@ -38,7 +39,7 @@ export function PdfExportDialog({ runs, onClose }: { runs: RunPdfData[]; onClose
 
   const submit = () => {
     try { localStorage.setItem(storeKey(vehicleId), JSON.stringify(info)); } catch { /* ignorieren */ }
-    exportRunPdf(runs, info, standard);
+    exportRunPdf(runs, info, standard, { comparePage: runs.length >= 2 && comparePage });
     onClose();
   };
 
@@ -63,6 +64,18 @@ export function PdfExportDialog({ runs, onClose }: { runs: RunPdfData[]; onClose
         <div className="mt-3">
           <CorrectionSelect label="Normkorrektur im Protokoll" />
         </div>
+
+        {runs.length >= 2 && (
+          <label className="mt-3 flex min-h-11 items-center gap-2 text-caption text-foreground">
+            <input
+              type="checkbox"
+              checked={comparePage}
+              onChange={(e) => setComparePage(e.target.checked)}
+              className="h-4 w-4 flex-none"
+            />
+            Zusätzliche Vergleichsseite (alle Läufe überlagert) vor den Einzelseiten
+          </label>
+        )}
 
         <div className="mt-3 space-y-2">
           <Note>
