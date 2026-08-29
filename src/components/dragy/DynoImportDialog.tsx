@@ -109,12 +109,11 @@ export function DynoImportDialog({ initial, initialName, defaultRpmFactor, onSav
     run: ReturnType<typeof sheetToRun>["run"],
     f: number | null,
     a: AnchorInfo,
-    src: DynoRun["source"],
     fallbackName?: string,
   ) => {
     setRows(rowsFromRun(run));
     setAnchor(a);
-    setSource(src);
+    setSource(run.source);
     setStandard(run.correctedBy);
     if (fallbackName) setName(fallbackName);
     if (run.bench) setBench(run.bench);
@@ -143,9 +142,9 @@ export function DynoImportDialog({ initial, initialName, defaultRpmFactor, onSav
     setReadError(null);
     try {
       const { sheet, name: csvName, rpmFactor: explicit } = parseDynoCsv(await file.text());
-      const { run, rpmFactor: derived, anchor: a } = sheetToRun(sheet);
+      const { run, rpmFactor: derived, anchor: a } = sheetToRun(sheet, "manual");
       if (run.points.length === 0) throw new Error("Die Wertetabelle enthält keine verwertbaren Zeilen.");
-      applySheet(run, explicit ?? derived, a, "manual", csvName);
+      applySheet(run, explicit ?? derived, a, csvName);
     } catch (e) {
       setReadError(errorMessage(e, "Die CSV konnte nicht gelesen werden."));
     } finally {
@@ -169,9 +168,9 @@ export function DynoImportDialog({ initial, initialName, defaultRpmFactor, onSav
     setBusy(true); setReadError(null);
     try {
       const sheet = await extractDynoSheet(file);
-      const { run, rpmFactor: f, anchor: a } = sheetToRun(sheet);
+      const { run, rpmFactor: f, anchor: a } = sheetToRun(sheet, "vision");
       if (run.points.length === 0) throw new Error("Im Protokoll wurden keine Kurvenpunkte gefunden.");
-      applySheet(run, f, a, "vision");
+      applySheet(run, f, a);
     } catch (e) {
       setReadError(errorMessage(e, "Das Protokoll konnte nicht ausgelesen werden."));
     } finally {
@@ -300,15 +299,6 @@ export function DynoImportDialog({ initial, initialName, defaultRpmFactor, onSav
             {readError} Die Werte lassen sich unten von Hand eintragen.
           </p>
         )}
-        {anchor && anchor.printedPs != null && (
-          <p className={`mt-2 text-caption ${anchor.suspicious ? "text-warning" : "text-muted-foreground"}`}>
-            Kurve auf den gedruckten Spitzenwert {anchor.printedPs.toFixed(1).replace(".", ",")} PS verankert
-            (abgelesen {anchor.readPs?.toFixed(1).replace(".", ",")} PS, Faktor{" "}
-            {anchor.scale.toFixed(3).replace(".", ",")}). Die Drehzahlen bleiben wie eingetragen.
-            {anchor.suspicious && ` Mehr als ${(ANCHOR_WARN * 100).toFixed(0)} % Abweichung – bitte die Wertetabelle gegen das Protokoll prüfen.`}
-          </p>
-        )}
-
         <Row cols={2}>
           <Field label="Name des Laufs"><TextInput value={name} onChange={(e) => setName(e.target.value)} /></Field>
           <Field label="Meßdatum" hint="bestimmt Datum und Sortierung der Session">
@@ -364,6 +354,42 @@ export function DynoImportDialog({ initial, initialName, defaultRpmFactor, onSav
               {rpmFactor > 0 && ` (${(peaks.psRpm / rpmFactor).toFixed(1)} km/h)`}
               {" · "}{peaks.nm.toFixed(1)} Nm bei {peaks.nmRpm.toFixed(0)} U/min
             </p>
+          </div>
+        )}
+
+        {anchor && anchor.printedPs != null && anchor.scale !== 1 && (
+          <div className="mt-2">
+            <Note>
+              {anchor.applied ? (
+                <>
+                  {anchor.suspicious && (
+                    <b>Mehr als {(ANCHOR_WARN * 100).toFixed(0)} % Abweichung, Ablesefehler wahrscheinlich –
+                      bitte die Tabelle gegen das Protokoll prüfen. </b>
+                  )}
+                  Alle Werte oben wurden um den Faktor {anchor.scale.toFixed(3).replace(".", ",")} skaliert
+                  ({anchor.scale > 1 ? "hoch" : "runter"}gerechnet), nicht nur die Spitze: die abgelesene
+                  Kurve erreicht ihr eigenes Maximum mit {anchor.readPs?.toFixed(1).replace(".", ",")} PS,
+                  das Protokoll druckt bei {anchor.printedField ?? "P_Norm"} aber{" "}
+                  {anchor.printedPs.toFixed(1).replace(".", ",")} PS. Das Foto-Ablesen ist ungenauer als der
+                  gedruckte Text, deshalb wird hier auf den gedruckten Wert korrigiert.
+                </>
+              ) : (
+                <>
+                  Deine Tabelle erreicht ihr eigenes Maximum mit {anchor.readPs?.toFixed(1).replace(".", ",")}{" "}
+                  PS, das Protokoll druckt bei {anchor.printedField ?? "P_Norm"}{" "}
+                  {anchor.printedPs.toFixed(1).replace(".", ",")} PS (
+                  {((anchor.scale - 1) * 100).toFixed(1).replace(".", ",").replace("-", "−")} %). Deine
+                  eingetragenen Werte werden unverändert übernommen, hier wird nicht automatisch
+                  skaliert – bei CSV/Handeingabe ist deine Tabelle die maßgebliche Quelle, nicht der
+                  gedruckte Wert. Kann Drehzahlraster-Rundung sein (der echte Scheitelpunkt liegt oft
+                  zwischen zwei eingetragenen Zeilen) oder eine kleine Ablesedifferenz.
+                  {anchor.suspicious && (
+                    <b> Die Abweichung ist aber recht groß – lohnt sich, die Tabelle nochmal gegen das
+                      Protokoll zu prüfen (Zeile für Zeile, nicht nur die Spitze).</b>
+                  )}
+                </>
+              )}
+            </Note>
           </div>
         )}
 

@@ -101,10 +101,13 @@ NUR die fertige CSV zurück – keine Erklärung davor oder danach.
 4. Feldnamen und das Semikolon als Trennzeichen nicht verändern. Die #-Zeilen
    bleiben unverändert stehen.
 
-Warum 1 und 2 getrennt sind: die App skaliert die abgelesene Kurve anschließend
-auf die gedruckten Spitzenwerte. Die Form kommt aus dem Diagramm, der Betrag aus
-dem Text. Die gedruckten Werte müssen deshalb stimmen – auch dann, wenn das
-Ablesen der Kurve ungenau war.`;
+Warum 1 und 2 getrennt sind: deine Wertetabelle gilt beim Import als maßgeblich
+und wird unverändert übernommen, nicht die gedruckten Werte. Die App vergleicht
+nach dem Laden nur zur Kontrolle, ob deine Tabellen-Spitze zum gedruckten
+Spitzenwert passt, und weist bei größerer Abweichung darauf hin – ändert die
+Tabelle aber nicht. Beide Blöcke sollten deshalb möglichst genau sein: die
+gedruckten Werte, weil sie unabhängig gespeichert werden und dieser Kontrolle
+dienen, die Kurve, weil sie unverändert in die Auswertung übernommen wird.`;
 
 /**
  * Kopfzeile der Wertetabelle: erste Zelle nennt NUR die Drehzahl.

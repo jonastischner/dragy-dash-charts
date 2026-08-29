@@ -50,22 +50,42 @@ export function rpmFactorFromSheet(printed: DynoSheet["printed"]): number | null
 }
 
 export interface AnchorInfo {
-  /** Faktor, mit dem die abgelesene Motorkurve auf den gedruckten Spitzenwert gebracht wurde. */
+  /** Rechnerischer Faktor zwischen abgelesener/eingetragener und gedruckter Spitzenleistung. */
   scale: number;
-  /** Abgelesene Spitzenleistung vor der Verankerung. */
+  /**
+   * Wurde der Faktor tatsächlich auf die Kurve angewendet? Nur beim Auslesen
+   * eines Fotos/Scans (source "vision") – dort ist die Kurve selbst eine
+   * Schätzung (Pixel-Position auf einer Rastergrafik), der gedruckte Text
+   * dagegen zuverlässig, eine Korrektur also gerechtfertigt.
+   *
+   * Bei CSV/Handeingabe (source "manual") ist es umgekehrt: die Tabelle IST
+   * die Messung, vom Nutzer bzw. seiner eigenen Prüfstandssoftware exakt
+   * angegeben. Der gedruckte Spitzenwert ist dort nur ein zusätzlicher
+   * Beleg, kein zuverlässigerer Wert als die Tabelle selbst – eine Abweichung
+   * ist meist reine Drehzahlraster-Rundung (der wahre Scheitel der Kurve
+   * liegt zwischen zwei eingetragenen Zeilen). Die eingetragenen Werte
+   * bleiben in diesem Fall unangetastet, `scale`/`suspicious` dienen nur der
+   * Anzeige als Cross-Check.
+   */
+  applied: boolean;
+  /** Spitzenleistung der Kurve vor der Verankerung (Tabelle bzw. Ablesung). */
   readPs: number | null;
-  /** Gedruckte Spitzenleistung, an der verankert wurde. */
+  /** Gedruckte Spitzenleistung, an der verankert bzw. gegengeprüft wurde. */
   printedPs: number | null;
-  /** Auffällig große Korrektur – dann war das Ablesen schlecht und der Nutzer muss hinsehen. */
+  /** Welches gedruckte Feld das war – für die Anzeige im Dialog. */
+  printedField: "P_Norm" | "P_Mot" | null;
+  /** Auffällig große Abweichung – dann lohnt ein Blick auf Tabelle vs. Protokoll. */
   suspicious: boolean;
 }
 
-/** Ab dieser Abweichung gilt das Ablesen als unzuverlässig. */
+/** Ab dieser Abweichung gilt der Unterschied als auffällig. */
 export const ANCHOR_WARN = 0.05;
 
 /**
- * Kurve an den gedruckten Eckwerten verankern. Ohne gedruckte Werte bleibt die
- * abgelesene Kurve unverändert – dann ist sie eben nur so gut wie das Ablesen.
+ * Kurve an den gedruckten Eckwerten verankern – aber nur, wenn `applyScale`
+ * gesetzt ist. Ohne gedruckte Werte oder ohne `applyScale` bleibt die Kurve
+ * unverändert; `scale`/`suspicious` werden trotzdem berechnet, damit der
+ * Dialog eine Abweichung anzeigen kann, ohne die Werte selbst zu verändern.
  *
  * Verankert wird NUR die Leistung, nicht die Drehzahl. Die Drehzahl je Zeile
  * wird beim Ausfüllen von einem Raster gewählt (Vorlage bzw. Prompt: "in
@@ -79,19 +99,42 @@ export const ANCHOR_WARN = 0.05;
 export function anchorCurve(
   points: DynoPoint[],
   printed: DynoSheet["printed"],
+  applyScale: boolean,
 ): { points: DynoPoint[]; anchor: AnchorInfo } {
-  const none: AnchorInfo = { scale: 1, readPs: null, printedPs: null, suspicious: false };
+  const none: AnchorInfo = { scale: 1, applied: false, readPs: null, printedPs: null, printedField: null, suspicious: false };
   if (points.length === 0) return { points, anchor: none };
 
   let peak = points[0];
   for (const p of points) if (p.pEnginePs > peak.pEnginePs) peak = p;
 
-  const printedPs = fin(printed?.psNorm) ?? fin(printed?.psEngine);
-  if (printedPs == null || printedPs <= 0 || peak.pEnginePs <= 0) {
-    return { points, anchor: { ...none, readPs: peak.pEnginePs, printedPs } };
+  // P_Norm (bereits normkorrigiert) und P_Mot (roh, vor der Korrektur) sind
+  // zwei unterschiedliche physikalische Größen, keine genauere/ungenauere
+  // Fassung derselben Zahl – ihr Verhältnis IST der Korrekturfaktor, oft
+  // mehrere Prozent. Je nach Prüfstandssoftware zeigt das Diagramm (und damit
+  // die eingetragene bzw. abgelesene Kurve) mal die eine, mal die andere.
+  // Verankert bzw. verglichen wird deshalb mit dem Feld, dem die Kurve
+  // tatsächlich näher kommt – sonst würde die normale Normkorrektur selbst
+  // fälschlich als Ablesefehler oder Rundungsdifferenz interpretiert.
+  const candidates: number[] = [];
+  const psNorm = fin(printed?.psNorm);
+  const psEngine = fin(printed?.psEngine);
+  if (psNorm != null && psNorm > 0) candidates.push(psNorm);
+  if (psEngine != null && psEngine > 0) candidates.push(psEngine);
+
+  if (candidates.length === 0 || peak.pEnginePs <= 0) {
+    return { points, anchor: { ...none, readPs: peak.pEnginePs, printedPs: psNorm ?? psEngine ?? null } };
   }
 
+  const printedPs = candidates.reduce((best, c) =>
+    Math.abs(c - peak.pEnginePs) < Math.abs(best - peak.pEnginePs) ? c : best);
+  const printedField: "P_Norm" | "P_Mot" = printedPs === psNorm ? "P_Norm" : "P_Mot";
+
   const scale = printedPs / peak.pEnginePs;
+  const suspicious = Math.abs(scale - 1) > ANCHOR_WARN;
+
+  if (!applyScale) {
+    return { points, anchor: { scale, applied: false, readPs: peak.pEnginePs, printedPs, printedField, suspicious } };
+  }
 
   const scaled = points.map((p) => ({
     rpm: p.rpm,
@@ -102,20 +145,17 @@ export function anchorCurve(
     pEnginePs: +(p.pEnginePs * scale).toFixed(1),
   }));
 
-  return {
-    points: scaled,
-    anchor: {
-      scale, readPs: peak.pEnginePs, printedPs,
-      suspicious: Math.abs(scale - 1) > ANCHOR_WARN,
-    },
-  };
+  return { points: scaled, anchor: { scale, applied: true, readPs: peak.pEnginePs, printedPs, printedField, suspicious } };
 }
 
 /**
  * Extraktion in einen DynoRun überführen: aufräumen, ergänzen, verankern.
  * Das Ergebnis ist ein Vorschlag für den Dialog, kein fertiger Datensatz.
+ *
+ * `source` entscheidet, ob die Verankerung die Kurve tatsächlich verändert:
+ * nur bei "vision" (Foto/Scan, siehe anchorCurve()).
  */
-export function sheetToRun(sheet: DynoSheet): {
+export function sheetToRun(sheet: DynoSheet, source: DynoRun["source"]): {
   run: DynoRun;
   rpmFactor: number | null;
   anchor: AnchorInfo;
@@ -133,7 +173,7 @@ export function sheetToRun(sheet: DynoSheet): {
     .filter((p): p is DynoPoint => p !== null)
     .sort((a, b) => a.rpm - b.rpm);
 
-  const { points, anchor } = anchorCurve(raw, sheet.printed);
+  const { points, anchor } = anchorCurve(raw, sheet.printed, source === "vision");
 
   const measured = sheet.measuredAt ? Date.parse(sheet.measuredAt) : NaN;
   const env = sheet.env && (fin(sheet.env.tempC) != null || fin(sheet.env.pressureHpa) != null || fin(sheet.env.rh) != null)
@@ -149,7 +189,7 @@ export function sheetToRun(sheet: DynoSheet): {
   const run: DynoRun = {
     points,
     correctedBy: sheet.correctedBy ?? "none",
-    source: "vision",
+    source,
     ...(sheet.bench ? { bench: sheet.bench } : {}),
     ...(sheet.operator ? { operator: sheet.operator } : {}),
     ...(Number.isFinite(measured) ? { measuredAt: measured } : {}),
