@@ -340,12 +340,13 @@ export function Chart({ series, bands = [], xLabel, yLabel, height = 280, onLege
       <div ref={plotRef} className={fullscreen ? "w-full min-h-0 flex-1" : "w-full"} style={fullscreen ? undefined : { height }}>
         <canvas ref={canvasRef} onPointerMove={onMove} onPointerDown={onMove} className="h-full w-full touch-none rounded-md" />
       </div>
-      {/* Im Vollbild darf die Legende nicht mitwachsen: als Flex-Item hat sie
-          min-height:auto, würde sich also nicht verkleinern und bei vielen
-          Läufen die ganze Höhe belegen – das Diagramm (flex-1) bliebe mit 0 px
-          übrig. Deshalb hier deckeln und stattdessen scrollen lassen. */}
-      {showLegend && series.length > 0 && (
-        <div className={`mt-1 flex flex-wrap gap-2 ${fullscreen ? "max-h-[22vh] shrink-0 overflow-y-auto" : ""}`}>
+      {/* Im Vollbild ohne Legende: sie kostet dort nur Höhe, die dem Diagramm
+          fehlt (bei vielen Läufen eine Zeile pro Lauf). Zuordnen lässt sich
+          jede Kurve weiterhin über das Werte-Panel oben, das dieselben
+          Farbchips und Namen zeigt; ein-/ausblenden über die Legende in der
+          Normalansicht, bevor man das Vollbild öffnet. */}
+      {showLegend && !fullscreen && series.length > 0 && (
+        <div className="mt-1 flex flex-wrap gap-2">
           {series.map((s, i) => (
             <button key={i} type="button" onClick={() => onLegendToggle?.(i)}
               aria-pressed={s.visible !== false}
