@@ -34,6 +34,15 @@ function ceilTo(v: number, step: number) {
   return Math.max(step, Math.ceil(v / step) * step);
 }
 
+function hexToRgb(hex: string): [number, number, number] {
+  const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec((hex ?? "").trim());
+  return m ? [parseInt(m[1], 16), parseInt(m[2], 16), parseInt(m[3], 16)] : COL.axis;
+}
+
+function runLabel(d: RunPdfData) {
+  return `${d.vehicle.name} · ${d.session.name} · ${d.segment.name}`;
+}
+
 interface Curve { rpm: number; pWheel: number; pDrag: number; pEngine: number; nm: number }
 
 export interface RunPdfData {
@@ -370,18 +379,236 @@ function drawPage(doc: jsPDF, d: RunPdfData, info: PdfHeaderInfo, standard: Corr
   );
 }
 
-export function buildRunPdf(runs: RunPdfData[], info: PdfHeaderInfo, standard: CorrectionStandard = "none"): jsPDF {
+/**
+ * Vergleichsseite: die Motorgrößen mehrerer Läufe überlagert auf einer
+ * Seite statt auf getrennten Einzelseiten – durchgezogen Motorleistung,
+ * gestrichelt Motordrehmoment, Farbe je Lauf wie in der App-Ansicht
+ * (Segmentfarbe, bei Fahrzeugvergleichen bereits kollisionsfrei gemacht).
+ * P-Rad/P-Schlepp bleiben hier außen vor – die Einzelseiten danach zeigen
+ * jeden Lauf mit allen vier Kurven und den vollständigen Datenblöcken.
+ */
+function drawComparePage(doc: jsPDF, runs: RunPdfData[], info: PdfHeaderInfo, standard: CorrectionStandard) {
+  const W = doc.internal.pageSize.getWidth();
+  const H = doc.internal.pageSize.getHeight();
+  const M = 12;
+
+  const perRun = runs.map((d) => {
+    const corr = runCorrection(d, standard);
+    const curves = buildCurves(d, corr.alpha);
+    const p = peaks(curves, d);
+    const rec = d.session.records.filter((r) => r.t >= d.segment.startT && r.t <= d.segment.endT);
+    const dur = rec.length ? rec[rec.length - 1].t - rec[0].t : NaN;
+    return { d, corr, curves, p, dur, color: hexToRgb(d.segment.color) };
+  });
+
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(...COL.text);
+
+  /* --- Kopfzeile --- */
+  doc.setFontSize(8);
+  doc.text(`Vergleich · ${runs.length} Läufe`, M, M);
+  doc.setDrawColor(...COL.line);
+  doc.setLineWidth(0.2);
+  doc.line(M, M + 1.5, W - M, M + 1.5);
+
+  /* --- Diagrammfläche --- */
+  const plot = { x: M + 14, y: M + 6, w: W - 2 * M - 28, h: H * 0.5 };
+  const rpmMax = ceilTo(Math.max(...perRun.map((r) => r.p.maxRpm), 1000), 1000);
+  const psMax = ceilTo(Math.max(...perRun.map((r) => r.p.pEngine), 50) * 1.15, 100);
+  const nmMax = ceilTo(Math.max(...perRun.map((r) => (Number.isFinite(r.p.nm) ? r.p.nm : 0)), 50) * 1.15, 100);
+
+  const px = (rpm: number) => plot.x + (rpm / rpmMax) * plot.w;
+  const pyPs = (ps: number) => plot.y + plot.h - (ps / psMax) * plot.h;
+  const pyNm = (v: number) => plot.y + plot.h - (v / nmMax) * plot.h;
+
+  // Gitter + Achsen wie auf der Einzelseite.
+  const colsMajor = rpmMax / 1000;
+  const rowsMajor = psMax / 100;
+  doc.setLineWidth(0.1);
+  doc.setDrawColor(...COL.gridMinor);
+  for (let i = 0; i <= colsMajor * 5; i++) {
+    const x = plot.x + (plot.w * i) / (colsMajor * 5);
+    doc.line(x, plot.y, x, plot.y + plot.h);
+  }
+  for (let i = 0; i <= rowsMajor * 5; i++) {
+    const y = plot.y + (plot.h * i) / (rowsMajor * 5);
+    doc.line(plot.x, y, plot.x + plot.w, y);
+  }
+  doc.setLineWidth(0.25);
+  doc.setDrawColor(...COL.grid);
+  for (let i = 0; i <= colsMajor; i++) {
+    const x = plot.x + (plot.w * i) / colsMajor;
+    doc.line(x, plot.y, x, plot.y + plot.h);
+  }
+  for (let i = 0; i <= rowsMajor; i++) {
+    const y = plot.y + (plot.h * i) / rowsMajor;
+    doc.line(plot.x, y, plot.x + plot.w, y);
+  }
+  doc.setLineWidth(0.4);
+  doc.setDrawColor(...COL.axis);
+  doc.rect(plot.x, plot.y, plot.w, plot.h);
+  doc.setFontSize(7);
+  doc.setTextColor(...COL.text);
+  for (let i = 0; i <= colsMajor; i++) {
+    const x = plot.x + (plot.w * i) / colsMajor;
+    doc.text(String(i * 1000), x, plot.y + plot.h + 4, { align: "center" });
+  }
+  doc.text("n [U/min]", plot.x + plot.w, plot.y + plot.h + 8, { align: "right" });
+  for (let i = 0; i <= rowsMajor; i++) {
+    const y = plot.y + plot.h - (plot.h * i) / rowsMajor;
+    doc.text(String(i * 100), plot.x - 2, y + 1, { align: "right" });
+  }
+  const nmRows = nmMax / 100;
+  for (let i = 0; i <= nmRows; i++) {
+    const y = plot.y + plot.h - (plot.h * i) / nmRows;
+    doc.text(String(i * 100), plot.x + plot.w + 2, y + 1);
+  }
+  doc.text("M [Nm]", plot.x + plot.w + 2, plot.y - 1.5);
+  doc.text("P [PS]", plot.x - 2, plot.y - 1.5, { align: "right" });
+
+  // Kurven: je Lauf durchgezogen Motorleistung, gestrichelt Motordrehmoment.
+  doc.setLineWidth(0.7);
+  for (const r of perRun) {
+    doc.setDrawColor(...r.color);
+    doc.setLineDashPattern([], 0);
+    let run: Array<[number, number]> = [];
+    for (const c of r.curves) {
+      if (!Number.isFinite(c.pEngine)) { if (run.length > 1) drawPolyline(doc, run); run = []; continue; }
+      run.push([px(c.rpm), pyPs(Math.max(0, Math.min(c.pEngine, psMax)))]);
+    }
+    if (run.length > 1) drawPolyline(doc, run);
+
+    doc.setLineDashPattern([1.5, 1.2], 0);
+    run = [];
+    for (const c of r.curves) {
+      if (!Number.isFinite(c.nm)) { if (run.length > 1) drawPolyline(doc, run); run = []; continue; }
+      run.push([px(c.rpm), pyNm(Math.max(0, Math.min(c.nm, nmMax)))]);
+    }
+    if (run.length > 1) drawPolyline(doc, run);
+  }
+  doc.setLineDashPattern([], 0);
+
+  // Legende: ein Eintrag je Lauf in seiner Farbe.
+  const lw = Math.min(95, plot.w - 6);
+  const lh = 3 + perRun.length * 4 + 5;
+  const lx = plot.x + 3, ly = plot.y + 3;
+  doc.setFillColor(255, 255, 255);
+  doc.setDrawColor(...COL.axis);
+  doc.setLineWidth(0.2);
+  doc.rect(lx, ly, lw, lh, "FD");
+  doc.setFontSize(7);
+  perRun.forEach((r, i) => {
+    const y = ly + 5 + i * 4;
+    doc.setDrawColor(...r.color);
+    doc.setLineWidth(0.8);
+    doc.line(lx + 2, y - 1, lx + 7, y - 1);
+    doc.setTextColor(...r.color);
+    doc.text(doc.splitTextToSize(runLabel(r.d), lw - 11)[0], lx + 9, y);
+  });
+  doc.setTextColor(...COL.text);
+  doc.setFontSize(6.5);
+  doc.text("durchgezogen = Motorleistung, gestrichelt = Motordrehmoment", lx + 2, ly + lh - 1.5);
+
+  /* --- Spitzenwerte je Lauf --- */
+  const tableY = plot.y + plot.h + 11;
+  const tblX = M, tblW = W - 2 * M;
+  const cols: Array<{ title: string; w: number }> = [
+    { title: "Lauf", w: 0.34 },
+    { title: "P-Motor", w: 0.13 },
+    { title: "@ U/min", w: 0.11 },
+    { title: "M-Motor", w: 0.13 },
+    { title: "@ U/min", w: 0.11 },
+    { title: "v max", w: 0.09 },
+    { title: "Dauer", w: 0.09 },
+  ];
+  const colX: number[] = [];
+  { let cx = tblX; for (const c of cols) { colX.push(cx); cx += tblW * c.w; } }
+
+  doc.setFont("helvetica", "italic");
+  doc.setFontSize(9);
+  doc.text("Vergleich – Spitzenwerte", tblX, tableY - 2);
+  doc.setFont("helvetica", "normal");
+
+  const rowH = 5.2;
+  const tblH = rowH * (perRun.length + 1);
+  doc.setDrawColor(...COL.axis);
+  doc.setLineWidth(0.3);
+  doc.rect(tblX, tableY, tblW, tblH);
+  doc.setFontSize(7.5);
+  doc.setFont("helvetica", "bold");
+  cols.forEach((c, i) => doc.text(c.title, colX[i] + 2, tableY + 3.6));
+  doc.setFont("helvetica", "normal");
+  doc.setLineWidth(0.15);
+  doc.line(tblX, tableY + rowH, tblX + tblW, tableY + rowH);
+
+  perRun.forEach((r, i) => {
+    const y = tableY + rowH * (i + 2) - 1.4;
+    doc.setFillColor(...r.color);
+    doc.circle(colX[0] + 1.2, y - 1, 1, "F");
+    doc.setTextColor(...COL.text);
+    doc.text(doc.splitTextToSize(runLabel(r.d), colX[1] - colX[0] - 5)[0], colX[0] + 4, y);
+    doc.text(`${de(r.p.pEngine)} PS`, colX[1] + 2, y);
+    doc.text(de(r.p.pERpm, 0), colX[2] + 2, y);
+    doc.text(`${de(r.p.nm)} Nm`, colX[3] + 2, y);
+    doc.text(de(r.p.nmRpm, 0), colX[4] + 2, y);
+    doc.text(Number.isFinite(r.p.vMax) ? `${de(r.p.vMax, 0)} km/h` : "—", colX[5] + 2, y);
+    doc.text(Number.isFinite(r.dur) ? `${de(r.dur, 2)} s` : "—", colX[6] + 2, y);
+    if (i < perRun.length - 1) {
+      doc.setDrawColor(...COL.line);
+      doc.setLineWidth(0.1);
+      doc.line(tblX, tableY + rowH * (i + 2), tblX + tblW, tableY + rowH * (i + 2));
+    }
+  });
+
+  /* --- Fußzeile --- */
+  const vehicleNames = [...new Set(runs.map((r) => r.vehicle.name))].join(", ");
+  const fy = tableY + tblH + 8;
+  doc.setDrawColor(...COL.line);
+  doc.setLineWidth(0.2);
+  doc.line(M, fy - 3, W - M, fy - 3);
+  doc.setFontSize(8);
+  doc.text(`Fahrzeug-Typ: ${info.vehicleType || vehicleNames}`, M, fy);
+  doc.text(`Kennzeichen: ${info.plate || "—"}`, M + 70, fy);
+  doc.text(`Prüfer: ${info.tester || "—"}`, M + 130, fy);
+  if (info.customer) doc.text(`Kunde: ${info.customer}`, M + 180, fy);
+  doc.setFontSize(6.5);
+  doc.setTextColor(90, 90, 90);
+  doc.text(
+    "GPS-basierte Messung (kein Rollenprüfstand). Motorleistung/-drehmoment sind Schätzungen; bei aktiver Normkorrektur "
+    + "wird jeder Lauf mit dem Korrekturfaktor seiner eigenen Umgebungsdaten umgerechnet. Einzelseiten je Lauf mit allen "
+    + "Werten und Kurven (inkl. Rad-/Schleppleistung) folgen nach dieser Seite.",
+    M, H - M, { maxWidth: W - 2 * M },
+  );
+}
+
+export function buildRunPdf(
+  runs: RunPdfData[],
+  info: PdfHeaderInfo,
+  standard: CorrectionStandard = "none",
+  opts: { comparePage?: boolean } = {},
+): jsPDF {
   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
-  runs.forEach((r, i) => {
-    if (i > 0) doc.addPage();
+  let firstPage = true;
+  if (opts.comparePage && runs.length >= 2) {
+    drawComparePage(doc, runs, info, standard);
+    firstPage = false;
+  }
+  runs.forEach((r) => {
+    if (!firstPage) doc.addPage();
+    firstPage = false;
     drawPage(doc, r, info, standard);
   });
   return doc;
 }
 
-export function exportRunPdf(runs: RunPdfData[], info: PdfHeaderInfo, standard: CorrectionStandard = "none") {
+export function exportRunPdf(
+  runs: RunPdfData[],
+  info: PdfHeaderInfo,
+  standard: CorrectionStandard = "none",
+  opts: { comparePage?: boolean } = {},
+) {
   if (runs.length === 0) return;
-  const doc = buildRunPdf(runs, info, standard);
+  const doc = buildRunPdf(runs, info, standard, opts);
   const first = runs[0];
   const safe = (s: string) => s.replace(/[^\w\-]+/g, "_");
   const name = runs.length === 1
